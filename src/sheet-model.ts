@@ -69,7 +69,8 @@ export function calculate(row:SheetRow,units:CatalogRow[],presentations:CatalogR
  }).sort((a,b)=>[b.effective_on,b.created_at,b.id].join('|').localeCompare([a.effective_on,a.created_at,a.id].join('|')));
  const previous=candidates[0];let previousUnit:number|null=previous?.normalized??null;
  const legacyAmount=legacyImport&&row.importedPrevious!==undefined?parseNumber(row.importedPrevious):row.legacyAmount??null;
- const legacyBasis=legacyImport&&row.importedPrevious!==undefined?basis:row.legacyBasis;
+ const inheritedComparable=!own||(own.currency===row.currency&&ownPresentation?.unit_id===unit?.id&&Number(ownPresentation?.quantity)===qty&&!!date&&date>=own.effective_on);
+ const legacyBasis=legacyImport&&row.importedPrevious!==undefined?basis:inheritedComparable?row.legacyBasis:'unknown';
  if(previousUnit===null&&legacyAmount!==null){if(legacyBasis==='unit')previousUnit=legacyAmount;else if(legacyBasis==='presentation'&&qty)previousUnit=legacyAmount/qty}
  return {current,previousUnit,variation:current!==null&&previousUnit!==null?current-previousUnit:null,previousDisplay:previousUnit??legacyAmount,previousSupplier:previous?.supplier||(legacyImport?row.importedSupplier:row.legacySupplier)||'—',previousDate:previous?.effective_on||null,unknown:!previous&&legacyAmount!==null&&previousUnit===null};
 }

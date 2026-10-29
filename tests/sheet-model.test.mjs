@@ -31,3 +31,9 @@ test('editing only a comment does not compare the current quotation against itse
  assert.equal(calculate(row,units,presentations,materials,suppliers,history,false,'unknown').previousUnit,.1);
  row.cells[7]='70';assert.equal(calculate(row,units,presentations,materials,suppliers,history,false,'unknown').previousUnit,.12);
 });
+test('inherited Excel references do not cross currencies or apply to a backdated different package',()=>{
+ const row=blankRow();row.id='p2';row.materialId='m1';row.priceId='h2';row.legacyAmount=50;row.legacyBasis='presentation';row.currency='USD';row.cells=['Proveedor B','','Aceite coco','','500','g','','60','','','','','2026-07-03'];
+ const history=[{id:'h2',presentation_id:'p2',amount:60,currency:'GTQ',effective_on:'2026-07-03',created_at:'2026-07-03T12:00:00Z'}];
+ assert.equal(calculate(row,units,presentations,materials,suppliers,history,false,'unknown').variation,null);
+ row.currency='GTQ';row.cells[4]='1000';row.cells[12]='2026-07-01';assert.equal(calculate(row,units,presentations,materials,suppliers,history,false,'unknown').variation,null);
+});
