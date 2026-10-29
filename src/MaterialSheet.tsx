@@ -1,0 +1,104 @@
+import {useEffect,useMemo,useRef,useState} from 'react';
+import type {ClipboardEvent,KeyboardEvent} from 'react';
+import {supabase as db} from './client';
+import {columns,manualColumns,blankRow,parseTSV,formatTSV,parseNumber,parseDate,normalize,findUnit,validateRow,calculate} from './sheet-model';
+import type {SheetRow,CatalogRow} from './sheet-model';
+import './sheet.css';
+import {readSheet} from './sheet-repository';
+import type {SheetSnapshot} from './sheet-repository';
+type Props={company:string;canWrite:boolean;catalog:{units:CatalogRow[];suppliers:CatalogRow[];raw_materials:CatalogRow[];presentations:CatalogRow[]};onSaved:()=>Promise<void>;onDirty:(dirty:boolean)=>void;readSnapshot?:(company:string)=>Promise<SheetSnapshot>};
+type Point={row:number;col:number};
+const numeric=(value:number|null)=>value===null?'—':new Intl.NumberFormat('es-GT',{maximumFractionDigits:6}).format(value);
+export default function MaterialSheet({company,canWrite,catalog,onSaved,onDirty,readSnapshot=readSheet}:Props){
+ const [rows,setRows]=useState<SheetRow[]>([]),[history,setHistory]=useState<CatalogRow[]>([]),[loading,setLoading]=useState(true),[error,setError]=useState(''),[notice,setNotice]=useState(''),[busy,setBusy]=useState(false),[preview,setPreview]=useState(false),[legacyImport,setLegacyImport]=useState(false),[basis,setBasis]=useState('unknown');
+ const [anchor,setAnchor]=useState<Point>({row:0,col:0}),[end,setEnd]=useState<Point>({row:0,col:0});
+ const modal=useRef<HTMLElement>(null);
+ const [filter,setFilter]=useState('');const table=useRef<HTMLDivElement>(null),dragging=useRef(false),moving=useRef(false),batch=useRef<{id:string;payload:string}|null>(null);
+ const {units,suppliers,raw_materials:materials,presentations}=catalog;
+ const selected={r0:Math.min(anchor.row,end.row),r1:Math.max(anchor.row,end.row),c0:Math.min(anchor.col,end.col),c1:Math.max(anchor.col,end.col)};
+ async function load(){setLoading(true);setError('');try{
+  const {sheet,history:all}=await readSnapshot(company);
+  setHistory(all);setRows(sheet.map(r=>({key:r.id,id:r.id,materialId:r.raw_material_id,priceId:r.price_id||undefined,currency:r.currency||'GTQ',dirty:false,mode:'update',legacyAmount:r.legacy_previous_amount,legacySupplier:r.legacy_previous_supplier,legacyBasis:r.legacy_previous_basis,cells:[r.supplier_name,r.alternative_name,r.material_name,r.capacity,String(r.quantity),r.unit_symbol,r.comment,r.amount===null?'':String(r.amount),'','','','',r.effective_on||new Date().toLocaleDateString('en-CA')]})));
+ }catch(e:any){setError(e.message)}finally{setLoading(false)}}
+ useEffect(()=>{void load()},[company]);
+ useEffect(()=>{const up=()=>{dragging.current=false};window.addEventListener('pointerup',up);window.addEventListener('pointercancel',up);return()=>{window.removeEventListener('pointerup',up);window.removeEventListener('pointercancel',up)}},[]);
+ useEffect(()=>{const leave=(e:BeforeUnloadEvent)=>{if(rows.some(r=>r.dirty)){e.preventDefault();e.returnValue=''}};window.addEventListener('beforeunload',leave);return()=>window.removeEventListener('beforeunload',leave)},[rows]);
+ useEffect(()=>{if(preview)modal.current?.focus()},[preview]);
+ const dirty=rows.filter(r=>r.dirty);
+ useEffect(()=>{onDirty(dirty.length>0);return()=>onDirty(false)},[dirty.length,onDirty]);
+ const materialIds=useMemo(()=>new Map(materials.map(m=>[normalize(m.name),m.id])),[materials]);
+ function computeResult(r:SheetRow){
+  const materialKey=(row:SheetRow)=>row.materialId||materialIds.get(normalize(row.cells[2]))||'draft-material:'+normalize(row.cells[2]);
+  const extraMaterials:CatalogRow[]=[...materials];if(!extraMaterials.some(m=>m.id===materialKey(r)))extraMaterials.push({id:materialKey(r),name:r.cells[2]});
+  const extraPresentations:CatalogRow[]=[...presentations],extraSuppliers:CatalogRow[]=[...suppliers],extraHistory:CatalogRow[]=[...history];
+  const date=parseDate(r.cells[12]),currentIndex=rows.indexOf(r);
+  rows.forEach((other,index)=>{
+   if(other===r||!other.dirty||materialKey(other)!==materialKey(r))return;
+   const previousDate=parseDate(other.cells[12]),unit=findUnit(other.cells[5],units),quantity=parseNumber(other.cells[4]),amount=parseNumber(other.cells[7]);
+   if(!date||!previousDate||previousDate>date||(previousDate===date&&index>=currentIndex)||!unit||!quantity||amount===null)return;
+   const old=history.find(h=>h.id===other.priceId),pack=presentations.find(p=>p.id===other.id),supplier=suppliers.find(s=>normalize(s.name)===normalize(other.cells[0]));
+   if(old&&Number(old.amount)===amount&&old.effective_on===previousDate&&Number(pack?.quantity)===quantity&&pack?.unit_id===unit.id&&pack?.supplier_id===supplier?.id)return;
+   const id='draft:'+other.key,sid=supplier?.id||id;
+   extraPresentations.push({id,raw_material_id:materialKey(other),supplier_id:sid,unit_id:unit.id,quantity});
+   if(!extraSuppliers.some(s=>s.id===sid))extraSuppliers.push({id:sid,name:other.cells[0]});
+   extraHistory.push({id,presentation_id:id,amount,currency:other.currency,effective_on:previousDate,created_at:new Date(Date.now()+index).toISOString()});
+  });
+  return calculate({...r,materialId:materialKey(r)},units,extraPresentations,extraMaterials,extraSuppliers,extraHistory,legacyImport,basis)
+ }
+ const calculations=useMemo(()=>new Map(rows.map(r=>[r.key,computeResult(r)])),[rows,units,presentations,materials,suppliers,history,legacyImport,basis]);
+ function result(r:SheetRow){return calculations.get(r.key)!}
+ function value(r:SheetRow,c:number){const calc=result(r);if(c===8)return numeric(calc.current);if(c===9)return numeric(calc.variation);if(c===10)return numeric(calc.previousDisplay)+(calc.unknown?' *':'');if(c===11)return calc.previousSupplier;return r.cells[c]}
+ function editable(c:number){return canWrite&&(manualColumns.includes(c)||(legacyImport&&(c===10||c===11)))}
+ function change(index:number,col:number,value:string){setRows(old=>old.map((r,i)=>{if(i!==index)return r;const next={...r,cells:[...r.cells],dirty:true,duplicateChoice:undefined};next.cells[col]=value;if(col===10)next.importedPrevious=value;if(col===11)next.importedSupplier=value;if(col===7&&/^(USD|\$)/i.test(value.trim()))next.currency='USD';else if(col===7&&/^Q/i.test(value.trim()))next.currency='GTQ';return next}));setNotice('Cambios pendientes. Revisa el lote antes de guardar.')}
+ function focus(p:Point){setEnd(p);moving.current=true;table.current?.querySelector<HTMLElement>(`[data-row="${p.row}"][data-col="${p.col}"]`)?.focus();moving.current=false}
+ function select(p:Point,extend=false){if(!extend)setAnchor(p);setEnd(p)}
+ function paste(e:ClipboardEvent){if(!canWrite)return;e.preventDefault();setError('');setFilter('');try{
+  let matrix=parseTSV(e.clipboardData.getData('text/plain'));if(!matrix.length)return;
+  if(normalize(matrix[0][0])==='proveedor'&&normalize(matrix[0][2]||'')==='mp')matrix=matrix.slice(1);
+  if(!matrix.length)return;
+  if(matrix.length>500||matrix.some(r=>r.length>13))throw Error('Pega como máximo 500 filas y 13 columnas por lote.');
+  const start={row:selected.r0,col:selected.c0};if(start.col+Math.max(...matrix.map(r=>r.length))>13)throw Error('El rango pegado supera las 13 columnas. Selecciona la primera columna o un rango menor.');
+  const importing=start.col===0&&matrix.some(r=>r.length>=12&&(r[10]?.trim()||r[11]?.trim()));
+  if(importing)setLegacyImport(true);
+  setRows(old=>{const next=old.map(r=>({...r,cells:[...r.cells]}));while(next.length<start.row+matrix.length)next.push(blankRow());
+   matrix.forEach((line,ri)=>line.forEach((text,ci)=>{const col=start.col+ci,row=next[start.row+ri];if(manualColumns.includes(col)||(col===10||col===11)&&(legacyImport||importing)){
+    row.cells[col]=text;row.dirty=true;row.duplicateChoice=undefined;if(col===7&&/^(USD|\$)/i.test(text.trim()))row.currency='USD';else if(col===7&&/^Q/i.test(text.trim()))row.currency='GTQ';if(col===10)row.importedPrevious=text;if(col===11)row.importedSupplier=text;
+   }}));return next});
+  setAnchor(start);setEnd({row:start.row+matrix.length-1,col:start.col+Math.max(...matrix.map(r=>r.length))-1});
+  setNotice(`${matrix.length} fila(s) pegadas. PRECIO UN y VS se recalculan; los valores copiados en esas columnas se ignoran. Revisa antes de guardar.`);
+ }catch(e:any){setError(e.message)}}
+ function copy(e:ClipboardEvent){const matrix=rows.slice(selected.r0,selected.r1+1).map(r=>columns.slice(selected.c0,selected.c1+1).map((_,i)=>value(r,selected.c0+i).replace(/ \*$/,'')));if(!matrix.length)return;e.preventDefault();e.clipboardData.setData('text/plain',formatTSV(matrix))}
+ function key(e:KeyboardEvent){const arrows:Record<string,Point>={ArrowUp:{row:-1,col:0},ArrowDown:{row:1,col:0},ArrowLeft:{row:0,col:-1},ArrowRight:{row:0,col:1},Enter:{row:1,col:0},Tab:{row:0,col:e.shiftKey?-1:1}};
+  if(e.key==='Escape'){setAnchor(end);return}if(e.key==='Delete'&&e.shiftKey&&canWrite){e.preventDefault();setRows(old=>old.map((r,ri)=>{if(ri<selected.r0||ri>selected.r1)return r;const next={...r,cells:[...r.cells],dirty:true};for(let c=selected.c0;c<=selected.c1;c++)if(editable(c)){next.cells[c]='';if(c===10)next.importedPrevious='';if(c===11)next.importedSupplier=''}return next}));return}
+  const move=arrows[e.key];if(!move)return;
+  if(!e.shiftKey&&!['Enter','Tab','ArrowUp','ArrowDown'].includes(e.key))return;
+  e.preventDefault();const p={row:Math.max(0,Math.min(rows.length-1,end.row+move.row)),col:Math.max(0,Math.min(12,end.col+move.col))};if(!e.shiftKey||e.key==='Tab')setAnchor(p);focus(p);
+ }
+ function matches(r:SheetRow){const u=findUnit(r.cells[5],units);return presentations.filter(p=>p.active&&p.raw_material_id===(r.materialId||materials.find(m=>normalize(m.name)===normalize(r.cells[2]))?.id)&&p.supplier_id===suppliers.find(s=>normalize(s.name)===normalize(r.cells[0]))?.id&&p.unit_id===u?.id&&Number(p.quantity)===parseNumber(r.cells[4])&&normalize(p.capacity||'')===normalize(r.cells[3]))}
+ function duplicate(r:SheetRow){return !r.id&&(matches(r).length>0||rows.some(other=>other.key!==r.key&&[0,2,3].every(c=>normalize(other.cells[c])===normalize(r.cells[c]))&&parseNumber(other.cells[4])===parseNumber(r.cells[4])&&findUnit(other.cells[5],units)?.id===findUnit(r.cells[5],units)?.id))}
+ const rowLimitError=dirty.length>500;
+ const errors=dirty.flatMap(r=>validateRow(r,units,suppliers,materials).map(message=>({key:r.key,message,row:rows.indexOf(r)+1})));
+ const duplicateMissing=dirty.some(r=>duplicate(r)&&!r.duplicateChoice);
+ async function save(){setBusy(true);setError('');try{
+  const payload=dirty.map(r=>({id:r.id||'',expectedPriceId:r.priceId||null,mode:r.mode,confirmedDuplicate:r.duplicateChoice||false,supplier:r.cells[0].trim(),alternative:r.cells[1].trim(),material:r.cells[2].trim(),capacity:r.cells[3].trim(),quantity:parseNumber(r.cells[4]),unit:r.cells[5].trim(),comment:r.cells[6],price:parseNumber(r.cells[7]),date:parseDate(r.cells[12]),currency:r.currency,previous:legacyImport&&r.importedPrevious!==undefined?parseNumber(r.importedPrevious):r.legacyAmount??null,previousSupplier:legacyImport&&r.importedSupplier!==undefined?r.importedSupplier:r.legacySupplier??'',previousBasis:legacyImport&&r.importedPrevious!==undefined?basis:r.legacyBasis||'unknown'}));
+  const encoded=JSON.stringify(payload);if(!batch.current||batch.current.payload!==encoded)batch.current={id:crypto.randomUUID(),payload:encoded};
+  const {error}=await db.rpc('save_material_sheet',{p_company:company,p_batch:batch.current.id,p_rows:payload});if(error)throw error;
+  setRows(old=>old.map(r=>({...r,dirty:false})));setPreview(false);await onSaved();await load();batch.current=null;setNotice(`${dirty.length} fila(s) guardadas. El historial anterior se conservó.`);
+ }catch(e:any){setError(e.message)}finally{setBusy(false)}}
+ async function copyAll(){try{await navigator.clipboard.writeText(formatTSV([columns,...rows.map(r=>columns.map((_,c)=>value(r,c).replace(/ \*$/,'')))]));setNotice('Tabla copiada con encabezados. Puedes pegarla en Excel.')}catch{setError('Selecciona un rango en la tabla y pulsa Ctrl+C para copiar.')}}
+ function add(){const index=rows.length;setRows(old=>[...old,blankRow()]);setFilter('');setAnchor({row:index,col:0});setEnd({row:index,col:0});setTimeout(()=>focus({row:index,col:0}),0)}
+ return <section className="sheet-panel"><div className="sheet-heading"><div><h2>Materias primas · hoja de trabajo</h2><p>Una fila por presentación. Selecciona una celda y pega desde Excel. Arrastra o usa Mayús + clic para seleccionar un rango.</p></div><button className="secondary" onClick={()=>void copyAll()}>Copiar tabla</button></div>
+ <div className="sheet-controls"><input aria-label="Buscar en la hoja" placeholder="Buscar materia prima o proveedor…" value={filter} onChange={e=>setFilter(e.target.value)}/>{canWrite&&<><button className="secondary" onClick={add}>+ Fila nueva</button><button disabled={!dirty.length||busy} onClick={()=>{setPreview(true);setError('')}}>Revisar {dirty.length||''} cambios</button><button className="secondary" disabled={!dirty.length||busy} onClick={()=>{if(!window.confirm('¿Descartar todos los cambios sin guardar de la hoja?'))return;setPreview(false);void load();setNotice('Cambios sin guardar descartados.')}}>Descartar cambios</button></>}</div>
+ {canWrite&&<div className="sheet-migration"><label><input type="checkbox" checked={legacyImport} onChange={e=>setLegacyImport(e.target.checked)}/> Importación inicial: conservar precio y proveedor anteriores de Excel</label>{legacyImport&&<label>Interpretación del precio anterior<select aria-label="Interpretación del precio anterior" value={basis} onChange={e=>setBasis(e.target.value)}><option value="unknown">Sin unidad conocida: conservar referencia, sin VS</option><option value="unit">Precio por la misma unidad de esta fila</option><option value="presentation">Precio total de la misma cantidad y unidad de esta fila</option></select></label>}</div>}
+ <p className="sheet-legend"><span>Editable</span><span>▧ Calculado / solo lectura</span> CAPACIDAD es informativa. PRECIO UN = precio ÷ presentación. VS se expresa en la unidad de la fila y la misma moneda. <b>* Referencia histórica sin unidad o fecha conocida.</b></p>
+ {notice&&<p role="status" className="sheet-notice">{notice}</p>}{error&&<p role="alert" className="error">{error}</p>}
+ {loading?<p role="status">Cargando hoja…</p>:<div ref={table} className="sheet-scroll" onPaste={paste} onCopy={copy} onKeyDown={key}><table className="sheet-table" aria-label="Hoja de materias primas"><thead><tr><th>#</th>{columns.map((col,c)=><th key={col} scope="col">{col}<small>{manualColumns.includes(c)?'Manual':c===10||c===11?'Historial / importación':'Automático'}</small></th>)}</tr></thead><tbody>{rows.map((r,ri)=>{
+  if(filter&&!r.cells.some(c=>normalize(c).includes(normalize(filter))))return null;
+  const rowErrors=validateRow(r,units,suppliers,materials);return <tr key={r.key} className={r.dirty?'pending':''}><th scope="row"><span>{ri+1}{r.dirty?' •':''}</span>{!r.id&&canWrite&&<button aria-label={`Quitar fila nueva ${ri+1}`} className="remove-row" onClick={()=>setRows(old=>old.filter(row=>row.key!==r.key))}>×</button>}</th>{columns.map((col,ci)=>{const chosen=ri>=selected.r0&&ri<=selected.r1&&ci>=selected.c0&&ci<=selected.c1;const isEditable=editable(ci);const shown=(ci===10&&legacyImport)?r.importedPrevious??(r.legacyAmount==null?'':String(r.legacyAmount)):(ci===11&&legacyImport)?r.importedSupplier??r.legacySupplier??'':value(r,ci);return <td key={col} className={`${chosen?'cell-selected ':''}${isEditable?'':'cell-auto'}`} title={rowErrors.length&&r.dirty?rowErrors.join(' · '):ci===10?'El historial se compara por unidad; referencias importadas sin fecha conocida se conservan sin inventar fechas.':col} onPointerDown={e=>{dragging.current=true;select({row:ri,col:ci},e.shiftKey);if(e.shiftKey)e.preventDefault()}} onPointerEnter={()=>{if(dragging.current)setEnd({row:ri,col:ci})}}>{isEditable?<input data-row={ri} data-col={ci} aria-label={`Fila ${ri+1} ${col}`} value={shown} list={ci===0?'sheet-suppliers':ci===5?'sheet-units':undefined} inputMode={[4,7,10].includes(ci)?'decimal':undefined} disabled={busy} onFocus={()=>{if(!dragging.current&&!moving.current)select({row:ri,col:ci})}} onChange={e=>change(ri,ci,e.target.value)}/>:<span tabIndex={0} data-row={ri} data-col={ci} aria-label={`Fila ${ri+1} ${col}`} onFocus={()=>{if(!dragging.current&&!moving.current)select({row:ri,col:ci})}}>{shown||'—'}</span>}</td>})}</tr>})}</tbody></table></div>}
+ {!loading&&!rows.length&&<div className="empty"><h2>Tu hoja está lista</h2><p>Agrega una fila, selecciona PROVEEDOR y pega tus filas de Excel.</p>{canWrite&&<button onClick={add}>+ Primera fila</button>}</div>}
+ <datalist id="sheet-suppliers">{suppliers.filter(s=>s.active).map(s=><option key={s.id} value={s.name}/>)}</datalist><datalist id="sheet-units">{units.filter(u=>u.active).map(u=><option key={u.id} value={u.symbol}>{u.name}</option>)}</datalist>
+ <p className="muted sheet-footnote">{rows.length} filas · {dirty.length} pendientes · Pega hasta 500 filas por lote · Mayús + Supr vacía el rango editable. Los cambios no se guardan hasta confirmar. Guarda antes de cambiar de sección o empresa.</p>
+ {preview&&<div className="overlay"><section ref={modal} tabIndex={-1} onKeyDown={e=>{if(e.key==='Escape'&&!busy){setPreview(false);return}if(e.key==='Tab'){const controls=Array.from(modal.current?.querySelectorAll<HTMLElement>('button:not(:disabled),select:not(:disabled),input:not(:disabled)')||[]);const first=controls[0],last=controls[controls.length-1];if(e.shiftKey&&(document.activeElement===first||document.activeElement===modal.current)){e.preventDefault();last?.focus()}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first?.focus()}}}} className="modal sheet-preview" role="dialog" aria-modal="true" aria-label="Vista previa de cambios"><button className="close" aria-label="Cerrar vista previa" disabled={busy} onClick={()=>setPreview(false)}>×</button><p className="eyebrow">REVISAR ANTES DE GUARDAR</p><h2>{dirty.length} filas pendientes</h2><p>Se guardan juntas. Cualquier error cancela el lote completo. Los precios anteriores se conservan como historial. Una fecha futura se guarda como cotización programada; será vigente desde esa fecha. Nombre y nombre alternativo pertenecen a la materia prima y se comparten entre sus presentaciones.</p>{rowLimitError&&<p role="alert" className="error">Guarda como máximo 500 filas por lote.</p>}{errors.length>0&&<div role="alert" className="error">{errors.map((e,i)=><p key={i}>Fila {e.row}: {e.message}</p>)}<p>Cierra esta vista y corrige las celdas indicadas.</p></div>}
+ <div className="sheet-preview-list">{dirty.map(r=>{const calc=result(r),isDuplicate=duplicate(r),newSupplier=!suppliers.some(s=>normalize(s.name)===normalize(r.cells[0]));return <article key={r.key}><strong>Fila {rows.indexOf(r)+1}: {r.cells[2]||'Sin nombre'}</strong><p>{r.cells[0]||'Sin proveedor'}{newSupplier?' · Se creará este proveedor':''} · {r.cells[4]} {r.cells[5]} · {r.currency} {r.cells[7]} · {parseDate(r.cells[12])||'Fecha inválida'}</p><p>Precio UN: {numeric(calc.current)} · VS: {numeric(calc.variation)}{calc.unknown?' · Antecedente sin unidad conocida, no comparable':''}</p>{r.importedPrevious&&legacyImport&&<p>Antecedente importado: {r.importedPrevious} · {r.importedSupplier||'Proveedor no indicado'} · Fecha desconocida</p>}{isDuplicate&&<label>Posible duplicado: elige cómo guardar<select aria-label={`Duplicado fila ${rows.indexOf(r)+1}`} value={r.duplicateChoice?r.mode:''} onChange={e=>setRows(old=>old.map(item=>item.key===r.key?{...item,mode:e.target.value as 'add'|'update',duplicateChoice:!!e.target.value}:item))}><option value="">Seleccionar…</option><option value="update">Actualizar coincidencia y añadir precio al historial</option><option value="add">Agregar otra presentación intencionalmente</option></select></label>}{r.id&&<p className="muted">Actualizar fila existente. Si cambia el proveedor o contenido, se conserva la presentación anterior archivada.</p>}</article>})}</div>{error&&<p className="error" role="alert">{error}</p>}<button disabled={busy||rowLimitError||!!errors.length||duplicateMissing||!dirty.length} onClick={()=>void save()}>{busy?'Guardando lote…':`Confirmar y guardar ${dirty.length} filas`}</button></section></div>}
+ </section>
+}

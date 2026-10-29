@@ -1,1 +1,24 @@
-{"name":"ohana-app","version":"0.1.0","private":true,"type":"module","scripts":{"dev":"vite --host 127.0.0.1","build":"tsc --noEmit && vite build","preview":"vite preview"},"dependencies":{"@supabase/supabase-js":"2.118.0","react":"19.2.8","react-dom":"19.2.8"},"devDependencies":{"@types/react":"19.2.18","@types/react-dom":"19.2.7","@vitejs/plugin-react":"6.1.1","typescript":"6.0.2","vite":"8.3.5"}}
+{
+  "name": "ohana-app",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "test": "node --experimental-strip-types --test tests/*.test.mjs"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "2.118.0",
+    "react": "19.2.8",
+    "react-dom": "19.2.8"
+  },
+  "devDependencies": {
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.7",
+    "@vitejs/plugin-react": "6.1.1",
+    "typescript": "6.0.2",
+    "vite": "8.3.5"
+  }
+}

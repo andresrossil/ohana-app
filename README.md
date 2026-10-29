@@ -2,6 +2,8 @@
 
 Catálogo privado de materias primas, proveedores, presentaciones, enlaces de compra, unidades configurables y precios históricos. Diseño original Ohana, en español, adaptable a computadora y celular.
 
+Incluye una [hoja editable con pegado desde Excel](docs/hoja-materias-primas.md), selección y copia de rangos, importación histórica y confirmación de lotes de hasta 500 filas. Se conserva la vista clásica del catálogo.
+
 Repositorio principal: https://github.com/andresrossil/ohana-app
 
 Aplicación: https://andresrossil.github.io/ohana-app/
