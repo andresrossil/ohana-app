@@ -8,7 +8,7 @@ import {
   comparison,
   classifications,
   manualColumns,
-  blankRow,
+  blankRow as coreBlankRow,
   parseTSV,
   formatTSV,
   parseNumber,
@@ -37,6 +37,7 @@ import { readSheet } from "./sheet-repository";
 import type { SheetSnapshot } from "./sheet-repository";
 type Props = {
   company: string;
+  currency?: string;
   canWrite: boolean;
   catalog: {
     units: CatalogRow[];
@@ -106,6 +107,7 @@ function VsIcon({ variation }: { variation: number | null }) {
 }
 export default function MaterialSheet({
   company,
+  currency = "GTQ",
   canWrite,
   catalog,
   onSaved,
@@ -124,6 +126,7 @@ export default function MaterialSheet({
     return data;
   },
 }: Props) {
+  const blankRow = () => ({ ...coreBlankRow(), currency });
   const importing = mode === "import";
   const [rows, setRows] = useState<SheetRow[]>([]),
     [history, setHistory] = useState<CatalogRow[]>([]),
@@ -176,7 +179,7 @@ export default function MaterialSheet({
               id: r.id,
               materialId: r.raw_material_id,
               priceId: r.price_id || undefined,
-              currency: r.currency || "GTQ",
+              currency: r.currency || currency,
               dirty: false,
               mode: "update",
               legacyAmount: r.legacy_previous_amount,

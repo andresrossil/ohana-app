@@ -1,3 +1,5 @@
+import Inventory from "./Inventory";
+import Production from "./Production";
 import React, { Suspense, lazy, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import type { Session } from "@supabase/supabase-js";
@@ -114,6 +116,8 @@ function App() {
       setData(emptyCatalog);
       setPrices([]);
       setRole("viewer");
+      setSection("dashboard");
+      setConfigView("profile");
       setPickerCorp("");
       setEdit(undefined);
       setHistory(null);
@@ -272,6 +276,9 @@ function App() {
     if (tab === "units") payload.base_factor = Number(payload.base_factor);
     if (tab === "presentations") {
       payload.quantity = Number(payload.quantity);
+      payload.sku = f.get("sku") || null;
+      payload.barcode = f.get("barcode") || null;
+      payload.barcode_custom = f.has("barcode_custom");
       if (!payload.supplier_id) payload.supplier_id = null;
     }
     if (edit?.id) payload.active = f.get("active") === "true";
@@ -513,6 +520,8 @@ function App() {
           if (next === section) return true;
           if (!leaveSheet()) return false;
           setSection(next);
+          if (next === "settings" && !activeCompany?.manage)
+            setConfigView("origins");
           if (next === "materials") setTab("raw_materials");
           if (
             next === "settings" &&
@@ -695,11 +704,15 @@ function App() {
                   </div>
                 </section>
                 <div className="form-actions">
-                  <button onClick={() => setSection("materials")}>
+                  <button
+                    disabled={!activeCompany?.catalog_read}
+                    onClick={() => setSection("materials")}
+                  >
                     Abrir materiales
                   </button>
                   <button
                     className="secondary"
+                    disabled={!activeCompany?.catalog_read}
                     onClick={() => setSection("products")}
                   >
                     Abrir productos
@@ -708,7 +721,9 @@ function App() {
                     className="secondary"
                     onClick={() => {
                       setSection("settings");
-                      setConfigView("profile");
+                      setConfigView(
+                        activeCompany?.manage ? "profile" : "origins",
+                      );
                     }}
                   >
                     Configurar empresa
@@ -728,7 +743,23 @@ function App() {
                 onBarcode={setBarcode}
               />
             )}
-            {(section === "inventory" || section === "reports") && (
+            {(section === "inventory" || section === "purchases") && (
+              <Inventory
+                key={company + section}
+                company={company}
+                currency={activeCompany?.currency}
+                purchases={section === "purchases"}
+              />
+            )}
+            {(section === "formulas" || section === "production") && (
+              <Production
+                key={company + section}
+                company={company}
+                formulasOnly={section === "formulas"}
+                manager={activeCompany?.manage}
+              />
+            )}
+            {section === "reports" && (
               <CatalogOverview
                 key={company + section}
                 materials={data.raw_materials}
@@ -743,6 +774,9 @@ function App() {
               "products",
               "settings",
               "inventory",
+              "purchases",
+              "formulas",
+              "production",
               "reports",
             ].includes(section) && (
               <section className="empty module-pending">
@@ -844,6 +878,7 @@ function App() {
                 )}
                 {tab === "raw_materials" && sheetView ? (
                   <MaterialSheet
+                    currency={activeCompany?.currency}
                     key={company}
                     company={company}
                     canWrite={canWrite}
@@ -903,6 +938,12 @@ function App() {
                                   <th>Código de barras</th>
                                 </>
                               )}
+                              {tab === "presentations" && (
+                                <>
+                                  <th>SKU</th>
+                                  <th>Código de barras</th>
+                                </>
+                              )}
                               <th>Nombre</th>
                               <th>
                                 {tab === "raw_materials"
@@ -938,8 +979,17 @@ function App() {
                                       <td>{r.barcode || "—"}</td>
                                     </>
                                   )}
+                                  {tab === "presentations" && (
+                                    <>
+                                      <td>{r.sku || "Pendiente"}</td>
+                                      <td>{r.barcode || "—"}</td>
+                                    </>
+                                  )}
                                   <td>
                                     <strong>{r.name}</strong>
+                                    {tab === "presentations" && (
+                                      <small>{r.alternative_name}</small>
+                                    )}
                                     <small>
                                       {tab === "presentations"
                                         ? name(
@@ -1008,11 +1058,13 @@ function App() {
                                         Editar
                                       </button>
                                     )}
-                                    {tab === "raw_materials" && r.barcode && (
-                                      <button onClick={() => setBarcode(r)}>
-                                        Código de barras
-                                      </button>
-                                    )}
+                                    {(tab === "raw_materials" ||
+                                      tab === "presentations") &&
+                                      r.barcode && (
+                                        <button onClick={() => setBarcode(r)}>
+                                          Código de barras
+                                        </button>
+                                      )}
                                     {tab === "presentations" && (
                                       <button
                                         onClick={() => void showHistory(r)}
@@ -1057,6 +1109,7 @@ function App() {
       )}{" "}
       {importOpen && (
         <ImportMaterials
+          currency={activeCompany?.currency}
           company={company}
           canWrite={canWrite}
           catalog={data}
@@ -1145,6 +1198,17 @@ function App() {
               )}
               {tab === "presentations" && (
                 <>
+                  {input("sku", "SKU (se sugiere automáticamente)")}
+                  {input("barcode", "Código de barras personalizado")}
+                  <label>
+                    <input
+                      type="checkbox"
+                      name="barcode_custom"
+                      defaultChecked={edit?.barcode_custom ?? false}
+                    />{" "}
+                    Conservar código personalizado, incluso vacío
+                  </label>
+                  {input("alternative_name", "Nombre alternativo")}
                   {select(
                     "raw_material_id",
                     "Material",

@@ -1,3 +1,4 @@
+import VariantManager from "./VariantManager";
 import { useState } from "react";
 import type { ComponentProps, FormEvent } from "react";
 import { supabase as db } from "./client";
@@ -24,6 +25,7 @@ export default function ProductsCatalog({
   onBarcode: (item: CatalogRow) => void;
   requestCodes?: ComponentProps<typeof CatalogFields>["requestCodes"];
 }) {
+  const [variantProduct, setVariantProduct] = useState<CatalogRow | null>(null);
   const [edit, setEdit] = useState<CatalogRow | null | undefined>(),
     [query, setQuery] = useState(""),
     [origin, setOrigin] = useState(""),
@@ -44,6 +46,8 @@ export default function ProductsCatalog({
         company_id: company,
         name: String(f.get("name")).trim(),
         notes: String(f.get("notes") || ""),
+        description: String(f.get("description") || ""),
+        published: f.get("published") === "on",
         unit_id: f.get("unit_id") || null,
         active: f.get("active") !== "false",
         ...metadata,
@@ -131,6 +135,9 @@ export default function ProductsCatalog({
                     </span>
                   </td>
                   <td className="actions">
+                    <button onClick={() => setVariantProduct(p)}>
+                      Variantes y existencias
+                    </button>
                     {canWrite && (
                       <button
                         onClick={() => {
@@ -160,6 +167,13 @@ export default function ProductsCatalog({
           )}
         </div>
       </section>
+      {variantProduct && (
+        <VariantManager
+          company={company}
+          product={variantProduct}
+          onClose={() => setVariantProduct(null)}
+        />
+      )}
       {edit !== undefined && (
         <div className="overlay">
           <section
@@ -206,6 +220,21 @@ export default function ProductsCatalog({
                       </option>
                     ))}
                 </select>
+              </label>
+              <label>
+                Descripción pública
+                <textarea
+                  name="description"
+                  defaultValue={edit?.description || ""}
+                />
+              </label>
+              <label>
+                <input
+                  name="published"
+                  type="checkbox"
+                  defaultChecked={edit?.published ?? false}
+                />{" "}
+                Publicar producto en tienda
               </label>
               <label>
                 Notas
