@@ -52,7 +52,7 @@ En Authentication → URL Configuration:
 
 Mantener confirmación de correo habilitada. El frontend muestra “Cuenta verificada” solamente cuando Supabase devuelve una sesión con correo confirmado; un parámetro de URL por sí solo no confirma cuentas. Los enlaces expirados muestran una salida al acceso.
 
-Los usuarios existentes no necesitan volver a registrarse. Los permisos están en company_members y no en metadatos editables del usuario. Admin/editor pueden editar, viewer solo consultar. El historial de precios es de solo inserción para clientes. Las relaciones compuestas impiden enlaces entre empresas y current_prices usa security_invoker.
+Los usuarios existentes no necesitan volver a registrarse. Las asignaciones se guardan en corporation_members, company_members y company_module_access; nunca en metadatos editables del usuario. Los administradores actúan dentro de su ámbito y los operativos según sus módulos. Los valores técnicos antiguos de membresía se conservan por compatibilidad, sin añadir roles de negocio. El historial de precios sigue siendo de solo inserción; las relaciones compuestas impiden enlaces entre empresas y current_prices usa security_invoker.
 
 ## Migraciones y privacidad
 
@@ -60,7 +60,7 @@ Las migraciones son referencias versionadas del esquema ya aplicado. **No volver
 
 El repositorio comienza con una instantánea limpia para no publicar datos privados del historial previo. El código y las funciones existentes se conservan; la copia original y su historial permanecen localmente como respaldo. No se incluyen exportaciones de datos, archivos de sesión, `.env.local` ni configuración de ChatGPT Sites.
 
-La página de acceso y el código son públicos; los datos del negocio requieren autenticación y pertenencia a la empresa. No agregar datos del negocio a archivos dentro de public/.
+La página de acceso y el código son públicos. Los datos administrativos requieren acceso autorizado a la empresa. La tienda expone una proyección limitada de los productos publicados y enlaces habilitados; no concede acceso a tablas privadas, clientes ni pedidos. No agregar datos del negocio a archivos dentro de public/.
 
 ## Comprobación
 

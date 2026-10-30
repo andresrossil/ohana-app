@@ -111,6 +111,28 @@ function App() {
     !(sheetDirty || settingsDirty) ||
     window.confirm("Hay cambios sin guardar. ¿Quieres descartarlos?");
   const canWrite = role !== "viewer" && !!activeCompany?.write;
+  const currentCompany = useRef(company);
+  currentCompany.current = company;
+  function chooseCompany(id: string) {
+    currentCompany.current = id;
+    loadVersion.current++;
+    setData(emptyCatalog);
+    setPrices([]);
+    setRole("viewer");
+    setEdit(undefined);
+    setHistory(null);
+    setBarcode(null);
+    setQuery("");
+    setClassification("");
+    setOrigin("");
+    setImportOpen(false);
+    setImportNotice("");
+    setSheetDirty(false);
+    setSettingsDirty(false);
+    setSheetView(false);
+    setCompany(id);
+    setSection("dashboard");
+  }
   function acceptSession(next: Session | null) {
     if (authIdentity.current !== (next?.user.id || null)) {
       contextVersion.current++;
@@ -186,6 +208,7 @@ function App() {
     };
   }, [session?.user.id]);
   async function load() {
+    if (currentCompany.current !== company) return;
     const version = ++loadVersion.current;
     if (!company) return;
     setLoading(true);
@@ -214,7 +237,8 @@ function App() {
         db.rpc("company_permission", { p_company: company, p_action: "write" }),
       ]);
       if (r.error) throw r.error;
-      if (version !== loadVersion.current) return;
+      if (version !== loadVersion.current || currentCompany.current !== company)
+        return;
       setData(Object.fromEntries(results) as Catalog);
       setPrices(p);
       setRole(r.data ? "editor" : "viewer");
@@ -238,7 +262,7 @@ function App() {
     setPrices([]);
     setRole("viewer");
     void load();
-  }, [company]);
+  }, [company, activeCompany?.catalog_read, activeCompany?.write]);
   async function auth(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setBusy(true);
@@ -303,6 +327,7 @@ function App() {
     setBusy(false);
   }
   async function showHistory(row: Row) {
+    if (currentCompany.current !== company) return;
     setError("");
     setEntries([]);
     const { data, error } = await db
@@ -312,6 +337,7 @@ function App() {
       .eq("presentation_id", row.id)
       .order("effective_on", { ascending: false })
       .order("created_at", { ascending: false });
+    if (currentCompany.current !== company) return;
     if (error) setError(error.message);
     else {
       setEntries(data || []);
@@ -514,13 +540,13 @@ function App() {
           const list = companies.filter(
             (c) => c.corporation_id === id && c.active !== false,
           );
-          setCompany(list.length === 1 ? list[0].id : "");
+          chooseCompany(list.length === 1 ? list[0].id : "");
           setSection("dashboard");
         }}
         email={session.user.email}
         onCompany={(value) => {
           if (value === company) return;
-          if (leaveSheet()) setCompany(value);
+          if (leaveSheet()) chooseCompany(value);
         }}
         onNavigate={(next) => {
           if (next === section) return true;
@@ -585,7 +611,7 @@ function App() {
             corporations={corporations}
             canCreate={canCreate}
             onSelect={(id) => {
-              setCompany(id);
+              chooseCompany(id);
               setSection("dashboard");
             }}
             onManage={() => {
