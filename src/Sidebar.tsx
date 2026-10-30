@@ -1,3 +1,4 @@
+import NavIcon from "./NavIcon";
 import { useState } from "react";
 import type { CatalogRow } from "./sheet-model";
 import CompanyLogo from "./CompanyBrand";
@@ -107,7 +108,9 @@ export default function Sidebar({
                   if (onNavigate(key)) setOpen(false);
                 }}
               >
-                <span aria-hidden="true">{icon}</span>
+                <span aria-hidden="true">
+                  <NavIcon name={key} />
+                </span>
                 {label}
               </button>
             ))}

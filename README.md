@@ -8,6 +8,8 @@ Incluye clasificación de materiales, orígenes configurables, SKU M/E/P y sufij
 
 La arquitectura admite corporaciones y empresas con nombres independientes, cuatro roles y accesos por módulo. Datos de empresa y Apariencia son compartidos dentro de cada empresa y editables por sus administradores autorizados. El superadministrador global requiere asignación explícita y no recibe acceso comercial automático.
 
+El tema administrativo se guarda en `company_settings.admin_theme`, separado de `appearance` (tienda). Incluye cinco temas, seis tipografías, colores personalizados, vista previa y restauración del azul corporativo. RLS protege la edición y una validación de base de datos comprueba colores, fuentes y contraste de textos.
+
 Compras recibidas y ajustes generan inventario real; las cotizaciones no modifican existencias. Las fórmulas conservan versiones y los lotes registran consumos reales, variantes obtenidas, costos FIFO y curación con liberación manual. Los costos desconocidos permanecen pendientes.
 
 La tienda de cada empresa se habilita en Configuración → Tienda y ventas. Muestra productos y variantes publicados sin SKU ni códigos internos. Carrito y pedidos usan precios confirmados por Supabase, reservas de 24 horas, cancelación y entrega sin movimientos duplicados. Incluye retiro, envío de tarifa fija, un código porcentual y regalo por compra mínima configurables; transferencia, efectivo y contra entrega se confirman manualmente. No procesa tarjetas ni reembolsos automáticos.

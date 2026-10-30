@@ -1,3 +1,8 @@
+import {
+  adminDefault,
+  normalizeAdminTheme,
+  adminVariables,
+} from "./admin-theme";
 import { useEffect, useState } from "react";
 import { supabase as db } from "./client";
 import type { CatalogRow } from "./sheet-model";
@@ -14,19 +19,15 @@ export function useCompanyTheme(company: string) {
     let live = true;
     const root = document.documentElement;
     const apply = (theme: Record<string, string>) => {
-      for (const [key, value] of Object.entries({ ...defaultTheme, ...theme }))
-        root.style.setProperty("--company-" + key, value);
-      root.style.setProperty(
-        "--company-heading",
-        theme.font && theme.font !== "DM Sans"
-          ? theme.font
-          : "'Libre Caslon Display',Georgia,serif",
-      );
+      for (const [key, value] of Object.entries(
+        adminVariables(normalizeAdminTheme(theme)),
+      ))
+        root.style.setProperty(key, value);
     };
     apply({});
     if (!company) return;
     const load = async () => {
-      const { data, error } = await db.rpc("company_theme", {
+      const { data, error } = await db.rpc("company_admin_theme", {
         p_company: company,
       });
       if (live && !error) apply(data || {});

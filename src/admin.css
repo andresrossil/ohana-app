@@ -1,0 +1,463 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Roboto:wght@400;500;700&family=Open+Sans:wght@400;500;600;700&family=Montserrat:wght@400;500;600;700&family=Lato:wght@400;700&display=swap");
+:root {
+  --admin-background: #fff;
+  --admin-secondary: #f3f6fa;
+  --admin-surface: #fff;
+  --admin-heading: #233d5b;
+  --admin-primary: #285e97;
+  --admin-text: #233d5b;
+  --admin-muted: #60758d;
+  --admin-border: #dce4ed;
+  --admin-font: Inter;
+  --admin-button-text: #fff;
+}
+.shell,
+.login {
+  font-family: var(--admin-font), sans-serif;
+  background: var(--admin-background);
+  color: var(--admin-text);
+}
+.shell h1,
+.shell h2,
+.shell h3,
+.shell h4,
+.login h1 {
+  font-family: var(--admin-font), sans-serif;
+  color: var(--admin-heading);
+  letter-spacing: -0.025em;
+  font-weight: 650;
+}
+.shell h1 {
+  font-size: clamp(28px, 3vw, 40px);
+  line-height: 1.2;
+}
+.shell h2 {
+  font-size: 22px;
+}
+.shell h3 {
+  font-size: 17px;
+}
+.shell main {
+  padding: 0 36px 36px;
+}
+.shell main > header {
+  border-color: var(--admin-border);
+  color: var(--admin-muted);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+}
+.shell .intro {
+  padding: 36px 0 28px;
+}
+.shell .intro p,
+.shell .eyebrow,
+.shell .muted,
+.shell small,
+.shell footer {
+  color: var(--admin-muted);
+}
+.shell .eyebrow {
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.13em;
+}
+.shell p {
+  line-height: 1.6;
+}
+.shell .app-sidebar {
+  background: var(--admin-surface);
+  border-color: var(--admin-border);
+  padding: 28px 18px;
+  gap: 0;
+}
+.shell .workspace {
+  margin: 30px 0 20px;
+}
+.shell .workspace > span {
+  color: var(--admin-muted);
+  font-size: 10px;
+  font-weight: 650;
+}
+.shell .app-sidebar select {
+  background: var(--admin-secondary);
+  border: 1px solid var(--admin-border);
+  color: var(--admin-text);
+  font-size: 13px;
+  min-height: 42px;
+}
+.shell .app-sidebar nav {
+  gap: 5px;
+}
+.shell .app-sidebar nav button {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 45px;
+  padding: 12px 14px;
+  color: var(--admin-text);
+  border-radius: 9px;
+  font-size: 13px;
+  font-weight: 500;
+  background: transparent;
+  transition: background 0.15s;
+}
+.shell .app-sidebar nav button:hover {
+  background: var(--admin-secondary);
+  filter: none;
+}
+.shell .app-sidebar nav button.selected {
+  background: var(--admin-secondary) !important;
+  color: var(--admin-heading) !important;
+  box-shadow: inset 3px 0 var(--admin-primary);
+  font-weight: 650;
+}
+.shell .app-sidebar nav button span {
+  display: flex;
+  width: 20px;
+  height: 20px;
+  color: var(--admin-primary);
+}
+.shell .nav-icon {
+  height: 20px;
+  width: 20px;
+  flex-shrink: 0;
+}
+.shell .aside-bottom {
+  padding-top: 30px;
+}
+.shell .aside-bottom p {
+  font-family: inherit;
+  font-style: normal;
+  font-size: 12px;
+  color: var(--admin-muted);
+}
+.shell .aside-bottom button {
+  background: transparent;
+  color: var(--admin-text);
+}
+.shell button,
+.login button {
+  background: var(--admin-primary);
+  color: var(--admin-button-text);
+  border: 1px solid transparent;
+  box-shadow: none;
+  border-radius: 8px;
+  min-height: 42px;
+  font-weight: 600;
+}
+.shell button.secondary,
+.shell .secondary {
+  background: var(--admin-surface);
+  color: var(--admin-text);
+  border: 1px solid var(--admin-border);
+}
+.shell button:focus-visible,
+.shell input:focus-visible,
+.shell select:focus-visible,
+.shell textarea:focus-visible {
+  outline: 2px solid var(--admin-primary);
+  outline-offset: 3px;
+}
+.shell button:disabled {
+  cursor: not-allowed;
+}
+.shell a {
+  color: var(--admin-heading);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.shell input,
+.shell select,
+.shell textarea {
+  background: var(--admin-surface);
+  color: var(--admin-text);
+  border: 1px solid var(--admin-border);
+  border-radius: 8px;
+  min-height: 42px;
+}
+.shell input::placeholder,
+.shell textarea::placeholder {
+  color: var(--admin-muted);
+  opacity: 1;
+}
+.shell input[type="checkbox"] {
+  min-height: 0;
+  accent-color: var(--admin-primary);
+}
+.shell label {
+  font-size: 13px;
+  color: var(--admin-text);
+  font-weight: 550;
+}
+.shell .catalog,
+.shell .stats,
+.shell .settings-block,
+.shell .sheet-panel,
+.shell .modal,
+.shell .bulk-import-dialog,
+.shell .theme-preview {
+  background: var(--admin-surface);
+  color: var(--admin-text);
+  border: 1px solid var(--admin-border);
+  border-radius: 12px;
+  box-shadow: 0 3px 16px #233d5b05;
+}
+.shell .catalog {
+  overflow: hidden;
+}
+.shell .stats {
+  gap: 0;
+}
+.shell .stats > div {
+  border-color: var(--admin-border);
+  padding: 25px;
+}
+.shell .stats strong {
+  font-family: var(--admin-font);
+  font-weight: 650;
+  color: var(--admin-heading);
+  font-size: 36px;
+}
+.shell .stats span {
+  color: var(--admin-muted);
+}
+.shell .toolbar {
+  border-color: var(--admin-border);
+  padding: 22px;
+}
+.shell .toolbar h2 {
+  font-size: 18px;
+}
+.shell .settings-tabs {
+  gap: 8px;
+  margin-bottom: 25px;
+}
+.shell .settings-tabs button {
+  color: var(--admin-text);
+  background: var(--admin-surface);
+  border: 1px solid var(--admin-border);
+  font-size: 13px;
+}
+.shell .settings-tabs button.selected {
+  background: var(--admin-secondary) !important;
+  color: var(--admin-heading) !important;
+  border-color: var(--admin-primary);
+}
+.shell table {
+  background: var(--admin-surface);
+  color: var(--admin-text);
+}
+.shell th {
+  background: var(--admin-secondary);
+  color: var(--admin-heading);
+  border-color: var(--admin-border);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  font-weight: 650;
+}
+.shell td {
+  border-color: var(--admin-border);
+  color: var(--admin-text);
+  font-size: 13px;
+}
+.shell tbody tr:hover {
+  background: var(--admin-secondary);
+}
+.shell td small,
+.shell th small {
+  color: var(--admin-muted);
+}
+.shell .status,
+.shell .badge {
+  background: var(--admin-secondary);
+  color: var(--admin-text);
+  border-color: var(--admin-border);
+}
+.shell .overlay {
+  background: #0c1c3480;
+  backdrop-filter: blur(3px);
+}
+.shell .modal h2 {
+  font-size: 24px;
+}
+.shell .modal header {
+  color: var(--admin-text);
+  border-color: var(--admin-border);
+}
+.shell dialog::backdrop {
+  background: #0c1c3480;
+  backdrop-filter: blur(3px);
+}
+.shell .sheet-panel th,
+.shell .sheet-panel thead,
+.shell .import-heading,
+.shell .sheet-options {
+  background: var(--admin-secondary);
+  color: var(--admin-text);
+  border-color: var(--admin-border);
+}
+.shell .sheet-panel td,
+.shell .sheet-panel input {
+  background: var(--admin-surface);
+  color: var(--admin-text);
+  border-color: var(--admin-border);
+}
+.shell .sheet-panel td.readonly,
+.shell .sheet-panel td.calculated {
+  background: var(--admin-secondary);
+}
+.shell .sheet-panel .selected {
+  color: var(--admin-text) !important;
+  background: var(--admin-secondary) !important;
+  outline-color: var(--admin-primary);
+}
+.shell .company-card {
+  border-color: var(--admin-border);
+}
+.theme-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
+  gap: 12px;
+  margin: 20px 0;
+}
+.shell .theme-option {
+  display: flex;
+  flex-direction: column;
+  align-items: start;
+  gap: 14px;
+  padding: 16px;
+  text-align: left;
+}
+.shell .theme-option[aria-pressed="true"] {
+  outline: 2px solid var(--admin-primary);
+  outline-offset: 2px;
+}
+.theme-swatches {
+  display: flex;
+  gap: 5px;
+}
+.theme-swatches i {
+  width: 23px;
+  height: 23px;
+  border-radius: 50%;
+  border: 1px solid #60758d55;
+}
+.color-control {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.shell .color-control input[type="color"] {
+  width: 55px;
+  height: 42px;
+  padding: 4px;
+  min-height: 42px;
+}
+.color-control code {
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--admin-muted);
+}
+.admin-preview {
+  background: var(--admin-background);
+  color: var(--admin-text);
+  font-family: var(--admin-font), sans-serif;
+  padding: 28px;
+  border: 1px solid var(--admin-border);
+  border-radius: 12px;
+  margin: 24px 0;
+}
+.shell .admin-preview h3,
+.shell .admin-preview strong {
+  color: var(--admin-heading);
+  font-family: var(--admin-font);
+}
+.shell .admin-preview .preview-muted,
+.shell .admin-preview .eyebrow {
+  color: var(--admin-muted);
+}
+.preview-card {
+  padding: 24px;
+  background: var(--admin-surface);
+  border: 1px solid var(--admin-border);
+  border-radius: 10px;
+}
+.admin-preview table {
+  width: 100%;
+  margin-top: 24px;
+}
+.contrast-ok {
+  color: var(--admin-muted);
+  font-size: 13px;
+}
+.shell .company-settings {
+  padding: 0;
+}
+.appearance-intro {
+  margin-bottom: 24px;
+}
+.shell .error {
+  color: #b42332;
+  background: #fff0f1;
+  border-radius: 8px;
+  padding: 12px;
+}
+.shell .sheet-warning,
+.shell .sheet-notice {
+  color: var(--admin-text);
+  background: var(--admin-secondary);
+  border-color: var(--admin-border);
+}
+@media (max-width: 800px) {
+  .shell main {
+    padding: 0 18px 24px;
+  }
+  .shell .app-sidebar {
+    padding: 15px 18px;
+  }
+  .shell .intro {
+    padding: 25px 0;
+  }
+  .shell .stats > div {
+    padding: 20px;
+  }
+  .shell .toolbar {
+    padding: 18px;
+  }
+  .admin-preview {
+    padding: 18px;
+  }
+  .preview-card {
+    padding: 16px;
+  }
+  .theme-options {
+    grid-template-columns: 1fr 1fr;
+  }
+  .shell input,
+  .shell select,
+  .shell textarea {
+    font-size: 16px;
+  }
+}
+.shell :is(th, .status, .badge, .sheet-notice, .sheet-warning) small {
+  color: inherit;
+}
+.shell .sheet-legend,
+.shell .sheet-heading p {
+  color: var(--admin-muted);
+}
+.shell .sheet-migration,
+.shell .import-options,
+.shell .sheet-import .sheet-table .cell-auto {
+  background: var(--admin-secondary);
+  color: var(--admin-text);
+  border-color: var(--admin-border);
+}
+.shell .sheet-import .sheet-table tbody tr:nth-child(even) td:not(.cell-auto),
+.shell .sheet-placeholder-row td {
+  background: var(--admin-surface);
+}
+.shell .sheet-table td.cell-auto,
+.shell .sheet-table td.cell-auto input {
+  background: var(--admin-secondary);
+}

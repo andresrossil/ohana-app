@@ -1,3 +1,4 @@
+import AdminAppearance from "./AdminAppearance";
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { supabase as db } from "./client";
@@ -27,7 +28,21 @@ const palettes = {
     accent: "#edc8cc",
   },
 };
-export default function CompanySettings({
+export default function CompanySettings(
+  props: Parameters<typeof CompanyProfile>[0],
+) {
+  return props.appearance ? (
+    <AdminAppearance
+      company={props.company as any}
+      canManage={props.canManage}
+      onDirty={props.onDirty}
+      onSaved={props.onSaved}
+    />
+  ) : (
+    <CompanyProfile {...props} />
+  );
+}
+function CompanyProfile({
   company,
   canManage,
   appearance = false,
