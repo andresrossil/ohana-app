@@ -44,7 +44,7 @@ test('only product, quantity and unit are mandatory; incomplete optional data wa
  const computed=calculate(row,units,[],[],[],[],false,'unknown');assert.equal(computed.current,null);assert.equal(computed.variation,null);
  row.cells[7]='0';assert.equal(calculate(row,units,[],[],[],[],false,'unknown').current,0);
  assert.ok(!incompleteWarnings(row)[0].includes('PRECIO PRESENTACION'));
- row.cells[2]='';assert.ok(validateRow(row,units,[],[]).includes('MP obligatoria'));
+ row.cells[2]='';assert.ok(validateRow(row,units,[],[]).includes('MATERIAL obligatorio'));
 });
 test('an undated or unpriced historical quote is not treated as a comparable zero price',()=>{
  const row=blankRow();row.materialId='m1';row.cells=['Proveedor B','','Aceite coco','','500','g','','60','','','','','2026-07-03'];

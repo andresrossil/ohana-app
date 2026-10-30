@@ -1,8 +1,10 @@
 # Ohana
 
-Catálogo privado de materias primas, proveedores, presentaciones, enlaces de compra, unidades configurables y precios históricos. Diseño original Ohana, en español, adaptable a computadora y celular.
+Catálogo privado de materiales y productos, proveedores, presentaciones, enlaces de compra, unidades configurables y precios históricos. Diseño original Ohana, en español, adaptable a computadora y celular.
 
 Incluye una [hoja editable con pegado desde Excel](docs/hoja-materias-primas.md), selección y copia de rangos, importación histórica y confirmación de lotes de hasta 500 filas. Se conserva la vista clásica del catálogo.
+
+Incluye clasificación de materiales, orígenes configurables, SKU opcional con sugerencias M/E/P y códigos de barras Code 128 con vista, descarga PNG e impresión. Consulta los [detalles de los catálogos y las etiquetas](docs/catalogos-identificacion.md). La navegación incluye los módulos futuros, identificados como pendientes; Inventario y Reportes consultan el catálogo, sin crear existencias ni movimientos.
 
 Repositorio principal: https://github.com/andresrossil/ohana-app
 
@@ -54,6 +56,6 @@ La página de acceso y el código son públicos; los datos del negocio requieren
 
 ## Comprobación
 
-`npm run build` valida tipos y genera producción. `supabase/tests/catalog_rls.sql` contiene pruebas transaccionales con rollback para aislamiento, roles y precios; ejecutar solo en una sesión administrativa controlada. Los despliegues del frontend no ejecutan estas pruebas ni migraciones automáticamente.
+`npm test` comprueba cálculos, importación antigua/nueva e identificación. `npm run build` valida tipos y genera producción. `supabase/tests/catalog_rls.sql` contiene pruebas transaccionales con rollback para aislamiento, roles y precios; ejecutar solo en una sesión administrativa controlada. Los despliegues del frontend no ejecutan estas pruebas ni migraciones automáticamente.
 
 Todas las futuras mejoras deben guardarse en este repositorio y publicarse a través del workflow de Pages.

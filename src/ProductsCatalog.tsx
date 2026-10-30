@@ -1,0 +1,237 @@
+import { useState } from "react";
+import type { ComponentProps, FormEvent } from "react";
+import { supabase as db } from "./client";
+import type { CatalogRow } from "./sheet-model";
+import CatalogFields from "./CatalogFields";
+import CatalogFilters, { originMatches } from "./CatalogFilters";
+import { identityPayload, matchesCatalog } from "./catalog-model";
+export default function ProductsCatalog({
+  company,
+  products,
+  origins,
+  units,
+  canWrite,
+  onSaved,
+  onBarcode,
+  requestCodes,
+}: {
+  company: string;
+  products: CatalogRow[];
+  origins: CatalogRow[];
+  units: CatalogRow[];
+  canWrite: boolean;
+  onSaved: () => Promise<void>;
+  onBarcode: (item: CatalogRow) => void;
+  requestCodes?: ComponentProps<typeof CatalogFields>["requestCodes"];
+}) {
+  const [edit, setEdit] = useState<CatalogRow | null | undefined>(),
+    [query, setQuery] = useState(""),
+    [origin, setOrigin] = useState(""),
+    [busy, setBusy] = useState(false),
+    [error, setError] = useState("");
+  const filtered = products.filter(
+    (p) => matchesCatalog(p, query) && originMatches(p.origin_id, origin),
+  );
+  async function save(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (!canWrite) return;
+    setBusy(true);
+    setError("");
+    try {
+      const f = new FormData(e.currentTarget);
+      const { classification: _, ...metadata } = identityPayload(f);
+      const payload = {
+        company_id: company,
+        name: String(f.get("name")).trim(),
+        notes: String(f.get("notes") || ""),
+        unit_id: f.get("unit_id") || null,
+        active: f.get("active") !== "false",
+        ...metadata,
+      };
+      const result = edit
+        ? await db
+            .from("products")
+            .update(payload)
+            .eq("company_id", company)
+            .eq("id", edit.id)
+        : await db.from("products").insert(payload);
+      if (result.error) throw result.error;
+      setEdit(undefined);
+      await onSaved();
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <>
+      <section className="intro">
+        <div>
+          <p className="eyebrow">LO QUE CREAS</p>
+          <h1>Productos</h1>
+          <p>Tu catálogo de productos terminados.</p>
+        </div>
+        {canWrite && (
+          <button
+            onClick={() => {
+              setError("");
+              setEdit(null);
+            }}
+          >
+            Agregar producto
+          </button>
+        )}
+      </section>
+      <section className="catalog">
+        <div className="toolbar">
+          <h2>
+            Tu catálogo <small>{products.length}</small>
+          </h2>
+          <input
+            aria-label="Buscar productos"
+            placeholder="Nombre, SKU o código de barras…"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+        </div>
+        <CatalogFilters
+          origin={origin}
+          onOrigin={setOrigin}
+          origins={origins}
+        />
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>SKU</th>
+                <th>Producto</th>
+                <th>Origen</th>
+                <th>Código de barras</th>
+                <th>Estado</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((p) => (
+                <tr key={p.id}>
+                  <td>{p.sku || "—"}</td>
+                  <td>
+                    <strong>{p.name}</strong>
+                    <small>{p.notes}</small>
+                  </td>
+                  <td>
+                    {origins.find((o) => o.id === p.origin_id)?.name ||
+                      "Pendiente"}
+                  </td>
+                  <td>{p.barcode || "—"}</td>
+                  <td>
+                    <span className={`status ${p.active ? "" : "inactive"}`}>
+                      {p.active ? "Activo" : "Archivado"}
+                    </span>
+                  </td>
+                  <td className="actions">
+                    {canWrite && (
+                      <button
+                        onClick={() => {
+                          setError("");
+                          setEdit(p);
+                        }}
+                      >
+                        Editar
+                      </button>
+                    )}
+                    {p.barcode && (
+                      <button onClick={() => onBarcode(p)}>
+                        Código de barras
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {!filtered.length && (
+            <p className="empty">
+              {products.length
+                ? "No hay resultados para estos filtros."
+                : "Agrega tu primer producto para comenzar."}
+            </p>
+          )}
+        </div>
+      </section>
+      {edit !== undefined && (
+        <div className="overlay">
+          <section
+            className="modal"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Editar producto"
+          >
+            <button
+              className="close"
+              disabled={busy}
+              aria-label="Cerrar producto"
+              onClick={() => setEdit(undefined)}
+            >
+              ×
+            </button>
+            <h2>{edit ? "Editar producto" : "Nuevo producto"}</h2>
+            <form onSubmit={save}>
+              <label>
+                Nombre
+                <input
+                  name="name"
+                  maxLength={160}
+                  required
+                  defaultValue={edit?.name || ""}
+                />
+              </label>
+              <CatalogFields
+                company={company}
+                kind="product"
+                item={edit}
+                origins={origins}
+                requestCodes={requestCodes}
+              />
+              <label>
+                Unidad de medida (opcional)
+                <select name="unit_id" defaultValue={edit?.unit_id || ""}>
+                  <option value="">Pendiente</option>
+                  {units
+                    .filter((u) => u.active || u.id === edit?.unit_id)
+                    .map((u) => (
+                      <option value={u.id} key={u.id}>
+                        {u.name}
+                      </option>
+                    ))}
+                </select>
+              </label>
+              <label>
+                Notas
+                <textarea name="notes" defaultValue={edit?.notes || ""} />
+              </label>
+              {edit && (
+                <label>
+                  Estado
+                  <select name="active" defaultValue={String(edit.active)}>
+                    <option value="true">Activo</option>
+                    <option value="false">Archivado</option>
+                  </select>
+                </label>
+              )}
+              {error && (
+                <p className="error" role="alert">
+                  {error}
+                </p>
+              )}
+              <button disabled={busy}>
+                {busy ? "Guardando…" : "Guardar producto"}
+              </button>
+            </form>
+          </section>
+        </div>
+      )}
+    </>
+  );
+}

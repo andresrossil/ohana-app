@@ -1,0 +1,93 @@
+-- Synthetic users and records only; every change rolls back.
+begin;
+insert into auth.users(id) values('14000000-0000-0000-0000-000000000001'),('14000000-0000-0000-0000-000000000002');
+insert into public.companies(id,name) values('24000000-0000-0000-0000-000000000001','Identity test'),('24000000-0000-0000-0000-000000000002','Other identity test');
+update public.catalog_origins set id='54000000-0000-0000-0000-000000000002' where company_id='24000000-0000-0000-0000-000000000002' and name='Comprado';
+insert into public.company_members(company_id,user_id,role) values('24000000-0000-0000-0000-000000000001','14000000-0000-0000-0000-000000000001','editor'),('24000000-0000-0000-0000-000000000001','14000000-0000-0000-0000-000000000002','viewer');
+insert into public.units(id,company_id,name,symbol,dimension,base_factor) values('34000000-0000-0000-0000-000000000001','24000000-0000-0000-0000-000000000001','Gramo','g','mass',1);
+set local role authenticated;
+select set_config('request.jwt.claim.sub','14000000-0000-0000-0000-000000000001',true);
+do $test$
+declare c uuid:='24000000-0000-0000-0000-000000000001';u uuid:='34000000-0000-0000-0000-000000000001';m uuid; p uuid; o uuid; code text; payload jsonb; result jsonb;b uuid:=gen_random_uuid();before_prices bigint;before_materials bigint;
+begin
+ if (select count(*) from public.catalog_origins where company_id=c)<>2 then raise exception 'Missing seeded origins';end if;
+ select id into o from public.catalog_origins where company_id=c and name='Comprado';
+ code:=public.suggest_catalog_skus(c,'[{"key":"m","prefix":"M"}]')->0->>'sku';
+ if code<>'M0001' then raise exception 'Bad M sequence';end if;
+ if public.suggest_catalog_skus(c,'[{"key":"e","prefix":"E"},{"key":"p","prefix":"P"}]')->0->>'sku'<>'E0001' then raise exception 'Counters not independent';end if;
+ insert into public.raw_materials(company_id,name,unit_id,sku,classification,origin_id) values(c,'Identity material',u,code,'Materia prima',o) returning id into m;
+ if not exists(select 1 from public.raw_materials where id=m and barcode=code and not barcode_custom) then raise exception 'Barcode did not default to SKU';end if;
+ update public.raw_materials set classification='Material de empaque' where id=m;
+ if (select sku from public.raw_materials where id=m)<>'M0001' then raise exception 'Classification overwrote SKU';end if;
+ update public.raw_materials set sku='CUSTOM-1' where id=m;
+ if (select barcode from public.raw_materials where id=m)<>'CUSTOM-1' then raise exception 'Linked barcode did not follow SKU';end if;
+ update public.raw_materials set barcode='123456789012' where id=m;
+ update public.raw_materials set sku='CUSTOM-2' where id=m;
+ if not exists(select 1 from public.raw_materials where id=m and barcode='123456789012' and barcode_custom) then raise exception 'Custom barcode overwritten';end if;
+ update public.raw_materials set barcode=null where id=m;
+ update public.raw_materials set sku='CUSTOM-3' where id=m;
+ if (select barcode from public.raw_materials where id=m) is not null then raise exception 'Cleared barcode recreated';end if;
+ update public.raw_materials set barcode_custom=false,barcode='CUSTOM-3' where id=m;
+ insert into public.products(company_id,name,sku,barcode,barcode_custom,origin_id) values(c,'Finished product','P0001','PRODUCT-0001',true,o) returning id into p;
+ begin insert into public.raw_materials(company_id,name,unit_id,sku) values(c,'Duplicate SKU',u,'p0001');raise exception 'Cross-catalog duplicate SKU allowed';exception when unique_violation then null;end;
+ begin insert into public.raw_materials(company_id,name,unit_id,sku,barcode,barcode_custom) values(c,'Duplicate barcode',u,'OTHER','PRODUCT-0001',true);raise exception 'Cross-catalog duplicate barcode allowed';exception when unique_violation then null;end;
+ begin update public.products set barcode='CUSTOM-3',barcode_custom=true where id=p;raise exception 'Update duplicate allowed';exception when unique_violation then null;end;
+ begin update public.products set origin_id='54000000-0000-0000-0000-000000000002' where id=p;raise exception 'Cross-company origin assigned';exception when foreign_key_violation then null;end;
+ insert into public.products(company_id,name,sku,barcode_custom) values(c,'Manual sequence code','M0002',true);
+ if public.suggest_catalog_skus(c,'[{"key":"skip","prefix":"M"}]')->0->>'sku'<>'M0003' then raise exception 'Manual code not skipped';end if;
+ insert into public.products(id,company_id,name,sku) values('44000000-0000-0000-0000-000000000001',c,'Delete sequence test','M0003');
+ insert into public.products(company_id,name,sku,barcode_custom) values(c,'Free unicode SKU','Ñ-producto',false);
+ if (select barcode from public.products where name='Free unicode SKU') is not null then raise exception 'Unencodable default barcode';end if;
+ insert into public.products(company_id,name,sku,barcode,barcode_custom) values(c,'Optional identifiers','  ',null,true);
+ if (select sku from public.products where name='Optional identifiers') is not null then raise exception 'Blank SKU not nullable';end if;
+ update public.catalog_origins set name='Adquirido',active=false where id=o;
+ if not exists(select 1 from public.raw_materials where id=m and origin_id=o) then raise exception 'Origin references lost';end if;
+ begin delete from public.catalog_origins where id=o;raise exception 'Referenced origin deleted';exception when foreign_key_violation then null;end;
+ begin update public.products set origin_id=(select id from public.catalog_origins where company_id='24000000-0000-0000-0000-000000000002' limit 1),company_id='24000000-0000-0000-0000-000000000002' where id=p;raise exception 'Company move allowed';exception when others then if sqlerrm='Company move allowed' then raise;end if;end;
+ begin insert into public.catalog_identifiers(company_id,kind,record_id,sku) values(c,'product',gen_random_uuid(),'FORGED');raise exception 'Registry bypass';exception when insufficient_privilege then null;end;
+ begin update public.catalog_sku_counters set last_value=0 where company_id=c;raise exception 'Counter reset allowed';exception when insufficient_privilege then null;end;
+ -- Metadata in the bulk saver is atomic, shared by presentations, and backward compatible.
+ payload:='[{"material":"Bulk identified","quantity":10,"unit":"g","price":null,"date":null,"sku":"BULK-1","classification":"Materia prima","origin":"Fabricado","barcode":"BULK-CODE","barcodeCustom":true}]';
+ result:=public.save_material_sheet(c,b,payload);
+ select count(*) into before_prices from public.price_history where company_id=c;
+ update public.raw_materials set sku='BULK-EDITED' where company_id=c and name='Bulk identified';
+ perform public.save_material_sheet(c,b,payload);
+ if (select sku from public.raw_materials where company_id=c and name='Bulk identified')<>'BULK-EDITED' then raise exception 'Idempotent retry overwrote later metadata';end if;
+ payload:=jsonb_build_array(jsonb_build_object('id',result->0->>'id','expectedPriceId',(select price_id from public.material_sheet where id=(result->0->>'id')::uuid),'material','Bulk identified','quantity',10,'unit','g','price',null,'date',null));
+ perform public.save_material_sheet(c,gen_random_uuid(),payload);
+ if not exists(select 1 from public.raw_materials where company_id=c and name='Bulk identified' and sku='BULK-EDITED' and barcode='BULK-CODE' and classification='Materia prima') then raise exception 'Legacy import cleared metadata';end if;
+ if (select count(*) from public.price_history where company_id=c)<>before_prices then raise exception 'Metadata-only operation added price history';end if;
+ select count(*) into before_materials from public.raw_materials where company_id=c;
+ begin perform public.save_material_sheet(c,gen_random_uuid(),'[{"material":"Atomic rejected","quantity":1,"unit":"g","sku":"P0001"}]');raise exception 'Bulk duplicate accepted';exception when unique_violation then null;end;
+ if (select count(*) from public.raw_materials where company_id=c)<>before_materials then raise exception 'Bulk failure left partial data';end if;
+ begin perform public.save_material_sheet(c,gen_random_uuid(),'[{"material":"Conflicting metadata","quantity":1,"unit":"g","sku":"A"},{"material":"Conflicting metadata","quantity":2,"unit":"g","sku":"B"}]');raise exception 'Conflicting material metadata accepted';exception when others then if sqlerrm='Conflicting material metadata accepted' then raise;end if;end;
+ if exists(select 1 from public.raw_materials where company_id=c and name='Conflicting metadata') then raise exception 'Conflict left partial data';end if;
+ begin perform public.suggest_catalog_skus('24000000-0000-0000-0000-000000000002','[{"prefix":"M"}]');raise exception 'Tenant sequence escape';exception when insufficient_privilege then null;end;
+ if exists(select 1 from public.catalog_origins where company_id<>c) then raise exception 'Tenant read leak';end if;
+end $test$;
+reset role;
+delete from public.products where id='44000000-0000-0000-0000-000000000001';
+set local role authenticated;
+do $$ begin
+ if public.suggest_catalog_skus('24000000-0000-0000-0000-000000000001','[{"prefix":"M"}]')->0->>'sku'<>'M0004' then raise exception 'Deleted suggestion reused';end if;
+ insert into public.products(id,company_id,name,sku) values('44000000-0000-0000-0000-000000000002','24000000-0000-0000-0000-000000000001','Manual high watermark','E0099');
+end $$;
+reset role;
+delete from public.products where id='44000000-0000-0000-0000-000000000002';
+set local role authenticated;
+do $$ begin
+ if public.suggest_catalog_skus('24000000-0000-0000-0000-000000000001','[{"prefix":"E"}]')->0->>'sku'<>'E0100' then raise exception 'Deleted manual code reused';end if;
+end $$;
+select set_config('request.jwt.claim.sub','14000000-0000-0000-0000-000000000002',true);
+do $$ begin
+ begin perform public.suggest_catalog_skus('24000000-0000-0000-0000-000000000001','[{"prefix":"P"}]');raise exception 'Viewer reserved SKU';exception when insufficient_privilege then null;end;
+ begin insert into public.products(company_id,name) values('24000000-0000-0000-0000-000000000001','Viewer product');raise exception 'Viewer inserted product';exception when insufficient_privilege then null;end;
+ begin insert into public.catalog_origins(company_id,name) values('24000000-0000-0000-0000-000000000001','Viewer origin');raise exception 'Viewer configured origin';exception when insufficient_privilege then null;end;
+end $$;
+set local role anon;
+do $$ begin
+ begin perform count(*) from public.products;raise exception 'Anonymous product access';exception when insufficient_privilege then null;end;
+ begin perform public.suggest_catalog_skus('24000000-0000-0000-0000-000000000001','[{"prefix":"P"}]');raise exception 'Anonymous reservation';exception when insufficient_privilege then null;end;
+end $$;
+select 'PASS: shared identifiers, barcode linking, optional fields, retained counters, origins, atomic bulk saves, legacy imports, tenant/role/anonymous isolation' as result;
+rollback;
