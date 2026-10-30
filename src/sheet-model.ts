@@ -38,13 +38,13 @@ export function blankRow():SheetRow{return{key:crypto.randomUUID(),cells:Array.f
 export function findUnit(symbol:string,units:CatalogRow[]){const matches=units.filter(u=>u.active&&(normalize(u.symbol)===normalize(symbol)||normalize(u.name)===normalize(symbol)));return matches.length===1?matches[0]:undefined}
 export function validateRow(row:SheetRow,units:CatalogRow[],suppliers:CatalogRow[],materials:CatalogRow[]){
  const c=row.cells,errors:string[]=[];const quantity=parseNumber(c[4]),price=parseNumber(c[7]);
- if(!c[0].trim())errors.push('PROVEEDOR obligatorio');if(!c[2].trim())errors.push('MP obligatoria');
+ if(!c[2].trim())errors.push('MP obligatoria');
  for(const i of [0,1,2])if(c[i].trim().length>160)errors.push(`${columns[i]}: máximo 160 caracteres`);
  if(quantity===null||quantity<=0||quantity>999999999999)errors.push('PRESENTACION debe ser mayor que 0');
- if(price===null||price<0||price>99999999999999)errors.push('PRECIO PRESENTACION inválido');
+ if(c[7].trim()&&(price===null||price<0||price>99999999999999))errors.push('PRECIO PRESENTACION inválido');
  if(quantity!==null&&Number(quantity.toFixed(8))!==quantity)errors.push('PRESENTACION: máximo 8 decimales');
  if(price!==null&&Number(price.toFixed(4))!==price)errors.push('PRECIO PRESENTACION: máximo 4 decimales');
- if(!parseDate(c[12]))errors.push('FECHA CONSULTA: usa día/mes/año o año-mes-día');
+ if(c[12].trim()&&!parseDate(c[12]))errors.push('FECHA CONSULTA: usa día/mes/año o año-mes-día');
  const unit=findUnit(c[5],units);if(!unit)errors.push('UNIDAD MEDIDA desconocida o ambigua; configúrala en Unidades');
  const supplier=suppliers.filter(s=>normalize(s.name)===normalize(c[0]));if(supplier.length>1)errors.push('Proveedor ambiguo');else if(supplier[0]&&!supplier[0].active)errors.push('Proveedor archivado');
  const material=row.materialId?materials.find(m=>m.id===row.materialId):materials.find(m=>normalize(m.name)===normalize(c[2]));
@@ -53,16 +53,20 @@ export function validateRow(row:SheetRow,units:CatalogRow[],suppliers:CatalogRow
  if(row.importedPrevious?.trim()&&(parseNumber(row.importedPrevious)===null||(parseNumber(row.importedPrevious) as number)<0))errors.push('PRECIO ANTERIOR inválido');
  return errors;
 }
+export function incompleteWarnings(row:SheetRow){
+ const missing=[0,1,3,6,7,12].filter(i=>!row.cells[i].trim()).map(i=>columns[i]);
+ return missing.length?[`Datos pendientes: ${missing.join(', ')}. Puedes guardar y completarlos después.`]:[];
+}
 export function calculate(row:SheetRow,units:CatalogRow[],presentations:CatalogRow[],materials:CatalogRow[],suppliers:CatalogRow[],history:CatalogRow[],legacyImport:boolean,basis:string){
  const qty=parseNumber(row.cells[4]),price=parseNumber(row.cells[7]),unit=findUnit(row.cells[5],units),date=parseDate(row.cells[12]);
  const current=qty&&price!==null?price/qty:null;
  const materialId=row.materialId||materials.find(m=>normalize(m.name)===normalize(row.cells[2]))?.id;
  const own=history.find(h=>h.id===row.priceId),ownPresentation=presentations.find(p=>p.id===row.id);
  const currentSupplier=suppliers.find(s=>normalize(s.name)===normalize(row.cells[0]));
- const quoteChanged=!own||Number(own.amount)!==price||own.effective_on!==date||Number(ownPresentation?.quantity)!==qty||ownPresentation?.unit_id!==unit?.id||ownPresentation?.supplier_id!==currentSupplier?.id;
+ const quoteChanged=!own||(own.amount==null?null:Number(own.amount))!==price||own.effective_on!==date||Number(ownPresentation?.quantity)!==qty||ownPresentation?.unit_id!==unit?.id||ownPresentation?.supplier_id!==(currentSupplier?.id??null);
  const candidates=history.filter(h=>h.id!==row.priceId||quoteChanged).flatMap(h=>{
   const p=presentations.find(p=>p.id===h.presentation_id),u=units.find(u=>u.id===p?.unit_id);
-  if(!p||!u||!unit||p.raw_material_id!==materialId||u.dimension!==unit.dimension||h.currency!==row.currency||!date||h.effective_on>date)return [];
+  if(!p||!u||!unit||p.raw_material_id!==materialId||u.dimension!==unit.dimension||h.currency!==row.currency||h.amount==null||!h.effective_on||!date||h.effective_on>date)return [];
   // An unchanged saved quotation compares only with earlier chronological records.
   if(!quoteChanged&&own&&[h.effective_on,h.created_at,h.id].join('|')>=[own.effective_on,own.created_at,own.id].join('|'))return [];
   return [{...h,effective_on:String(h.effective_on),created_at:String(h.created_at),normalized:Number(h.amount)/Number(p.quantity)*(Number(unit.base_factor)/Number(u.base_factor)),supplier:suppliers.find(s=>s.id===p.supplier_id)?.name||'—'}];

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {parseTSV,formatTSV,parseNumber,parseDate,blankRow,calculate,validateRow} from '../src/sheet-model.ts';
+import {parseTSV,formatTSV,parseNumber,parseDate,blankRow,calculate,validateRow,incompleteWarnings} from '../src/sheet-model.ts';
 test('Excel TSV preserves empty cells, quoted tabs, multiline values and trailing blanks',()=>{
  const input='PRICESMART\t\tACEITE COCO\t54 OZ\t50\tOZ\t"nota\ncon\tcomilla ""ok"""\tQ120.00\tQ2.40\t-1\tQ110.00\t\t3/07/2026\r\n';
  const rows=parseTSV(input);assert.equal(rows.length,1);assert.equal(rows[0].length,13);assert.equal(rows[0][1],'');assert.equal(rows[0][6],'nota\ncon\tcomilla "ok"');assert.deepEqual(parseTSV(formatTSV(rows)),rows);
@@ -36,4 +36,24 @@ test('inherited Excel references do not cross currencies or apply to a backdated
  const history=[{id:'h2',presentation_id:'p2',amount:60,currency:'GTQ',effective_on:'2026-07-03',created_at:'2026-07-03T12:00:00Z'}];
  assert.equal(calculate(row,units,presentations,materials,suppliers,history,false,'unknown').variation,null);
  row.currency='GTQ';row.cells[4]='1000';row.cells[12]='2026-07-01';assert.equal(calculate(row,units,presentations,materials,suppliers,history,false,'unknown').variation,null);
+});
+test('only product, quantity and unit are mandatory; incomplete optional data warns without blocking',()=>{
+ const row=blankRow();row.cells=['','','Material pendiente','','50','OZ','','','','','','',''];
+ assert.deepEqual(validateRow(row,units,[],[]),[]);
+ assert.ok(incompleteWarnings(row).some(w=>w.includes('PROVEEDOR')&&w.includes('PRECIO PRESENTACION')&&w.includes('FECHA CONSULTA')));
+ const computed=calculate(row,units,[],[],[],[],false,'unknown');assert.equal(computed.current,null);assert.equal(computed.variation,null);
+ row.cells[7]='0';assert.equal(calculate(row,units,[],[],[],[],false,'unknown').current,0);
+ assert.ok(!incompleteWarnings(row)[0].includes('PRECIO PRESENTACION'));
+ row.cells[2]='';assert.ok(validateRow(row,units,[],[]).includes('MP obligatoria'));
+});
+test('an undated or unpriced historical quote is not treated as a comparable zero price',()=>{
+ const row=blankRow();row.materialId='m1';row.cells=['Proveedor B','','Aceite coco','','500','g','','60','','','','','2026-07-03'];
+ const history=[{id:'pending-price',presentation_id:'p1',amount:null,currency:'GTQ',effective_on:'2026-07-02',created_at:'2026-07-02T12:00:00Z'},{id:'pending-date',presentation_id:'p1',amount:100,currency:'GTQ',effective_on:null,created_at:'2026-07-02T12:01:00Z'}];
+ assert.equal(calculate(row,units,presentations,materials,suppliers,history,false,'unknown').variation,null);
+});
+test('a quote without a supplier still compares with the actual previous quotation when editing only comments',()=>{
+ const row=blankRow();row.id='pending-supplier';row.priceId='current';row.materialId='m1';row.cells=['','','Aceite coco','','50','g','Comentario','120','','','','','2026-07-03'];
+ const packs=[{id:'pending-supplier',raw_material_id:'m1',supplier_id:null,unit_id:'g',quantity:50}];
+ const history=[{id:'previous',presentation_id:'pending-supplier',amount:100,currency:'GTQ',effective_on:'2026-07-02',created_at:'2026-07-02T12:00:00Z'},{id:'current',presentation_id:'pending-supplier',amount:120,currency:'GTQ',effective_on:'2026-07-03',created_at:'2026-07-03T12:00:00Z'}];
+ const calc=calculate(row,units,packs,materials,[],history,false,'unknown');assert.equal(calc.previousUnit,2);assert.ok(Math.abs(calc.variation-.4)<1e-10);
 });

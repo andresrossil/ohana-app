@@ -18,6 +18,10 @@ Las cantidades admiten hasta 8 decimales y los precios hasta 4. La hoja muestra 
 
 ## Editar y copiar rangos
 
+Solo son obligatorios **MP (nombre del producto), PRESENTACION (cantidad mayor que cero) y UNIDAD MEDIDA**. Proveedor, precio, fecha y demás campos pueden quedar vacíos. La hoja y la revisión muestran una advertencia amarilla de datos pendientes, sin impedir guardar. Los campos obligatorios se identifican con un asterisco.
+
+Los datos faltantes se conservan vacíos: no se crea un proveedor ficticio, no se convierte un precio faltante en cero y no se sustituye una fecha vacía por la fecha actual. Sin precio, PRECIO UN y VS muestran un guion. Las cotizaciones sin precio o sin fecha conocida no se usan como antecedentes comparables. Puedes completar los datos después; el historial se conserva. Si escribes un precio o una fecha, deben tener un formato válido.
+
 - Edita las celdas manuales directamente. Los cálculos permanecen de solo lectura.
 - Selecciona un rango arrastrando, con Mayús + clic o con Mayús + flechas.
 - Ctrl+C copia el rango y Ctrl+V lo pega desde la celda superior izquierda. En la vista de edición del catálogo, “Copiar tabla” incluye los encabezados.
