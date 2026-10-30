@@ -5,9 +5,12 @@ export const today = () => new Date().toLocaleDateString("en-CA");
 export const money = (n: any, c = "GTQ") =>
   n == null
     ? "Pendiente"
-    : new Intl.NumberFormat("es-GT", { style: "currency", currency: c }).format(
-        Number(n),
-      );
+    : new Intl.NumberFormat("es-GT", {
+        style: "currency",
+        currency: c,
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }).format(Number(n));
 export async function operation(
   company: string,
   action: string,
@@ -36,7 +39,12 @@ function canonical(value: any): string {
         "}"
     : JSON.stringify(value);
 }
-export async function mutate(company: string, action: string, data: Row) {
+export async function keyedRequest(
+  company: string,
+  endpoint: string,
+  data: Row,
+  action?: string,
+) {
   const hash = Array.from(
     new Uint8Array(
       await crypto.subtle.digest(
@@ -47,7 +55,7 @@ export async function mutate(company: string, action: string, data: Row) {
   )
     .map((n) => n.toString(16).padStart(2, "0"))
     .join("");
-  const id = `ohana.pending.${company}.${action}.${hash}`;
+  const id = `ohana.pending.${company}.${endpoint}.${action || ""}.${hash}`;
   let key = pending.get(id);
   try {
     key = key || sessionStorage.getItem(id) || undefined;
@@ -57,13 +65,22 @@ export async function mutate(company: string, action: string, data: Row) {
   try {
     sessionStorage.setItem(id, key);
   } catch {}
-  const result = await operation(company, action, data, key);
+  const response = await db.rpc(endpoint, {
+    p_company: company,
+    p_key: key,
+    p_data: data,
+    ...(action ? { p_action: action } : {}),
+  });
+  if (response.error) throw response.error;
+  const result = response.data;
   pending.delete(id);
   try {
     sessionStorage.removeItem(id);
   } catch {}
   return result;
 }
+export const mutate = (company: string, action: string, data: Row) =>
+  keyedRequest(company, "operations", data, action);
 export function useOperation(company: string, module: string) {
   const [canWrite, setWrite] = useState(false),
     [error, setError] = useState(""),

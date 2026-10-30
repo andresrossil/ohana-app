@@ -4,7 +4,15 @@ Catálogo privado de materiales y productos, proveedores, presentaciones, enlace
 
 Incluye una [hoja editable con pegado desde Excel](docs/hoja-materias-primas.md), selección y copia de rangos, importación histórica y confirmación de lotes de hasta 500 filas. Se conserva la vista clásica del catálogo.
 
-Incluye clasificación de materiales, orígenes configurables, SKU opcional con sugerencias M/E/P y códigos de barras Code 128 con vista, descarga PNG e impresión. Consulta los [detalles de los catálogos y las etiquetas](docs/catalogos-identificacion.md). La navegación incluye los módulos futuros, identificados como pendientes; Inventario y Reportes consultan el catálogo, sin crear existencias ni movimientos.
+Incluye clasificación de materiales, orígenes configurables, SKU M/E/P y sufijos para presentaciones y variantes, y códigos Code 128 con vista, descarga PNG e impresión. Consulta los [detalles de los catálogos y las etiquetas](docs/catalogos-identificacion.md).
+
+La arquitectura admite corporaciones y empresas con nombres independientes, cuatro roles y accesos por módulo. Datos de empresa y Apariencia son compartidos dentro de cada empresa y editables por sus administradores autorizados. El superadministrador global requiere asignación explícita y no recibe acceso comercial automático.
+
+Compras recibidas y ajustes generan inventario real; las cotizaciones no modifican existencias. Las fórmulas conservan versiones y los lotes registran consumos reales, variantes obtenidas, costos FIFO y curación con liberación manual. Los costos desconocidos permanecen pendientes.
+
+La tienda de cada empresa se habilita en Configuración → Tienda y ventas. Muestra productos y variantes publicados sin SKU ni códigos internos. Carrito y pedidos usan precios confirmados por Supabase, reservas de 24 horas, cancelación y entrega sin movimientos duplicados. Incluye retiro, envío de tarifa fija, un código porcentual y regalo por compra mínima configurables; transferencia, efectivo y contra entrega se confirman manualmente. No procesa tarjetas ni reembolsos automáticos.
+
+Pruebas: `npm test`, `npm run build` y escenarios SQL con rollback en `supabase/tests/`. Las pantallas de `qa/` utilizan datos simulados y no forman parte de la compilación publicada.
 
 Repositorio principal: https://github.com/andresrossil/ohana-app
 

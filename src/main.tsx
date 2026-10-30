@@ -1,5 +1,3 @@
-import Inventory from "./Inventory";
-import Production from "./Production";
 import React, { Suspense, lazy, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import type { Session } from "@supabase/supabase-js";
@@ -11,7 +9,7 @@ import Sidebar, { sections } from "./Sidebar";
 import type { Section } from "./Sidebar";
 import ProductsCatalog from "./ProductsCatalog";
 import OriginsSettings from "./OriginsSettings";
-import CatalogOverview from "./CatalogOverview";
+
 import CatalogFields from "./CatalogFields";
 import CatalogFilters, {
   classificationMatches,
@@ -24,6 +22,12 @@ import OrganizationAdmin from "./OrganizationAdmin";
 import CompanyPicker from "./CompanyPicker";
 import { useCompanyTheme } from "./CompanyBrand";
 type Row = { id: string; [key: string]: any };
+const Reports = lazy(() => import("./Reports"));
+const Inventory = lazy(() => import("./Inventory"));
+const Production = lazy(() => import("./Production"));
+const Sales = lazy(() => import("./Sales"));
+const PublicStore = lazy(() => import("./PublicStore"));
+const StoreSettings = lazy(() => import("./StoreSettings"));
 type Tab = "raw_materials" | "suppliers" | "presentations" | "units";
 type Catalog = Record<Tab, Row[]> & { products: Row[]; catalog_origins: Row[] };
 const emptyCatalog: Catalog = {
@@ -92,7 +96,9 @@ function App() {
   const legacyVisible =
     section === "materials" ||
     (section === "settings" &&
-      !["origins", "profile", "appearance", "structure"].includes(configView));
+      !["origins", "profile", "appearance", "structure", "store"].includes(
+        configView,
+      ));
   const filtered = data[tab].filter(
     (r) =>
       matchesCatalog(r, query) &&
@@ -525,9 +531,13 @@ function App() {
           if (next === "materials") setTab("raw_materials");
           if (
             next === "settings" &&
-            !["origins", "profile", "appearance", "structure"].includes(
-              configView,
-            )
+            ![
+              "origins",
+              "profile",
+              "appearance",
+              "structure",
+              "store",
+            ].includes(configView)
           )
             setTab(configView as Tab);
           setQuery("");
@@ -604,6 +614,7 @@ function App() {
                     ["profile", "Datos de empresa"],
                     ["appearance", "Apariencia"],
                     ["structure", "Corporaciones y accesos"],
+                    ["store", "Tienda y ventas"],
                     ["origins", "Orígenes"],
                     ["suppliers", "Proveedores"],
                     ["presentations", "Presentaciones"],
@@ -633,6 +644,7 @@ function App() {
                               "profile",
                               "appearance",
                               "structure",
+                              "store",
                             ].includes(key)
                           )
                             setTab(key as Tab);
@@ -655,6 +667,14 @@ function App() {
                       onDirty={setSettingsDirty}
                     />
                   )}
+                {configView === "store" && activeCompany?.manage && (
+                  <StoreSettings
+                    key={company}
+                    company={company}
+                    currency={activeCompany.currency}
+                    onDirty={setSettingsDirty}
+                  />
+                )}
                 {configView === "structure" && (
                   <OrganizationAdmin
                     companies={companies}
@@ -683,51 +703,72 @@ function App() {
                     <p>Tu negocio, en armonía.</p>
                   </div>
                 </section>
-                <section className="stats">
-                  <div>
-                    <span>Materiales</span>
-                    <strong>
-                      {data.raw_materials.filter((m) => m.active).length}
-                    </strong>
-                  </div>
-                  <div>
-                    <span>Productos</span>
-                    <strong>
-                      {data.products.filter((p) => p.active).length}
-                    </strong>
-                  </div>
-                  <div>
-                    <span>Proveedores</span>
-                    <strong>
-                      {data.suppliers.filter((p) => p.active).length}
-                    </strong>
-                  </div>
-                </section>
+                {activeCompany?.catalog_read && (
+                  <section className="stats">
+                    <div>
+                      <span>Materiales</span>
+                      <strong>
+                        {data.raw_materials.filter((m) => m.active).length}
+                      </strong>
+                    </div>
+                    <div>
+                      <span>Productos</span>
+                      <strong>
+                        {data.products.filter((p) => p.active).length}
+                      </strong>
+                    </div>
+                    <div>
+                      <span>Proveedores</span>
+                      <strong>
+                        {data.suppliers.filter((p) => p.active).length}
+                      </strong>
+                    </div>
+                  </section>
+                )}
                 <div className="form-actions">
-                  <button
-                    disabled={!activeCompany?.catalog_read}
-                    onClick={() => setSection("materials")}
-                  >
-                    Abrir materiales
-                  </button>
-                  <button
-                    className="secondary"
-                    disabled={!activeCompany?.catalog_read}
-                    onClick={() => setSection("products")}
-                  >
-                    Abrir productos
-                  </button>
-                  <button
-                    className="secondary"
-                    onClick={() => {
-                      setSection("settings");
-                      setConfigView(
-                        activeCompany?.manage ? "profile" : "origins",
-                      );
-                    }}
-                  >
-                    Configurar empresa
-                  </button>
+                  {(
+                    [
+                      ["materials", "Materiales", activeCompany?.catalog_read],
+                      ["products", "Productos", activeCompany?.catalog_read],
+                      ["purchases", "Compras", activeCompany?.inventory_read],
+                      [
+                        "inventory",
+                        "Inventario",
+                        activeCompany?.inventory_read,
+                      ],
+                      ["formulas", "Fórmulas", activeCompany?.production_read],
+                      [
+                        "production",
+                        "Producción",
+                        activeCompany?.production_read,
+                      ],
+                      ["sales", "Ventas", activeCompany?.sales_read],
+                      ["reports", "Reportes", activeCompany?.reports_read],
+                    ] as const
+                  )
+                    .filter(([, , allowed]) => allowed)
+                    .map(([key, label]) => (
+                      <button
+                        key={key}
+                        className="secondary"
+                        onClick={() => {
+                          setSection(key);
+                          if (key === "materials") setTab("raw_materials");
+                        }}
+                      >
+                        Abrir {label.toLowerCase()}
+                      </button>
+                    ))}
+                  {activeCompany?.manage && (
+                    <button
+                      onClick={() => {
+                        setSection("settings");
+                        setConfigView("profile");
+                      }}
+                    >
+                      Configurar empresa
+                    </button>
+                  )}
                 </div>
               </>
             )}
@@ -759,14 +800,16 @@ function App() {
                 manager={activeCompany?.manage}
               />
             )}
-            {section === "reports" && (
-              <CatalogOverview
+            {(section === "sales" || section === "customers") && (
+              <Sales
                 key={company + section}
-                materials={data.raw_materials}
-                products={data.products}
-                origins={data.catalog_origins}
-                report={section === "reports"}
+                company={company}
+                currency={activeCompany?.currency}
+                customersOnly={section === "customers"}
               />
+            )}
+            {section === "reports" && (
+              <Reports key={company} company={company} />
             )}
             {![
               "dashboard",
@@ -777,6 +820,8 @@ function App() {
               "purchases",
               "formulas",
               "production",
+              "sales",
+              "customers",
               "reports",
             ].includes(section) && (
               <section className="empty module-pending">
@@ -1366,6 +1411,15 @@ function App() {
 }
 createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <App />
+    <Suspense fallback={<main className="store-loading">Cargando Ohana…</main>}>
+      {new URLSearchParams(location.search).get("shop") ? (
+        <PublicStore
+          key={new URLSearchParams(location.search).get("shop")!}
+          company={new URLSearchParams(location.search).get("shop")!}
+        />
+      ) : (
+        <App />
+      )}
+    </Suspense>
   </React.StrictMode>,
 );

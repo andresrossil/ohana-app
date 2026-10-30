@@ -1,5 +1,6 @@
+import ProductImage from "./ProductImage";
 import VariantManager from "./VariantManager";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { ComponentProps, FormEvent } from "react";
 import { supabase as db } from "./client";
 import type { CatalogRow } from "./sheet-model";
@@ -25,6 +26,19 @@ export default function ProductsCatalog({
   onBarcode: (item: CatalogRow) => void;
   requestCodes?: ComponentProps<typeof CatalogFields>["requestCodes"];
 }) {
+  const [variantIndex, setVariantIndex] = useState<CatalogRow[]>([]);
+  useEffect(() => {
+    let live = true;
+    db.from("product_variants")
+      .select("id,product_id,sku,barcode,name")
+      .eq("company_id", company)
+      .then((r) => {
+        if (live) setVariantIndex(r.data || []);
+      });
+    return () => {
+      live = false;
+    };
+  }, [company, products]);
   const [variantProduct, setVariantProduct] = useState<CatalogRow | null>(null);
   const [edit, setEdit] = useState<CatalogRow | null | undefined>(),
     [query, setQuery] = useState(""),
@@ -32,7 +46,12 @@ export default function ProductsCatalog({
     [busy, setBusy] = useState(false),
     [error, setError] = useState("");
   const filtered = products.filter(
-    (p) => matchesCatalog(p, query) && originMatches(p.origin_id, origin),
+    (p) =>
+      (matchesCatalog(p, query) ||
+        variantIndex.some(
+          (v) => v.product_id === p.id && matchesCatalog(v, query),
+        )) &&
+      originMatches(p.origin_id, origin),
   );
   async function save(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -42,7 +61,33 @@ export default function ProductsCatalog({
     try {
       const f = new FormData(e.currentTarget);
       const { classification: _, ...metadata } = identityPayload(f);
+      let photo = edit?.photo_path || null;
+      const file = f.get("photo");
+      let uploaded: string | null = null;
+      if (f.has("remove_photo")) photo = null;
+      if (file instanceof File && file.size) {
+        if (
+          file.size > 3145728 ||
+          !["image/png", "image/jpeg", "image/webp"].includes(file.type)
+        )
+          throw Error("La fotografía debe ser PNG, JPG o WebP de hasta 3 MB");
+        const image = await createImageBitmap(file);
+        image.close();
+        uploaded =
+          company +
+          "/" +
+          crypto.randomUUID() +
+          ({ "image/png": ".png", "image/jpeg": ".jpg", "image/webp": ".webp" }[
+            file.type
+          ] || ".png");
+        const r = await db.storage
+          .from("catalog-images")
+          .upload(uploaded, file);
+        if (r.error) throw r.error;
+        photo = uploaded;
+      }
       const payload = {
+        photo_path: photo,
         company_id: company,
         name: String(f.get("name")).trim(),
         notes: String(f.get("notes") || ""),
@@ -59,7 +104,11 @@ export default function ProductsCatalog({
             .eq("company_id", company)
             .eq("id", edit.id)
         : await db.from("products").insert(payload);
-      if (result.error) throw result.error;
+      if (result.error) {
+        if (uploaded)
+          await db.storage.from("catalog-images").remove([uploaded]);
+        throw result.error;
+      }
       setEdit(undefined);
       await onSaved();
     } catch (e: any) {
@@ -121,6 +170,9 @@ export default function ProductsCatalog({
                 <tr key={p.id}>
                   <td>{p.sku || "—"}</td>
                   <td>
+                    <div className="catalog-photo">
+                      <ProductImage path={p.photo_path} name={p.name} />
+                    </div>
                     <strong>{p.name}</strong>
                     <small>{p.notes}</small>
                   </td>
@@ -171,6 +223,7 @@ export default function ProductsCatalog({
         <VariantManager
           company={company}
           product={variantProduct}
+          onChanged={onSaved}
           onClose={() => setVariantProduct(null)}
         />
       )}
@@ -221,6 +274,20 @@ export default function ProductsCatalog({
                     ))}
                 </select>
               </label>
+              <label>
+                Fotografía (PNG, JPG o WebP, hasta 3 MB)
+                <input
+                  name="photo"
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                />
+              </label>
+              {edit?.photo_path && (
+                <label>
+                  <input name="remove_photo" type="checkbox" /> Quitar
+                  fotografía actual
+                </label>
+              )}
               <label>
                 Descripción pública
                 <textarea

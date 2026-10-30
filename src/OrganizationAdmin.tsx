@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, lazy, Suspense } from "react";
+const GlobalAdmin = lazy(() => import("./GlobalAdmin"));
 import type { FormEvent } from "react";
 import { supabase as db } from "./client";
 import type { CatalogRow } from "./sheet-model";
@@ -265,6 +266,9 @@ export default function OrganizationAdmin({
   }
   return (
     <section className="admin-structure">
+      <Suspense fallback={null}>
+        <GlobalAdmin />
+      </Suspense>
       <p className="eyebrow">ADMINISTRACIÓN AUTORIZADA</p>
       <h2>Corporaciones y empresas</h2>
       {error && (

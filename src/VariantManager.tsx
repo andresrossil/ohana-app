@@ -1,14 +1,16 @@
 import { useEffect, useState, lazy, Suspense } from "react";
-import { operation, useOperation, money, type Row } from "./operations";
+import { operation, mutate, useOperation, money, type Row } from "./operations";
 const BarcodeDialog = lazy(() => import("./BarcodeDialog"));
 export default function VariantManager({
   company,
   product,
   onClose,
+  onChanged,
 }: {
   company: string;
   product: Row;
   onClose: () => void;
+  onChanged?: () => Promise<void>;
 }) {
   const [rows, setRows] = useState<Row[]>([]),
     [edit, setEdit] = useState<Row | null | undefined>(),
@@ -83,14 +85,10 @@ export default function VariantManager({
                 allow_preorder: data.allow_preorder === "on",
               };
               state.run(async () => {
-                await operation(
-                  company,
-                  "variant_save",
-                  payload,
-                  crypto.randomUUID(),
-                );
+                await mutate(company, "variant_save", payload);
                 setEdit(undefined);
                 await load();
+                await onChanged?.();
                 state.setNotice("Variante guardada");
               });
             }}
