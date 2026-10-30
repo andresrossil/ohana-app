@@ -17,6 +17,10 @@ import CatalogFilters, {
 } from "./CatalogFilters";
 const BarcodeDialog = lazy(() => import("./BarcodeDialog"));
 import { identityPayload, matchesCatalog } from "./catalog-model";
+import CompanySettings from "./CompanySettings";
+import OrganizationAdmin from "./OrganizationAdmin";
+import CompanyPicker from "./CompanyPicker";
+import { useCompanyTheme } from "./CompanyBrand";
 type Row = { id: string; [key: string]: any };
 type Tab = "raw_materials" | "suppliers" | "presentations" | "units";
 type Catalog = Record<Tab, Row[]> & { products: Row[]; catalog_origins: Row[] };
@@ -69,15 +73,24 @@ function App() {
     [sheetDirty, setSheetDirty] = useState(false);
   const [importOpen, setImportOpen] = useState(false),
     [importNotice, setImportNotice] = useState("");
-  const [section, setSection] = useState<Section>("materials"),
-    [configView, setConfigView] = useState("origins"),
+  const [section, setSection] = useState<Section>("dashboard"),
+    [configView, setConfigView] = useState("profile"),
     [classification, setClassification] = useState(""),
     [origin, setOrigin] = useState(""),
     [barcode, setBarcode] = useState<Row | null>(null);
+  const [corporations, setCorporations] = useState<Row[]>([]),
+    [canCreate, setCanCreate] = useState(false),
+    [pickerCorp, setPickerCorp] = useState(""),
+    [settingsDirty, setSettingsDirty] = useState(false);
+  const authIdentity = useRef<string | null>(null);
+  const contextVersion = useRef(0);
+  const activeCompany = companies.find((c) => c.id === company);
+  useCompanyTheme(company);
   const loadVersion = useRef(0);
   const legacyVisible =
     section === "materials" ||
-    (section === "settings" && configView !== "origins");
+    (section === "settings" &&
+      !["origins", "profile", "appearance", "structure"].includes(configView));
   const filtered = data[tab].filter(
     (r) =>
       matchesCatalog(r, query) &&
@@ -87,15 +100,31 @@ function App() {
   );
   const sectionTitle = sections.find((s) => s[0] === section)?.[1] || "";
   const leaveSheet = () =>
-    !sheetDirty ||
-    window.confirm(
-      "Hay cambios sin guardar en la hoja. ¿Quieres descartarlos?",
-    );
-  const canWrite = role !== "viewer";
+    !(sheetDirty || settingsDirty) ||
+    window.confirm("Hay cambios sin guardar. ¿Quieres descartarlos?");
+  const canWrite = role !== "viewer" && !!activeCompany?.write;
+  function acceptSession(next: Session | null) {
+    if (authIdentity.current !== (next?.user.id || null)) {
+      contextVersion.current++;
+      loadVersion.current++;
+      setCompanies([]);
+      setCorporations([]);
+      setCanCreate(false);
+      setCompany("");
+      setData(emptyCatalog);
+      setPrices([]);
+      setRole("viewer");
+      setPickerCorp("");
+      setEdit(undefined);
+      setHistory(null);
+    }
+    authIdentity.current = next?.user.id || null;
+    setSession(next);
+  }
   useEffect(() => {
     db.auth.getSession().then(({ data, error }) => {
       if (error) setError(error.message);
-      setSession(data.session);
+      acceptSession(data.session);
       setReady(true);
       if (new URLSearchParams(location.search).get("auth") === "confirm") {
         setConfirmation(
@@ -107,7 +136,7 @@ function App() {
       }
     });
     const { data } = db.auth.onAuthStateChange((_e, s) => {
-      setSession(s);
+      acceptSession(s);
       setReady(true);
       if (!s) {
         setCompanies([]);
@@ -118,22 +147,32 @@ function App() {
     });
     return () => data.subscription.unsubscribe();
   }, []);
+  async function refreshContext() {
+    const version = ++contextVersion.current;
+    const { data, error } = await db.rpc("company_context");
+    if (version !== contextVersion.current) return;
+    if (error) {
+      setError(error.message);
+      return;
+    }
+    setCompanies(data.companies);
+    setCorporations(data.corporations);
+    setCanCreate(data.can_create);
+    setCompany((old) =>
+      data.companies.some((c: Row) => c.id === old && c.active !== false)
+        ? old
+        : data.companies.filter((c: Row) => c.active !== false).length === 1
+          ? data.companies.find((c: Row) => c.active !== false).id
+          : "",
+    );
+  }
   useEffect(() => {
     if (!session) return;
-    let live = true;
-    db.from("companies")
-      .select("*")
-      .order("name")
-      .then(({ data, error }) => {
-        if (!live) return;
-        if (error) setError(error.message);
-        else {
-          setCompanies(data || []);
-          setCompany(data?.[0]?.id || "");
-        }
-      });
+    void refreshContext();
+    const timer = setInterval(() => void refreshContext(), 60000);
     return () => {
-      live = false;
+      contextVersion.current++;
+      clearInterval(timer);
     };
   }, [session?.user.id]);
   async function load() {
@@ -162,18 +201,13 @@ function App() {
       const [results, p, r] = await Promise.all([
         Promise.all(tables.map(async (t) => [t, await all(t)] as const)),
         all("current_prices"),
-        db
-          .from("company_members")
-          .select("role")
-          .eq("company_id", company)
-          .eq("user_id", session!.user.id)
-          .single(),
+        db.rpc("company_permission", { p_company: company, p_action: "write" }),
       ]);
       if (r.error) throw r.error;
       if (version !== loadVersion.current) return;
       setData(Object.fromEntries(results) as Catalog);
       setPrices(p);
-      setRole(r.data.role);
+      setRole(r.data ? "editor" : "viewer");
     } catch (e: any) {
       if (version === loadVersion.current) setError(e.message);
     } finally {
@@ -448,7 +482,28 @@ function App() {
       <Sidebar
         section={section}
         company={company}
-        companies={companies}
+        companies={companies.filter((c) => c.active !== false)}
+        allowedSections={[
+          "dashboard",
+          ...(activeCompany?.catalog_read
+            ? ["materials", "products", "settings"]
+            : []),
+          ...(activeCompany?.inventory_read ? ["purchases", "inventory"] : []),
+          ...(activeCompany?.production_read ? ["formulas", "production"] : []),
+          ...(activeCompany?.sales_read ? ["sales", "customers"] : []),
+          ...(activeCompany?.reports_read ? ["reports"] : []),
+          ...(activeCompany?.manage || canCreate ? ["settings"] : []),
+        ]}
+        corporations={corporations}
+        onCorporation={(id) => {
+          if (!leaveSheet()) return;
+          setPickerCorp(id);
+          const list = companies.filter(
+            (c) => c.corporation_id === id && c.active !== false,
+          );
+          setCompany(list.length === 1 ? list[0].id : "");
+          setSection("dashboard");
+        }}
         email={session.user.email}
         onCompany={(value) => {
           if (value === company) return;
@@ -459,7 +514,12 @@ function App() {
           if (!leaveSheet()) return false;
           setSection(next);
           if (next === "materials") setTab("raw_materials");
-          if (next === "settings" && configView !== "origins")
+          if (
+            next === "settings" &&
+            !["origins", "profile", "appearance", "structure"].includes(
+              configView,
+            )
+          )
             setTab(configView as Tab);
           setQuery("");
           setEdit(undefined);
@@ -491,14 +551,29 @@ function App() {
             {error}
           </p>
         )}
-        {!company ? (
-          <section className="empty">
-            <h1>Tu cuenta está lista</h1>
-            <p>
-              El administrador debe asignarte acceso a Ohana para ver el
-              catálogo.
-            </p>
-          </section>
+        {!company && section === "settings" && configView === "structure" ? (
+          <OrganizationAdmin
+            companies={companies}
+            corporations={corporations}
+            canCreate={canCreate}
+            onSaved={refreshContext}
+          />
+        ) : !company ? (
+          <CompanyPicker
+            key={pickerCorp}
+            initialCorporation={pickerCorp}
+            companies={companies}
+            corporations={corporations}
+            canCreate={canCreate}
+            onSelect={(id) => {
+              setCompany(id);
+              setSection("dashboard");
+            }}
+            onManage={() => {
+              setSection("settings");
+              setConfigView("structure");
+            }}
+          />
         ) : (
           <>
             {section === "settings" && (
@@ -517,26 +592,68 @@ function App() {
                   aria-label="Catálogos de configuración"
                 >
                   {[
+                    ["profile", "Datos de empresa"],
+                    ["appearance", "Apariencia"],
+                    ["structure", "Corporaciones y accesos"],
                     ["origins", "Orígenes"],
                     ["suppliers", "Proveedores"],
                     ["presentations", "Presentaciones"],
                     ["units", "Unidades"],
-                  ].map(([key, label]) => (
-                    <button
-                      key={key}
-                      className={configView === key ? "selected" : ""}
-                      onClick={() => {
-                        if (!leaveSheet()) return;
-                        setConfigView(key);
-                        if (key !== "origins") setTab(key as Tab);
-                        setEdit(undefined);
-                        setQuery("");
-                      }}
-                    >
-                      {label}
-                    </button>
-                  ))}
+                  ]
+                    .filter(
+                      ([key]) =>
+                        activeCompany?.manage ||
+                        [
+                          "origins",
+                          "suppliers",
+                          "presentations",
+                          "units",
+                        ].includes(key),
+                    )
+                    .map(([key, label]) => (
+                      <button
+                        key={key}
+                        className={configView === key ? "selected" : ""}
+                        onClick={() => {
+                          if (key === configView) return;
+                          if (!leaveSheet()) return;
+                          setConfigView(key);
+                          if (
+                            ![
+                              "origins",
+                              "profile",
+                              "appearance",
+                              "structure",
+                            ].includes(key)
+                          )
+                            setTab(key as Tab);
+                          setEdit(undefined);
+                          setQuery("");
+                        }}
+                      >
+                        {label}
+                      </button>
+                    ))}
                 </nav>
+                {(configView === "profile" || configView === "appearance") &&
+                  activeCompany && (
+                    <CompanySettings
+                      key={company + configView}
+                      company={activeCompany}
+                      canManage={!!activeCompany.manage}
+                      appearance={configView === "appearance"}
+                      onSaved={refreshContext}
+                      onDirty={setSettingsDirty}
+                    />
+                  )}
+                {configView === "structure" && (
+                  <OrganizationAdmin
+                    companies={companies}
+                    corporations={corporations}
+                    canCreate={canCreate}
+                    onSaved={refreshContext}
+                  />
+                )}
                 {configView === "origins" && (
                   <OriginsSettings
                     key={company}
@@ -546,6 +663,57 @@ function App() {
                     onSaved={load}
                   />
                 )}
+              </>
+            )}
+            {section === "dashboard" && (
+              <>
+                <section className="intro">
+                  <div>
+                    <p className="eyebrow">{activeCompany?.corporation_name}</p>
+                    <h1>{activeCompany?.name}</h1>
+                    <p>Tu negocio, en armonía.</p>
+                  </div>
+                </section>
+                <section className="stats">
+                  <div>
+                    <span>Materiales</span>
+                    <strong>
+                      {data.raw_materials.filter((m) => m.active).length}
+                    </strong>
+                  </div>
+                  <div>
+                    <span>Productos</span>
+                    <strong>
+                      {data.products.filter((p) => p.active).length}
+                    </strong>
+                  </div>
+                  <div>
+                    <span>Proveedores</span>
+                    <strong>
+                      {data.suppliers.filter((p) => p.active).length}
+                    </strong>
+                  </div>
+                </section>
+                <div className="form-actions">
+                  <button onClick={() => setSection("materials")}>
+                    Abrir materiales
+                  </button>
+                  <button
+                    className="secondary"
+                    onClick={() => setSection("products")}
+                  >
+                    Abrir productos
+                  </button>
+                  <button
+                    className="secondary"
+                    onClick={() => {
+                      setSection("settings");
+                      setConfigView("profile");
+                    }}
+                  >
+                    Configurar empresa
+                  </button>
+                </div>
               </>
             )}
             {section === "products" && (
@@ -570,6 +738,7 @@ function App() {
               />
             )}
             {![
+              "dashboard",
               "materials",
               "products",
               "settings",
