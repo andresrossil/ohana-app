@@ -210,6 +210,7 @@ function CompanyProfile({
     <label>
       {label}
       <input
+        data-field={key}
         type={type}
         maxLength={key === "address" ? 500 : 200}
         value={details[key] || ""}

@@ -1450,3 +1450,4 @@ createRoot(document.getElementById("root")!).render(
   </React.StrictMode>,
 );
 import "./admin.css";
+import "./admin-forms.css";
