@@ -1,14 +1,16 @@
 # Hoja de materias primas
 
-La hoja conserva las 13 columnas del Excel, en el mismo orden. Una fila representa una presentación cotizada, enlazada a materia prima, proveedor y unidad. El catálogo y formularios anteriores siguen disponibles mediante “Ver catálogo y formularios clásicos”.
+La hoja conserva las 13 columnas del Excel, en el mismo orden. Una fila representa una presentación cotizada, enlazada a materia prima, proveedor y unidad. El catálogo es la vista inicial; “Editar catálogo en tabla” permite editar registros existentes. “Agregar materia prima individual” conserva el formulario de alta individual.
 
 ## Copiar desde Excel
 
-1. En Materias primas, pulsa “Fila nueva” y selecciona la celda PROVEEDOR.
-2. Copia las filas de Excel con Ctrl+C y pégalas con Ctrl+V. Puedes incluir los encabezados originales. El límite es 500 filas por lote.
+1. En Materias primas, pulsa “Copiar de Tabla”. Se abre una pantalla de carga independiente que siempre comienza vacía, sin los registros guardados del catálogo.
+2. Pega tus celdas de Excel con Ctrl+V en la primera celda, que recibe el foco al abrir. Si pegas 30 filas se crean automáticamente 30 filas de datos. No hay que agregarlas antes. Puedes incluir los encabezados originales. El límite es 500 filas por lote.
 3. Revisa las celdas. Los proveedores nuevos se crean al confirmar; las unidades deben existir en Unidades. OZ se reconoce como onza de masa; una onza fluida requiere una unidad de volumen separada.
-4. Abre “Revisar cambios”. Los errores indican la fila y el campo. Cierra la vista para corregirlos.
+4. Edita directamente las celdas que necesites y pulsa “Guardar”. Se abre la revisión del lote; los errores indican la fila y el campo. Cierra la revisión para corregir las celdas.
 5. Si hay coincidencias, elige actualizar o agregar una presentación intencionalmente. Confirmar guarda el lote completo; un error revierte todo el lote.
+
+“Cancelar” sale sin guardar y pide confirmación si hay datos pendientes. Al volver a abrir “Copiar de Tabla”, comienza una carga vacía. La última línea vacía de la tabla permite escribir o seguir pegando y no cuenta como registro hasta que recibe datos. En esta pantalla solo están los botones principales Guardar y Cancelar; las opciones de históricos y ayuda están dentro de un desplegable al pie.
 
 Se conservan celdas vacías y texto de Excel con saltos de línea o tabulaciones entre comillas. Los precios admiten `Q 120.00`, `Q2.40`, números sin símbolo, separadores de miles y coma decimal sin separadores de miles. Las fechas admiten día/mes/año o año-mes-día. La capacidad, por ejemplo `54 OZ`, es solo texto informativo: con presentación 50 y precio Q120, el precio unitario es Q2.40.
 
@@ -18,7 +20,7 @@ Las cantidades admiten hasta 8 decimales y los precios hasta 4. La hoja muestra 
 
 - Edita las celdas manuales directamente. Los cálculos permanecen de solo lectura.
 - Selecciona un rango arrastrando, con Mayús + clic o con Mayús + flechas.
-- Ctrl+C copia el rango y Ctrl+V lo pega desde la celda superior izquierda. “Copiar tabla” incluye los encabezados.
+- Ctrl+C copia el rango y Ctrl+V lo pega desde la celda superior izquierda. En la vista de edición del catálogo, “Copiar tabla” incluye los encabezados.
 - Mayús + Supr vacía las celdas editables del rango. Las columnas calculadas no se vacían.
 - Los cambios permanecen como borrador hasta revisar y confirmar. Navegar fuera, cambiar empresa, cerrar sesión o descartar pide confirmar si hay cambios pendientes.
 - En celular, desliza horizontalmente la hoja para llegar a todas las columnas. El pegado depende del menú de portapapeles del navegador y teclado del dispositivo.
