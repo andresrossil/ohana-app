@@ -698,6 +698,12 @@ function App() {
                         </AppButton>
                       ))}
                   </nav>
+                  {configView === "profile" && activeCompany?.manage && (
+                    <AppButton className="secondary company-back" iconKey="action.back"
+                      onClick={() => { if (leaveSheet()) setConfigView("structure"); }}>
+                      Volver a la corporación
+                    </AppButton>
+                  )}
                   {(configView === "profile" || configView === "appearance") &&
                     activeCompany && (
                       <CompanySettings
@@ -743,7 +749,7 @@ function App() {
                 </>
               )}
               {section === "dashboard" && (
-                <>
+                <section className="admin-dashboard" aria-label="Resumen de empresa">
                   <section className="intro">
                     <div>
                       <p className="eyebrow">
@@ -775,60 +781,8 @@ function App() {
                       </div>
                     </section>
                   )}
-                  <div className="form-actions">
-                    {(
-                      [
-                        [
-                          "materials",
-                          "Materiales",
-                          activeCompany?.catalog_read,
-                        ],
-                        ["products", "Productos", activeCompany?.catalog_read],
-                        ["purchases", "Compras", activeCompany?.inventory_read],
-                        [
-                          "inventory",
-                          "Inventario",
-                          activeCompany?.inventory_read,
-                        ],
-                        [
-                          "formulas",
-                          "Fórmulas",
-                          activeCompany?.production_read,
-                        ],
-                        [
-                          "production",
-                          "Producción",
-                          activeCompany?.production_read,
-                        ],
-                        ["sales", "Ventas", activeCompany?.sales_read],
-                        ["reports", "Reportes", activeCompany?.reports_read],
-                      ] as const
-                    )
-                      .filter(([, , allowed]) => allowed)
-                      .map(([key, label]) => (
-                        <AppButton
-                          key={key}
-                          className="secondary"
-                          onClick={() => {
-                            setSection(key);
-                            if (key === "materials") setTab("raw_materials");
-                          }}
-                        >
-                          Abrir {label.toLowerCase()}
-                        </AppButton>
-                      ))}
-                    {activeCompany?.manage && (
-                      <AppButton
-                        onClick={() => {
-                          setSection("settings");
-                          setConfigView("profile");
-                        }}
-                      >
-                        Configurar empresa
-                      </AppButton>
-                    )}
-                  </div>
-                </>
+
+                </section>
               )}
               {section === "products" && (
                 <ProductsCatalog

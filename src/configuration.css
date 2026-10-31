@@ -1,3 +1,26 @@
+.shell .admin-dashboard {
+  width: 100%;
+  max-width: 1120px;
+  display: grid;
+  gap: 20px;
+}
+.shell .admin-dashboard .intro {
+  margin-bottom: 0;
+}
+.shell .admin-dashboard .stats {
+  margin: 0;
+}
+.shell .company-settings,
+.shell .org-hierarchy {
+  width: 100%;
+  max-width: 1040px;
+}
+.shell .company-back {
+  margin-bottom: 14px;
+}
+.shell .org-hierarchy .modal.operations-dialog {
+  width: min(720px, calc(100vw - 32px));
+}
 .shell button:has(> .app-icon) {
   display: inline-flex;
   align-items: center;

@@ -506,6 +506,11 @@ export default function OrganizationAdmin({
           >
             <div className="hierarchy-toolbar">
               <h2>{dialog.title}</h2>
+              {dialog.type.includes("company") && (
+                <AppButton className="secondary" iconKey="action.back" disabled={busy} onClick={close}>
+                  Volver a la corporación
+                </AppButton>
+              )}
               <AppButton className="secondary" disabled={busy} onClick={close}>
                 Cerrar
               </AppButton>
