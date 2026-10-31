@@ -31,6 +31,7 @@ import {
   editIdentity,
   identityErrors,
 } from "./sheet-identity";
+import { sortSheetKeys, mergeSheetEdits } from "./sheet-order";
 import { linkedBarcode, prefixFor } from "./catalog-model";
 const displayColumns = visualOrder.map((c) => columns[c]);
 const emptyRows: CatalogRow[] = [];
@@ -87,7 +88,11 @@ function VsIcon({ variation }: { variation: number | null }) {
       title={`${label}${variation === null ? "" : ` · Diferencia por unidad: ${numeric(variation)}`}`}
     >
       {state === "neutral" ? (
-        "—"
+        variation === null ? (
+          "—"
+        ) : (
+          "="
+        )
       ) : (
         <svg width="21" height="21" viewBox="0 0 24 24" aria-hidden="true">
           <circle cx="12" cy="12" r="10" fill="currentColor" />
@@ -137,7 +142,23 @@ export default function MaterialSheet({
     [busy, setBusy] = useState(false),
     [preview, setPreview] = useState(false),
     [legacyImport, setLegacyImport] = useState(false),
-    [basis, setBasis] = useState("unknown");
+    [basis] = useState("unknown");
+  const [sort, setSort] = useState<{
+    column: number;
+    direction: "asc" | "desc";
+  } | null>(null);
+  const [orderedKeys, setOrderedKeys] = useState<string[]>([]);
+  const viewRows = useMemo(() => {
+    const positions = new Map(orderedKeys.map((key, index) => [key, index]));
+    return [...rows].sort(
+      (a, b) =>
+        (positions.get(a.key) ?? Infinity) - (positions.get(b.key) ?? Infinity),
+    );
+  }, [rows, orderedKeys]);
+  // Display order must never change chronological tie-breaking in calculations.
+  function updateView(next: SheetRow[]) {
+    setRows((old) => mergeSheetEdits(old, next));
+  }
   const [anchor, setAnchor] = useState<Point>({ row: 0, col: 0 }),
     [end, setEnd] = useState<Point>({ row: 0, col: 0 });
   const modal = useRef<HTMLElement>(null);
@@ -168,6 +189,8 @@ export default function MaterialSheet({
   };
   async function load() {
     setLoading(true);
+    setSort(null);
+    setOrderedKeys([]);
     setError("");
     try {
       const { sheet, history: all } = await readSnapshot(company, !importing);
@@ -360,6 +383,32 @@ export default function MaterialSheet({
     if (c === 11) return calc.previousSupplier;
     return r.cells[c] || "";
   }
+  function orderBy(column: number) {
+    const direction =
+      sort?.column === column && sort.direction === "asc" ? "desc" : "asc";
+    const logical = visualOrder[column];
+    setOrderedKeys(
+      sortSheetKeys(
+        viewRows,
+        (row) => {
+          if (column === -1) return rows.indexOf(row);
+          const calc = result(row);
+          if (logical === 8) return calc.current;
+          if (logical === 9) return calc.variation;
+          if (logical === 10) return calc.previousDisplay;
+          if ([4, 7].includes(logical)) return parseNumber(row.cells[logical]);
+          if (logical === 12) return parseDate(row.cells[logical]);
+          if (logical === 11)
+            return calc.previousSupplier === "—" ? null : calc.previousSupplier;
+          return row.cells[logical] || null;
+        },
+        direction,
+      ),
+    );
+    setSort({ column, direction });
+    setAnchor({ row: 0, col: Math.max(0, column) });
+    setEnd({ row: 0, col: Math.max(0, column) });
+  }
   function editable(position: number) {
     const c = visualOrder[position];
     return (
@@ -437,7 +486,7 @@ export default function MaterialSheet({
   }, [rows]);
   function change(index: number, position: number, text: string) {
     const col = visualOrder[position],
-      source = index === rows.length ? [...rows, blankRow()] : rows;
+      source = index === viewRows.length ? [...viewRows, blankRow()] : viewRows;
     const next = source.map((r, i) => {
       if (i !== index) return r;
       let row = editIdentity(hydrateIdentity(r, materials, origins), col, text);
@@ -468,7 +517,7 @@ export default function MaterialSheet({
         if (i !== index && groupKey(next[i]) === key)
           next[i] = editIdentity(next[i], col, text);
     }
-    setRows(next);
+    updateView(next);
     if (index === rows.length)
       requestAnimationFrame(() => {
         const input = table.current?.querySelector<HTMLElement>(
@@ -516,7 +565,7 @@ export default function MaterialSheet({
         line.some((text, ci) => [10, 11].includes(mapping[ci]) && text.trim()),
       );
       if (hasHistorical) setLegacyImport(true);
-      const next = rows.map((r) => ({ ...r, cells: [...r.cells] }));
+      const next = viewRows.map((r) => ({ ...r, cells: [...r.cells] }));
       while (next.length < start.row + matrix.length) next.push(blankRow());
       matrix.forEach((line, ri) => {
         let row = next[start.row + ri];
@@ -565,7 +614,7 @@ export default function MaterialSheet({
           );
         next[start.row + ri] = row;
       });
-      setRows(next);
+      updateView(next);
       start.col = Math.min(...mapping.map((c) => visualOrder.indexOf(c)));
       setAnchor(start);
       setEnd({
@@ -599,7 +648,7 @@ export default function MaterialSheet({
     );
   }
   function copy(e: ClipboardEvent) {
-    const matrix = rows
+    const matrix = viewRows
       .slice(selected.r0, selected.r1 + 1)
       .filter(visibleRow)
       .map((r) =>
@@ -612,6 +661,7 @@ export default function MaterialSheet({
     e.clipboardData.setData("text/plain", formatTSV(matrix));
   }
   function key(e: KeyboardEvent) {
+    if (e.target instanceof Element && e.target.closest("button")) return;
     if (e.target instanceof HTMLSelectElement && e.key !== "Tab") return;
     const arrows: Record<string, Point> = {
       ArrowUp: { row: -1, col: 0 },
@@ -629,7 +679,13 @@ export default function MaterialSheet({
       e.preventDefault();
       setRows((old) =>
         old.map((r, ri) => {
-          if (ri < selected.r0 || ri > selected.r1 || !visibleRow(r)) return r;
+          const viewIndex = viewRows.findIndex((row) => row.key === r.key);
+          if (
+            viewIndex < selected.r0 ||
+            viewIndex > selected.r1 ||
+            !visibleRow(r)
+          )
+            return r;
           const next = { ...r, cells: [...r.cells], dirty: true };
           for (let c = selected.c0; c <= selected.c1; c++)
             if (editable(c)) {
@@ -701,14 +757,14 @@ export default function MaterialSheet({
     validate(r).map((message) => ({
       key: r.key,
       message,
-      row: rows.indexOf(r) + 1,
+      row: viewRows.indexOf(r) + 1,
     })),
   );
   const warnings = dirty.flatMap((r) =>
     incompleteWarnings(r).map((message) => ({
       key: r.key,
       message,
-      row: rows.indexOf(r) + 1,
+      row: viewRows.indexOf(r) + 1,
     })),
   );
   const duplicateMissing = dirty.some(
@@ -798,7 +854,7 @@ export default function MaterialSheet({
       await navigator.clipboard.writeText(
         formatTSV([
           displayColumns,
-          ...rows
+          ...viewRows
             .filter(visibleRow)
             .map((r) =>
               displayColumns.map((_, c) => value(r, c).replace(/ \*$/, "")),
@@ -967,7 +1023,7 @@ export default function MaterialSheet({
                     setError("");
                   }}
                 >
-                  Revisar {dirty.length || ""} cambios
+                  Guardar cambios
                 </AppButton>
                 <AppButton
                   className="secondary"
@@ -1000,49 +1056,6 @@ export default function MaterialSheet({
           origins={origins}
         />
       )}
-      <details className={importing ? "import-options" : "sheet-options"}>
-        <summary>Opciones de históricos y ayuda</summary>
-        {canWrite && (
-          <div className="sheet-migration">
-            <label>
-              <input
-                type="checkbox"
-                checked={legacyImport}
-                onChange={(e) => setLegacyImport(e.target.checked)}
-              />{" "}
-              Importación inicial: conservar precio y proveedor anteriores de
-              Excel
-            </label>
-            {legacyImport && (
-              <label>
-                Interpretación del precio anterior
-                <select
-                  aria-label="Interpretación del precio anterior"
-                  value={basis}
-                  onChange={(e) => setBasis(e.target.value)}
-                >
-                  <option value="unknown">
-                    Sin unidad conocida: conservar referencia, sin VS
-                  </option>
-                  <option value="unit">
-                    Precio por la misma unidad de esta fila
-                  </option>
-                  <option value="presentation">
-                    Precio total de la misma cantidad y unidad de esta fila
-                  </option>
-                </select>
-              </label>
-            )}
-          </div>
-        )}
-        <p className="sheet-legend">
-          <span>Editable</span>
-          <span>▧ Calculado / solo lectura</span> CAPACIDAD es informativa.
-          PRECIO UN = precio ÷ presentación. VS se expresa en la unidad de la
-          fila y la misma moneda.{" "}
-          <b>* Referencia histórica sin unidad o fecha conocida.</b>
-        </p>
-      </details>
       {notice && (
         <p role="status" className="sheet-notice">
           <AppIcon name="status.info" />
@@ -1078,16 +1091,62 @@ export default function MaterialSheet({
           <table className="sheet-table" aria-label="Hoja de materiales">
             <thead>
               <tr>
-                <th>#</th>
+                <th
+                  scope="col"
+                  aria-sort={
+                    sort?.column === -1
+                      ? sort.direction === "asc"
+                        ? "ascending"
+                        : "descending"
+                      : "none"
+                  }
+                >
+                  <AppButton
+                    type="button"
+                    className="sheet-sort"
+                    disabled={busy || suggesting}
+                    onClick={() => orderBy(-1)}
+                    aria-label="Ordenar por fila"
+                  >
+                    # ↕
+                  </AppButton>
+                </th>
                 {displayColumns.map((col, c) => (
-                  <th key={col} scope="col">
-                    {col === "VS" && <AppIcon name="action.compare" />}
-                    {col === "PRECIO UN" && <AppIcon name="action.calculate" />}
-                    {col === "PRECIO ANTERIOR" && (
-                      <AppIcon name="action.history" />
-                    )}
-                    {col}
-                    {[2, 4, 5].includes(visualOrder[c]) ? " *" : ""}
+                  <th
+                    key={col}
+                    scope="col"
+                    aria-sort={
+                      sort?.column === c
+                        ? sort.direction === "asc"
+                          ? "ascending"
+                          : "descending"
+                        : "none"
+                    }
+                  >
+                    <AppButton
+                      type="button"
+                      className="sheet-sort"
+                      disabled={busy || suggesting}
+                      onClick={() => orderBy(c)}
+                      aria-label={`Ordenar por ${col}: ${sort?.column === c && sort.direction === "asc" ? "descendente" : "ascendente"}`}
+                    >
+                      {col === "VS" && <AppIcon name="action.compare" />}
+                      {col === "PRECIO UN" && (
+                        <AppIcon name="action.calculate" />
+                      )}
+                      {col === "PRECIO ANTERIOR" && (
+                        <AppIcon name="action.history" />
+                      )}
+                      {col}
+                      {[2, 4, 5].includes(visualOrder[c]) ? " *" : ""}
+                      <span aria-hidden="true" className="sort-direction">
+                        {sort?.column === c
+                          ? sort.direction === "asc"
+                            ? " ↑"
+                            : " ↓"
+                          : " ↕"}
+                      </span>
+                    </AppButton>
                     <small>
                       {manualColumns.includes(visualOrder[c])
                         ? "Manual"
@@ -1100,7 +1159,7 @@ export default function MaterialSheet({
               </tr>
             </thead>
             <tbody>
-              {rows.map((r, ri) => {
+              {viewRows.map((r, ri) => {
                 if (!visibleRow(r)) return null;
                 const rowErrors = validate(r),
                   rowWarnings = incompleteWarnings(r);
@@ -1400,7 +1459,8 @@ export default function MaterialSheet({
                 return (
                   <article key={r.key}>
                     <strong>
-                      Fila {rows.indexOf(r) + 1}: {r.cells[2] || "Sin nombre"}
+                      Fila {viewRows.indexOf(r) + 1}:{" "}
+                      {r.cells[2] || "Sin nombre"}
                     </strong>
                     <p>
                       {r.cells[0] || "Sin proveedor"}
@@ -1439,7 +1499,7 @@ export default function MaterialSheet({
                       <label>
                         Posible duplicado: elige cómo guardar
                         <select
-                          aria-label={`Duplicado fila ${rows.indexOf(r) + 1}`}
+                          aria-label={`Duplicado fila ${viewRows.indexOf(r) + 1}`}
                           value={r.duplicateChoice ? r.mode : ""}
                           onChange={(e) =>
                             setRows((old) =>

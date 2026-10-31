@@ -11,6 +11,9 @@ import CatalogOverview from "../src/CatalogOverview";
 import BarcodeDialog from "../src/BarcodeDialog";
 import type { CatalogRow } from "../src/sheet-model";
 import "../src/style.css";
+import "../src/admin.css";
+import "../src/admin-forms.css";
+import "../src/configuration.css";
 const company = "fixture";
 const catalog = {
   units: [
@@ -144,6 +147,24 @@ const history = [
     created_at: "2026-07-04T12:00:00Z",
   },
 ];
+history.push(
+  {
+    id: "h5",
+    presentation_id: "p3",
+    amount: 10,
+    currency: "GTQ",
+    effective_on: "2026-07-03",
+    created_at: "2026-07-03T12:00:00Z",
+  },
+  {
+    id: "h6",
+    presentation_id: "p3",
+    amount: 10,
+    currency: "GTQ",
+    effective_on: "2026-07-04",
+    created_at: "2026-07-04T12:00:00Z",
+  },
+);
 const readSnapshot = async () => ({
   sheet: catalog.presentations.map((p, i) => ({
     ...p,
@@ -153,9 +174,9 @@ const readSnapshot = async () => ({
     capacity: "",
     comment: "",
     unit_symbol: i === 0 ? "g" : "ud",
-    amount: i === 0 ? 8 : i === 1 ? 40 : null,
-    effective_on: i < 2 ? "2026-07-04" : null,
-    price_id: i === 0 ? "h2" : i === 1 ? "h4" : null,
+    amount: i === 0 ? 8 : i === 1 ? 40 : 10,
+    effective_on: "2026-07-04",
+    price_id: i === 0 ? "h2" : i === 1 ? "h4" : "h6",
   })),
   history,
 });
@@ -169,9 +190,23 @@ function Fixture() {
   const [section, setSection] = useState<Section>("materials"),
     [importing, setImporting] = useState(false),
     [barcode, setBarcode] = useState<CatalogRow | null>(null),
-    [dirty, setDirty] = useState(false);
+    [dirty, setDirty] = useState(false),
+    [purple, setPurple] = useState(false);
   return (
-    <div className="shell">
+    <div
+      className="shell"
+      style={
+        purple
+          ? ({
+              "--admin-text": "#512b67",
+              "--admin-heading": "#512b67",
+              "--admin-muted": "#6c4d7a",
+              "--admin-secondary": "#f4edf8",
+              "--admin-primary": "#71468b",
+            } as import("react").CSSProperties)
+          : undefined
+      }
+    >
       <Sidebar
         section={section}
         onNavigate={(value) => {
@@ -187,7 +222,9 @@ function Fixture() {
       <main>
         <header>
           <span>PRUEBA LOCAL · DATOS SINTÉTICOS</span>
-          <span className="badge">Acceso de edición</span>
+          <button onClick={() => setPurple((v) => !v)}>
+            Cambiar tema de prueba
+          </button>
         </header>
         {section === "materials" ? (
           <>
