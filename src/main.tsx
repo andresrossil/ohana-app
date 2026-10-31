@@ -26,6 +26,7 @@ import { useCompanyTheme } from "./CompanyBrand";
 type Row = { id: string; [key: string]: any };
 const Reports = lazy(() => import("./Reports"));
 const Inventory = lazy(() => import("./Inventory"));
+const Formulas = lazy(() => import("./Formulas"));
 const Production = lazy(() => import("./Production"));
 const BusinessPartners = lazy(() => import("./BusinessPartners"));
 const Sales = lazy(() => import("./Sales"));
@@ -817,11 +818,17 @@ function App() {
                   purchases={section === "purchases"}
                 />
               )}
-              {(section === "formulas" || section === "production") && (
+              {section === "formulas" && (
+                <Formulas
+                  key={company}
+                  company={company}
+                  onDirty={setSettingsDirty}
+                />
+              )}
+              {section === "production" && (
                 <Production
                   key={company + section}
                   company={company}
-                  formulasOnly={section === "formulas"}
                   manager={activeCompany?.manage}
                 />
               )}
