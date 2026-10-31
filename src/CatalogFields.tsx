@@ -1,3 +1,4 @@
+import { AppButton, AppIcon } from "./AppIcon";
 import { useEffect, useRef, useState } from "react";
 import { supabase as db } from "./client";
 import { classifications } from "./sheet-model";
@@ -116,14 +117,14 @@ export default function CatalogFields({
               changeSku(e.target.value);
             }}
           />
-          <button
+          <AppButton
             type="button"
             className="secondary"
             disabled={busy || !!sku}
             onClick={() => void suggest()}
           >
             {busy ? "Sugiriendo…" : "Sugerir"}
-          </button>
+          </AppButton>
         </div>
       </label>
       <label>
@@ -174,6 +175,7 @@ export default function CatalogFields({
       </p>
       {error && (
         <p className="error" role="alert">
+          <AppIcon name="status.error" />
           {error}
         </p>
       )}

@@ -1,3 +1,4 @@
+import { AppButton, AppIcon } from "./AppIcon";
 import { useEffect, useState } from "react";
 import {
   operation,
@@ -61,7 +62,7 @@ export default function Production({
         </div>
         <div className="actions">
           {state.canWrite && (
-            <button
+            <AppButton
               onClick={() => {
                 setSelected(null);
                 setIngredients([{ key: crypto.randomUUID(), material: "" }]);
@@ -70,19 +71,20 @@ export default function Production({
               }}
             >
               {formulasOnly ? "Crear versión de fórmula" : "Iniciar lote"}
-            </button>
+            </AppButton>
           )}
-          <button
+          <AppButton
             className="secondary"
             disabled={state.busy}
             onClick={() => state.run(load)}
           >
             Actualizar
-          </button>
+          </AppButton>
         </div>
       </section>
       {state.error && !mode && (
         <p className="error" role="alert">
+          <AppIcon name="status.error" />
           {state.error}
         </p>
       )}
@@ -108,6 +110,7 @@ export default function Production({
             <>
               {state.error && (
                 <p className="error" role="alert">
+                  <AppIcon name="status.error" />
                   {state.error}
                 </p>
               )}
@@ -267,7 +270,7 @@ export default function Production({
                           </select>
                         </label>
                         {ingredients.length > 1 && (
-                          <button
+                          <AppButton
                             type="button"
                             className="secondary"
                             onClick={() =>
@@ -277,12 +280,12 @@ export default function Production({
                             }
                           >
                             Quitar
-                          </button>
+                          </AppButton>
                         )}
                       </div>
                     );
                   })}
-                  <button
+                  <AppButton
                     type="button"
                     className="secondary"
                     disabled={ingredients.length >= 100}
@@ -294,7 +297,7 @@ export default function Production({
                     }
                   >
                     Añadir material
-                  </button>
+                  </AppButton>
                 </>
               ) : mode === "start" ? (
                 <div className="settings-grid">
@@ -401,6 +404,7 @@ export default function Production({
                     (v: Row) => v.product_id === selected!.product_id,
                   ) && (
                     <p className="error">
+                      <AppIcon name="status.error" />
                       Primero crea variantes en Productos.
                     </p>
                   )}
@@ -456,21 +460,21 @@ export default function Production({
                 </>
               )}
               <div className="form-actions">
-                <button disabled={state.busy}>
+                <AppButton disabled={state.busy}>
                   {mode === "finish"
                     ? "Finalizar y enviar a curación"
                     : mode === "release"
                       ? "Liberar existencias"
                       : "Guardar"}
-                </button>
-                <button
+                </AppButton>
+                <AppButton
                   type="button"
                   className="secondary"
                   disabled={state.busy}
                   onClick={() => setMode(null)}
                 >
                   Cancelar
-                </button>
+                </AppButton>
               </div>
             </form>
           </section>
@@ -559,17 +563,17 @@ export default function Production({
                         </small>
                       ))}
                       {state.canWrite && b.state === "in_progress" && (
-                        <button
+                        <AppButton
                           onClick={() => {
                             setSelected(b);
                             setMode("finish");
                           }}
                         >
                           Finalizar
-                        </button>
+                        </AppButton>
                       )}
                       {state.canWrite && b.state === "curing" && (
-                        <button
+                        <AppButton
                           disabled={b.available_on > today() && !manager}
                           onClick={() => {
                             setSelected(b);
@@ -577,7 +581,7 @@ export default function Production({
                           }}
                         >
                           Liberar lote
-                        </button>
+                        </AppButton>
                       )}
                     </td>
                   </tr>

@@ -1,3 +1,4 @@
+import { AppButton, AppIcon } from "./AppIcon";
 import { useEffect, useState, lazy, Suspense } from "react";
 import { operation, mutate, useOperation, money, type Row } from "./operations";
 const BarcodeDialog = lazy(() => import("./BarcodeDialog"));
@@ -35,7 +36,7 @@ export default function VariantManager({
             <p className="eyebrow">VARIANTES</p>
             <h2>{product.name}</h2>
           </div>
-          <button
+          <AppButton
             disabled={state.busy}
             className="secondary"
             onClick={() => {
@@ -48,7 +49,7 @@ export default function VariantManager({
             }}
           >
             Cerrar
-          </button>
+          </AppButton>
         </header>
         <p>
           Un producto, varias opciones de venta. Los rangos de peso son
@@ -56,12 +57,13 @@ export default function VariantManager({
         </p>
         {state.error && (
           <p className="error" role="alert">
+            <AppIcon name="status.error" />
             {state.error}
           </p>
         )}
         {state.notice && <p role="status">{state.notice}</p>}
         {state.canWrite && edit === undefined && (
-          <button onClick={() => setEdit(null)}>Agregar variante</button>
+          <AppButton onClick={() => setEdit(null)}>Agregar variante</AppButton>
         )}
         {edit !== undefined && (
           <form
@@ -199,14 +201,14 @@ export default function VariantManager({
               Permitir pedidos anticipados
             </label>
             <div className="form-actions">
-              <button disabled={state.busy}>Guardar variante</button>
-              <button
+              <AppButton disabled={state.busy}>Guardar variante</AppButton>
+              <AppButton
                 type="button"
                 className="secondary"
                 onClick={() => setEdit(undefined)}
               >
                 Cancelar
-              </button>
+              </AppButton>
             </div>
           </form>
         )}
@@ -249,10 +251,12 @@ export default function VariantManager({
                   </td>
                   <td className="actions">
                     {state.canWrite && (
-                      <button onClick={() => setEdit(r)}>Editar</button>
+                      <AppButton onClick={() => setEdit(r)}>Editar</AppButton>
                     )}
                     {r.barcode && (
-                      <button onClick={() => setBarcode(r)}>Barras</button>
+                      <AppButton onClick={() => setBarcode(r)}>
+                        Barras
+                      </AppButton>
                     )}
                   </td>
                 </tr>

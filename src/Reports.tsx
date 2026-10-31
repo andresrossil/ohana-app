@@ -1,3 +1,4 @@
+import { AppButton, AppIcon } from "./AppIcon";
 import { useEffect, useState } from "react";
 import { request } from "./commerce";
 import { useOperation, money, type Row } from "./operations";
@@ -21,12 +22,13 @@ export default function Reports({ company }: { company: string }) {
             separados por moneda.
           </p>
         </div>
-        <button disabled={state.busy} onClick={() => state.run(load)}>
+        <AppButton disabled={state.busy} onClick={() => state.run(load)}>
           Actualizar
-        </button>
+        </AppButton>
       </section>
       {state.error && (
         <p className="error" role="alert">
+          <AppIcon name="status.error" />
           {state.error}
         </p>
       )}

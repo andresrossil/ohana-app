@@ -1,3 +1,4 @@
+import { AppButton, AppIcon } from "./AppIcon";
 import AdminAppearance from "./AdminAppearance";
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
@@ -225,6 +226,7 @@ function CompanyProfile({
       <h2>{appearance ? "Apariencia de la empresa" : "Datos de empresa"}</h2>
       {!canManage && (
         <p className="sheet-notice">
+          <AppIcon name="status.info" />
           Configuración de solo lectura. Solo los administradores autorizados
           pueden modificarla.
         </p>
@@ -239,7 +241,7 @@ function CompanyProfile({
             </p>
             <div className="palette-buttons">
               {Object.entries(palettes).map(([key, value]) => (
-                <button
+                <AppButton
                   type="button"
                   className="secondary"
                   key={key}
@@ -249,7 +251,7 @@ function CompanyProfile({
                   }}
                 >
                   {key}
-                </button>
+                </AppButton>
               ))}
             </div>
             <div className="settings-grid">
@@ -459,23 +461,26 @@ function CompanyProfile({
       </fieldset>
       {dirty && (
         <p className="sheet-warning" role="status">
+          <AppIcon name="status.warning" />
           Tienes cambios sin guardar.
         </p>
       )}
       {error && (
         <p className="error" role="alert">
+          <AppIcon name="status.error" />
           {error}
         </p>
       )}
       {notice && (
         <p className="sheet-notice" role="status">
+          <AppIcon name="status.info" />
           {notice}
         </p>
       )}
       {canManage && (
-        <button disabled={busy || !dirty}>
+        <AppButton disabled={busy || !dirty}>
           {busy ? "Guardando…" : "Guardar cambios"}
-        </button>
+        </AppButton>
       )}
     </form>
   );

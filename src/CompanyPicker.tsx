@@ -1,3 +1,4 @@
+import { AppButton } from "./AppIcon";
 import { useState } from "react";
 import type { CatalogRow } from "./sheet-model";
 import CompanyLogo from "./CompanyBrand";
@@ -41,26 +42,26 @@ export default function CompanyPicker({
       {!corporation && corporations.length > 1 ? (
         <div className="company-cards">
           {corporations.map((c) => (
-            <button
+            <AppButton
               className="company-card"
               key={c.id}
               onClick={() => pickCorp(c.id)}
             >
               <span className="company-initial">{c.name.slice(0, 1)}</span>
               <strong>{c.name}</strong>
-            </button>
+            </AppButton>
           ))}
         </div>
       ) : (
         <>
           {corporations.length > 1 && (
-            <button className="secondary" onClick={() => setCorporation("")}>
+            <AppButton className="secondary" onClick={() => setCorporation("")}>
               ← Cambiar corporación
-            </button>
+            </AppButton>
           )}
           <div className="company-cards">
             {list.map((c) => (
-              <button
+              <AppButton
                 className="company-card"
                 key={c.id}
                 onClick={() => onSelect(c.id)}
@@ -68,7 +69,7 @@ export default function CompanyPicker({
                 <CompanyLogo company={c} />
                 <strong>{c.name}</strong>
                 <small>{c.corporation_name}</small>
-              </button>
+              </AppButton>
             ))}
           </div>
           {!list.length && (
@@ -79,7 +80,9 @@ export default function CompanyPicker({
       {(canCreate ||
         companies.some((c) => c.manage) ||
         corporations.some((c) => c.manage)) && (
-        <button onClick={onManage}>Administrar corporaciones y empresas</button>
+        <AppButton onClick={onManage}>
+          Administrar corporaciones y empresas
+        </AppButton>
       )}
       {!companies.length && !canCreate && (
         <p>Una persona administradora debe asignarte acceso a una empresa.</p>

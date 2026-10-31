@@ -15,8 +15,8 @@
 }
 /* Structural content spans the grid; ordinary field labels share the columns. */
 .shell
-  :is(form, form fieldset, form .settings-grid, form .settings-block)
-  > :not(label):not(input[type="hidden"]) {
+  :where(form, form fieldset, form .settings-grid, form .settings-block)
+  > :where(:not(label):not(input[type="hidden"])) {
   grid-column: 1/-1;
   min-width: 0;
 }

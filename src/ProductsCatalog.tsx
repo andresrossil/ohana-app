@@ -1,3 +1,4 @@
+import { AppButton, AppIcon } from "./AppIcon";
 import ProductImage from "./ProductImage";
 import VariantManager from "./VariantManager";
 import { useState, useEffect } from "react";
@@ -126,14 +127,14 @@ export default function ProductsCatalog({
           <p>Tu catálogo de productos terminados.</p>
         </div>
         {canWrite && (
-          <button
+          <AppButton
             onClick={() => {
               setError("");
               setEdit(null);
             }}
           >
             Agregar producto
-          </button>
+          </AppButton>
         )}
       </section>
       <section className="catalog">
@@ -187,23 +188,23 @@ export default function ProductsCatalog({
                     </span>
                   </td>
                   <td className="actions">
-                    <button onClick={() => setVariantProduct(p)}>
+                    <AppButton onClick={() => setVariantProduct(p)}>
                       Variantes y existencias
-                    </button>
+                    </AppButton>
                     {canWrite && (
-                      <button
+                      <AppButton
                         onClick={() => {
                           setError("");
                           setEdit(p);
                         }}
                       >
                         Editar
-                      </button>
+                      </AppButton>
                     )}
                     {p.barcode && (
-                      <button onClick={() => onBarcode(p)}>
+                      <AppButton onClick={() => onBarcode(p)}>
                         Código de barras
-                      </button>
+                      </AppButton>
                     )}
                   </td>
                 </tr>
@@ -235,14 +236,14 @@ export default function ProductsCatalog({
             aria-modal="true"
             aria-label="Editar producto"
           >
-            <button
+            <AppButton
               className="close"
               disabled={busy}
               aria-label="Cerrar producto"
               onClick={() => setEdit(undefined)}
             >
               ×
-            </button>
+            </AppButton>
             <h2>{edit ? "Editar producto" : "Nuevo producto"}</h2>
             <form onSubmit={save}>
               <label>
@@ -318,12 +319,13 @@ export default function ProductsCatalog({
               )}
               {error && (
                 <p className="error" role="alert">
+                  <AppIcon name="status.error" />
                   {error}
                 </p>
               )}
-              <button disabled={busy}>
+              <AppButton disabled={busy}>
                 {busy ? "Guardando…" : "Guardar producto"}
-              </button>
+              </AppButton>
             </form>
           </section>
         </div>

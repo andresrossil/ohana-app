@@ -1,3 +1,4 @@
+import { AppButton, AppIcon } from "./AppIcon";
 import { useEffect, useState } from "react";
 import {
   operation,
@@ -66,30 +67,34 @@ export default function Inventory({
         <div className="actions">
           {state.canWrite && (
             <>
-              <button
+              <AppButton
                 onClick={() => {
                   setMaterial("");
                   setForm("receive");
                 }}
               >
                 Recibir compra
-              </button>
-              <button className="secondary" onClick={() => setForm("adjust")}>
+              </AppButton>
+              <AppButton
+                className="secondary"
+                onClick={() => setForm("adjust")}
+              >
                 Ajustar existencias
-              </button>
+              </AppButton>
             </>
           )}
-          <button
+          <AppButton
             className="secondary"
             disabled={state.busy}
             onClick={() => state.run(load)}
           >
             Actualizar
-          </button>
+          </AppButton>
         </div>
       </section>
       {state.error && !form && (
         <p className="error" role="alert">
+          <AppIcon name="status.error" />
           {state.error}
         </p>
       )}
@@ -109,6 +114,7 @@ export default function Inventory({
             </h2>
             {state.error && (
               <p className="error" role="alert">
+                <AppIcon name="status.error" />
                 {state.error}
               </p>
             )}
@@ -295,15 +301,15 @@ export default function Inventory({
                 </>
               )}
               <div className="form-actions">
-                <button disabled={state.busy}>Guardar movimiento</button>
-                <button
+                <AppButton disabled={state.busy}>Guardar movimiento</AppButton>
+                <AppButton
                   type="button"
                   className="secondary"
                   disabled={state.busy}
                   onClick={() => setForm(null)}
                 >
                   Cancelar
-                </button>
+                </AppButton>
               </div>
             </form>
           </section>

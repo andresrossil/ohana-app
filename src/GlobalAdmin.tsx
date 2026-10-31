@@ -1,3 +1,4 @@
+import { AppButton, AppIcon } from "./AppIcon";
 import { useEffect, useState } from "react";
 import { request } from "./commerce";
 import type { Row } from "./operations";
@@ -47,6 +48,7 @@ export default function GlobalAdmin() {
       </p>
       {error && (
         <p className="error" role="alert">
+          <AppIcon name="status.error" />
           {error}
         </p>
       )}
@@ -96,7 +98,7 @@ export default function GlobalAdmin() {
                 <input type="checkbox" required /> Confirmo esta asignación
                 administrativa explícita
               </label>
-              <button disabled={busy}>Guardar rol global</button>
+              <AppButton disabled={busy}>Guardar rol global</AppButton>
             </form>
           </details>
           {[
@@ -158,7 +160,7 @@ export default function GlobalAdmin() {
                     <option value="false">Inactivo</option>
                   </select>
                 </label>
-                <button disabled={busy}>Guardar código</button>
+                <AppButton disabled={busy}>Guardar código</AppButton>
               </form>
             </details>
           ))}

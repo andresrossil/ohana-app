@@ -1,3 +1,4 @@
+import { AppButton, AppIcon } from "./AppIcon";
 import { useEffect, useRef, useState } from "react";
 import JsBarcode from "jsbarcode";
 import type { CatalogRow } from "./sheet-model";
@@ -99,7 +100,7 @@ export default function BarcodeDialog({
     }
     // Only fixed markup is written. All catalog content is added as text or generated SVG.
     win.document.write(
-      '<!doctype html><html lang="es"><head><title>Etiquetas Ohana</title><style>@page{margin:10mm}body{margin:0;font:12px sans-serif}.labels{display:flex;flex-wrap:wrap;gap:5mm}.label{break-inside:avoid;page-break-inside:avoid;max-width:100%;padding:3mm;border:1px dashed #aaa;text-align:center}.label svg{display:block;max-width:100%;height:auto}.label p{margin:0 0 2mm;overflow-wrap:anywhere}@media print{.label{border:0}button{display:none}}</style></head><body><button onclick="window.print()">Imprimir etiquetas</button><div class="labels"></div></body></html>',
+      '<!doctype html><html lang="es"><head><title>Etiquetas Ohana</title><style>@page{margin:10mm}body{margin:0;font:12px sans-serif}.labels{display:flex;flex-wrap:wrap;gap:5mm}.label{break-inside:avoid;page-break-inside:avoid;max-width:100%;padding:3mm;border:1px dashed #aaa;text-align:center}.label svg{display:block;max-width:100%;height:auto}.label p{margin:0 0 2mm;overflow-wrap:anywhere}@media print{.label{border:0}button{display:none}}</style></head><body><AppButton onclick="window.print()">Imprimir etiquetas</AppButton><div class="labels"></div></body></html>',
     );
     win.document.close();
     const target = win.document.querySelector(".labels")!;
@@ -126,13 +127,13 @@ export default function BarcodeDialog({
       onCancel={onClose}
       aria-label="Código de barras Code 128"
     >
-      <button
+      <AppButton
         className="close"
         aria-label="Cerrar código de barras"
         onClick={onClose}
       >
         ×
-      </button>
+      </AppButton>
       <p className="eyebrow">ETIQUETAS · CODE 128</p>
       <h2>{item.name}</h2>
       <div className="barcode-image">
@@ -155,6 +156,7 @@ export default function BarcodeDialog({
       </p>
       {error && (
         <p role="alert" className="error">
+          <AppIcon name="status.error" />
           {error}
         </p>
       )}
@@ -176,15 +178,15 @@ export default function BarcodeDialog({
         />
       </label>
       <div className="form-actions">
-        <button disabled={!ready || busy} onClick={() => void download()}>
+        <AppButton disabled={!ready || busy} onClick={() => void download()}>
           {busy ? "Preparando…" : "Descargar PNG"}
-        </button>
-        <button className="secondary" disabled={!ready} onClick={print}>
+        </AppButton>
+        <AppButton className="secondary" disabled={!ready} onClick={print}>
           Imprimir etiquetas
-        </button>
-        <button className="secondary" onClick={onClose}>
+        </AppButton>
+        <AppButton className="secondary" onClick={onClose}>
           Cerrar
-        </button>
+        </AppButton>
       </div>
     </dialog>
   );

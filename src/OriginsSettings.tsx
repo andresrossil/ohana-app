@@ -1,3 +1,4 @@
+import { AppButton, AppIcon } from "./AppIcon";
 import { useState } from "react";
 import type { FormEvent } from "react";
 import { supabase as db } from "./client";
@@ -82,6 +83,7 @@ export default function OriginsSettings({
       </p>
       {error && (
         <p className="error" role="alert">
+          <AppIcon name="status.error" />
           {error}
         </p>
       )}
@@ -96,17 +98,17 @@ export default function OriginsSettings({
               defaultValue={edit?.name || ""}
             />
           </label>
-          <button disabled={busy}>
+          <AppButton disabled={busy}>
             {edit ? "Guardar nombre" : "Agregar origen"}
-          </button>
+          </AppButton>
           {edit && (
-            <button
+            <AppButton
               type="button"
               className="secondary"
               onClick={() => setEdit(null)}
             >
               Cancelar
-            </button>
+            </AppButton>
           )}
         </form>
       )}
@@ -127,15 +129,15 @@ export default function OriginsSettings({
                 <td className="actions">
                   {canWrite && (
                     <>
-                      <button disabled={busy} onClick={() => setEdit(o)}>
+                      <AppButton disabled={busy} onClick={() => setEdit(o)}>
                         Renombrar
-                      </button>
-                      <button disabled={busy} onClick={() => void toggle(o)}>
+                      </AppButton>
+                      <AppButton disabled={busy} onClick={() => void toggle(o)}>
                         {o.active ? "Desactivar" : "Reactivar"}
-                      </button>
-                      <button disabled={busy} onClick={() => void remove(o)}>
+                      </AppButton>
+                      <AppButton disabled={busy} onClick={() => void remove(o)}>
                         Eliminar
-                      </button>
+                      </AppButton>
                     </>
                   )}
                 </td>

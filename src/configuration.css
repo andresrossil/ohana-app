@@ -1,0 +1,300 @@
+.shell button:has(> .app-icon) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.app-icon,
+.icon-placeholder {
+  display: inline-flex;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  vertical-align: middle;
+}
+.shell button > span:not(.app-icon) {
+  width: auto;
+  max-width: 100%;
+  font-size: inherit;
+  display: inline;
+  white-space: normal;
+}
+.app-icon svg {
+  display: block;
+  width: 18px;
+  height: 18px;
+}
+.shell .settings-tabs {
+  margin-bottom: 16px;
+}
+.shell .company-settings .settings-block,
+.shell .settings-panel,
+.shell .admin-structure .settings-block {
+  padding: 16px;
+  margin-bottom: 12px;
+}
+.shell .company-settings .social-entry {
+  grid-column: auto;
+  min-width: 0;
+}
+.shell .company-settings .social-entry input {
+  width: 100%;
+}
+.shell .company-settings .settings-block > h3 {
+  margin-bottom: 2px;
+}
+.hierarchy-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.hierarchy-toolbar h2,
+.hierarchy-toolbar h3 {
+  margin: 0;
+}
+.corporation-node {
+  border: 1px solid var(--admin-border);
+  border-radius: 10px;
+  background: var(--admin-surface);
+  margin: 12px 0;
+  overflow: hidden;
+}
+.hierarchy-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 14px 16px;
+}
+.tree-label {
+  flex: 1;
+  min-width: 130px;
+}
+.tree-label strong,
+.tree-label small {
+  display: block;
+  overflow-wrap: anywhere;
+}
+.tree-label small {
+  margin-top: 4px;
+}
+.tree-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.shell .tree-actions button {
+  font-size: 12px;
+  min-height: 36px;
+  padding: 8px 11px;
+}
+.shell .tree-toggle {
+  width: 32px;
+  min-width: 32px;
+  padding: 5px;
+  min-height: 32px;
+}
+.company-branches {
+  margin: 0 16px 12px 40px;
+  border-left: 2px solid var(--admin-border);
+}
+.company-node {
+  border-top: 1px solid var(--admin-border);
+  padding-left: 18px;
+}
+.company-node:first-child {
+  border-top: 0;
+}
+.company-branches > p {
+  padding: 12px;
+}
+.org-hierarchy .modal {
+  max-height: 88vh;
+  overflow: auto;
+}
+.shell form.admin-appearance {
+  grid-template-columns: minmax(0, 1.2fr) minmax(280px, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+.shell form.admin-appearance > fieldset {
+  grid-column: 1;
+  grid-row: 2;
+}
+.shell form.admin-appearance > .admin-preview {
+  grid-column: 2;
+  grid-row: 2;
+  margin: 0;
+  position: sticky;
+  top: 18px;
+  padding: 18px;
+}
+.shell .admin-appearance .appearance-intro {
+  margin: 0;
+}
+.shell form.admin-appearance .settings-block {
+  padding: 14px;
+  margin: 0;
+}
+.shell form.admin-appearance .theme-options {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 7px;
+  margin: 0;
+}
+.shell .admin-appearance .theme-option {
+  padding: 8px;
+  min-height: 65px;
+  font-size: 11px;
+  gap: 6px;
+}
+.shell .admin-appearance .theme-swatches {
+  gap: 3px;
+  margin-bottom: 6px;
+}
+.shell .admin-appearance .theme-swatches i {
+  width: 12px;
+  height: 12px;
+}
+.shell .admin-appearance .color-control {
+  gap: 8px;
+}
+.shell .admin-appearance .color-control input[type="color"] {
+  width: 40px;
+  height: 30px;
+  min-height: 30px;
+  padding: 3px;
+}
+.shell .admin-appearance .color-control code {
+  font-size: 11px;
+}
+.shell .admin-appearance .settings-grid {
+  gap: 8px 16px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.shell .admin-appearance label {
+  font-size: 12px;
+}
+.shell .admin-appearance .preview-card {
+  padding: 16px;
+}
+.shell .admin-appearance .admin-preview input {
+  min-height: 36px;
+}
+.shell .admin-appearance .admin-preview table {
+  margin-top: 14px;
+}
+.shell .admin-appearance .admin-preview .eyebrow {
+  margin-bottom: 10px;
+}
+.icon-assignments {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 18px 0;
+}
+.icon-assignment {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--admin-border);
+  border-radius: 9px;
+  padding: 12px;
+}
+.icon-assignment small {
+  display: block;
+  font-size: 10px;
+  overflow-wrap: anywhere;
+  margin-top: 4px;
+}
+.shell .icon-assignment button {
+  font-size: 11px;
+  padding: 7px;
+  min-height: 32px;
+}
+.icon-gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(95px, 1fr));
+  gap: 8px;
+  margin: 18px 0;
+}
+.shell .icon-gallery button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 76px;
+  padding: 8px;
+}
+.icon-gallery small {
+  font-size: 10px;
+  overflow-wrap: anywhere;
+}
+.icon-selector {
+  max-height: 88vh;
+  overflow: auto;
+}
+.icon-selector > .settings-grid {
+  gap: 16px;
+}
+.icon-selector > small {
+  display: block;
+  margin-top: 16px;
+}
+@media (max-width: 1100px) {
+  .shell form.admin-appearance {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .shell form.admin-appearance > fieldset,
+  .shell form.admin-appearance > .admin-preview {
+    grid-column: 1;
+    grid-row: auto;
+  }
+  .shell form.admin-appearance > .admin-preview {
+    position: static;
+  }
+  .icon-assignments {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 700px) {
+  .shell .tree-actions button,.shell .icon-assignment button{min-height:42px}
+  .shell .admin-appearance .settings-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .hierarchy-row {
+    flex-wrap: wrap;
+    padding: 12px;
+  }
+  .tree-actions {
+    width: 100%;
+    padding-left: 0;
+  }
+  .company-branches {
+    margin-left: 24px;
+    margin-right: 8px;
+  }
+  .shell .tree-actions button {
+    flex: 1 1 100px;
+  }
+  .shell form.admin-appearance .theme-options {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .shell .admin-appearance .color-control input[type="color"] {
+    height: 34px;
+    min-height: 34px;
+  }
+  .icon-assignment {
+    grid-template-columns: 22px minmax(0, 1fr) auto;
+  }
+  .icon-assignment > button:last-child {
+    grid-column: 2/-1;
+    justify-self: start;
+  }
+  .icon-gallery {
+    grid-template-columns: repeat(auto-fill, minmax(76px, 1fr));
+  }
+}

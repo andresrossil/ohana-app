@@ -1,3 +1,4 @@
+import { AppButton, AppIcon } from "./AppIcon";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ClipboardEvent, KeyboardEvent } from "react";
 import { supabase as db } from "./client";
@@ -914,7 +915,7 @@ export default function MaterialSheet({
             </p>
           </div>
           <div className="import-actions">
-            <button
+            <AppButton
               disabled={!dirty.length || busy || loading || suggesting}
               onClick={() => {
                 setPreview(true);
@@ -922,15 +923,15 @@ export default function MaterialSheet({
               }}
             >
               Guardar
-            </button>
-            <button
+            </AppButton>
+            <AppButton
               data-cancel-import
               className="secondary"
               disabled={busy}
               onClick={cancelImport}
             >
               Cancelar
-            </button>
+            </AppButton>
           </div>
         </div>
       ) : (
@@ -943,9 +944,9 @@ export default function MaterialSheet({
                 Excel. Arrastra o usa Mayús + clic para seleccionar un rango.
               </p>
             </div>
-            <button className="secondary" onClick={() => void copyAll()}>
+            <AppButton className="secondary" onClick={() => void copyAll()}>
               Copiar tabla
-            </button>
+            </AppButton>
           </div>
           <div className="sheet-controls">
             <input
@@ -956,10 +957,10 @@ export default function MaterialSheet({
             />
             {canWrite && (
               <>
-                <button className="secondary" onClick={add}>
+                <AppButton className="secondary" onClick={add}>
                   + Fila nueva
-                </button>
-                <button
+                </AppButton>
+                <AppButton
                   disabled={!dirty.length || busy || suggesting}
                   onClick={() => {
                     setPreview(true);
@@ -967,8 +968,8 @@ export default function MaterialSheet({
                   }}
                 >
                   Revisar {dirty.length || ""} cambios
-                </button>
-                <button
+                </AppButton>
+                <AppButton
                   className="secondary"
                   disabled={!dirty.length || busy}
                   onClick={() => {
@@ -984,7 +985,7 @@ export default function MaterialSheet({
                   }}
                 >
                   Descartar cambios
-                </button>
+                </AppButton>
               </>
             )}
           </div>
@@ -1044,16 +1045,19 @@ export default function MaterialSheet({
       </details>
       {notice && (
         <p role="status" className="sheet-notice">
+          <AppIcon name="status.info" />
           {notice}
         </p>
       )}
       {suggesting && (
         <p className="sheet-notice" role="status">
+          <AppIcon name="status.info" />
           Sugiriendo SKU para los materiales nuevos…
         </p>
       )}
       {error && (
         <p role="alert" className="error">
+          <AppIcon name="status.error" />
           {error}
         </p>
       )}
@@ -1077,6 +1081,11 @@ export default function MaterialSheet({
                 <th>#</th>
                 {displayColumns.map((col, c) => (
                   <th key={col} scope="col">
+                    {col === "VS" && <AppIcon name="action.compare" />}
+                    {col === "PRECIO UN" && <AppIcon name="action.calculate" />}
+                    {col === "PRECIO ANTERIOR" && (
+                      <AppIcon name="action.history" />
+                    )}
                     {col}
                     {[2, 4, 5].includes(visualOrder[c]) ? " *" : ""}
                     <small>
@@ -1125,7 +1134,7 @@ export default function MaterialSheet({
                           </span>
                         )}
                       {!importing && !r.id && canWrite && (
-                        <button
+                        <AppButton
                           aria-label={`Quitar fila nueva ${ri + 1}`}
                           className="remove-row"
                           onClick={() =>
@@ -1135,7 +1144,7 @@ export default function MaterialSheet({
                           }
                         >
                           ×
-                        </button>
+                        </AppButton>
                       )}
                     </th>
                     {displayColumns.map((col, ci) => {
@@ -1237,7 +1246,7 @@ export default function MaterialSheet({
                           {visualOrder[ci] === 16 &&
                             r.cells[16] &&
                             onBarcode && (
-                              <button
+                              <AppButton
                                 type="button"
                                 className="barcode-cell-action"
                                 aria-label={`Ver código de barras fila ${ri + 1}`}
@@ -1253,7 +1262,7 @@ export default function MaterialSheet({
                                 }
                               >
                                 ▥
-                              </button>
+                              </AppButton>
                             )}
                         </td>
                       );
@@ -1270,7 +1279,7 @@ export default function MaterialSheet({
         <div className="empty">
           <h2>Tu hoja está lista</h2>
           <p>Agrega una fila, selecciona SKU y pega tus filas de Excel.</p>
-          {canWrite && <button onClick={add}>+ Primera fila</button>}
+          {canWrite && <AppButton onClick={add}>+ Primera fila</AppButton>}
         </div>
       )}
       <datalist id="sheet-suppliers">
@@ -1339,14 +1348,14 @@ export default function MaterialSheet({
             aria-modal="true"
             aria-label="Vista previa de cambios"
           >
-            <button
+            <AppButton
               className="close"
               aria-label="Cerrar vista previa"
               disabled={busy}
               onClick={() => setPreview(false)}
             >
               ×
-            </button>
+            </AppButton>
             <p className="eyebrow">REVISAR ANTES DE GUARDAR</p>
             <h2>{dirty.length} filas pendientes</h2>
             <p>
@@ -1365,6 +1374,7 @@ export default function MaterialSheet({
             )}
             {rowLimitError && (
               <p role="alert" className="error">
+                <AppIcon name="status.error" />
                 Guarda como máximo 500 filas por lote.
               </p>
             )}
@@ -1468,10 +1478,11 @@ export default function MaterialSheet({
             </div>
             {error && (
               <p className="error" role="alert">
+                <AppIcon name="status.error" />
                 {error}
               </p>
             )}
-            <button
+            <AppButton
               disabled={
                 busy ||
                 suggesting ||
@@ -1485,7 +1496,7 @@ export default function MaterialSheet({
               {busy
                 ? "Guardando lote…"
                 : `Confirmar y guardar ${dirty.length} filas`}
-            </button>
+            </AppButton>
           </section>
         </div>
       )}

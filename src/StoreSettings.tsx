@@ -1,3 +1,4 @@
+import { AppButton, AppIcon } from "./AppIcon";
 import { useEffect, useState } from "react";
 import { request, storeLink } from "./commerce";
 import { useOperation, type Row } from "./operations";
@@ -39,6 +40,7 @@ export default function StoreSettings({
       </p>
       {state.error && (
         <p className="error" role="alert">
+          <AppIcon name="status.error" />
           {state.error}
         </p>
       )}
@@ -169,6 +171,7 @@ export default function StoreSettings({
           </div>
           {config.currency && config.currency !== currency && (
             <p className="error">
+              <AppIcon name="status.error" />
               Cambió la moneda de la empresa. Revisa y guarda las tarifas y
               promociones en {currency}.
             </p>
@@ -177,7 +180,9 @@ export default function StoreSettings({
             Los pedidos sin pago confirmado vencen a las 24 horas y liberan su
             reserva. No se realizan cargos automáticos.
           </p>
-          <button disabled={state.busy || !dirty}>Guardar condiciones</button>
+          <AppButton disabled={state.busy || !dirty}>
+            Guardar condiciones
+          </AppButton>
         </form>
       )}
     </section>

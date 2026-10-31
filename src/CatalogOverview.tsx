@@ -1,3 +1,4 @@
+import { AppButton, AppIcon } from "./AppIcon";
 import { useState } from "react";
 import type { CatalogRow } from "./sheet-model";
 import { formatTSV } from "./sheet-model";
@@ -87,10 +88,13 @@ export default function CatalogOverview({
               : "Consulta de materiales y productos del catálogo."}
           </p>
         </div>
-        {report && <button onClick={exportReport}>Descargar catálogo</button>}
+        {report && (
+          <AppButton onClick={exportReport}>Descargar catálogo</AppButton>
+        )}
       </section>
       {!report && (
         <p className="sheet-notice">
+          <AppIcon name="status.info" />
           La consulta muestra el catálogo. El registro de existencias y
           movimientos estará disponible al incorporar compras y producción.
         </p>

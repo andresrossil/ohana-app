@@ -1,3 +1,5 @@
+import { AppButton, AppIcon } from "./AppIcon";
+import { IconProvider } from "./AppIcon";
 import React, { Suspense, lazy, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import type { Session } from "@supabase/supabase-js";
@@ -443,11 +445,11 @@ function App() {
                 : "El enlace puede haber vencido o ya fue utilizado. Si ya confirmaste tu correo, inicia sesión con tu cuenta."}
           </p>
           {confirmation !== "checking" && (
-            <button onClick={() => setConfirmation(null)}>
+            <AppButton onClick={() => setConfirmation(null)}>
               {confirmation === "verified"
                 ? "Entrar a Ohana →"
                 : "Volver al acceso"}
-            </button>
+            </AppButton>
           )}
         </section>
       </main>
@@ -482,14 +484,14 @@ function App() {
               required
             />
           </label>
-          <button disabled={busy}>
+          <AppButton disabled={busy}>
             {busy
               ? "Procesando…"
               : authMode === "signup"
                 ? "Crear cuenta y verificar correo"
                 : "Entrar a mi negocio →"}
-          </button>
-          <button
+          </AppButton>
+          <AppButton
             className="auth-toggle"
             type="button"
             disabled={busy}
@@ -502,7 +504,7 @@ function App() {
             {authMode === "login"
               ? "Primera vez: crear mi cuenta"
               : "Ya tengo cuenta: iniciar sesión"}
-          </button>
+          </AppButton>
           <p className="muted">
             Acceso privado. Solo las cuentas autorizadas pueden acceder al
             catálogo.
@@ -511,928 +513,976 @@ function App() {
         </form>
         {error && (
           <p role="alert" className="error">
+            <AppIcon name="status.error" />
             {error}
           </p>
         )}
       </main>
     );
   return (
-    <div className="shell">
-      <Sidebar
-        section={section}
-        company={company}
-        companies={companies.filter((c) => c.active !== false)}
-        allowedSections={[
-          "dashboard",
-          ...(activeCompany?.catalog_read
-            ? ["materials", "products", "settings"]
-            : []),
-          ...(activeCompany?.inventory_read ? ["purchases", "inventory"] : []),
-          ...(activeCompany?.production_read ? ["formulas", "production"] : []),
-          ...(activeCompany?.sales_read ? ["sales", "customers"] : []),
-          ...(activeCompany?.reports_read ? ["reports"] : []),
-          ...(activeCompany?.manage || canCreate ? ["settings"] : []),
-        ]}
-        corporations={corporations}
-        onCorporation={(id) => {
-          if (!leaveSheet()) return;
-          setPickerCorp(id);
-          const list = companies.filter(
-            (c) => c.corporation_id === id && c.active !== false,
-          );
-          chooseCompany(list.length === 1 ? list[0].id : "");
-          setSection("dashboard");
-        }}
-        email={session.user.email}
-        onCompany={(value) => {
-          if (value === company) return;
-          if (leaveSheet()) chooseCompany(value);
-        }}
-        onNavigate={(next) => {
-          if (next === section) return true;
-          if (!leaveSheet()) return false;
-          setSection(next);
-          if (next === "settings" && !activeCompany?.manage)
-            setConfigView("origins");
-          if (next === "materials") setTab("raw_materials");
-          if (
-            next === "settings" &&
-            ![
-              "origins",
-              "profile",
-              "appearance",
-              "structure",
-              "store",
-            ].includes(configView)
-          )
-            setTab(configView as Tab);
-          setQuery("");
-          setEdit(undefined);
-          setImportNotice("");
-          setSheetDirty(false);
-          return true;
-        }}
-        onLogout={() => {
-          if (!leaveSheet()) return;
-          void db.auth.signOut().then(({ error }) => {
-            if (error) setError(error.message);
-          });
-        }}
-      />
-      <main>
-        <header>
-          <span>OHANA / {sectionTitle.toUpperCase()}</span>
-          <span className="badge">
-            {role === "viewer" ? "Solo lectura" : "Acceso de edición"}
-          </span>
-        </header>
-        {importNotice && (
-          <p className="sheet-notice" role="status">
-            {importNotice}
-          </p>
-        )}
-        {error && (
-          <p className="error" role="alert">
-            {error}
-          </p>
-        )}
-        {!company && section === "settings" && configView === "structure" ? (
-          <OrganizationAdmin
-            companies={companies}
-            corporations={corporations}
-            canCreate={canCreate}
-            onSaved={refreshContext}
-          />
-        ) : !company ? (
-          <CompanyPicker
-            key={pickerCorp}
-            initialCorporation={pickerCorp}
-            companies={companies}
-            corporations={corporations}
-            canCreate={canCreate}
-            onSelect={(id) => {
-              chooseCompany(id);
-              setSection("dashboard");
-            }}
-            onManage={() => {
-              setSection("settings");
-              setConfigView("structure");
-            }}
-          />
-        ) : (
-          <>
-            {section === "settings" && (
-              <>
-                <section className="intro">
-                  <div>
-                    <p className="eyebrow">TU ESPACIO DE TRABAJO</p>
-                    <h1>Configuración</h1>
-                    <p>
-                      Administra las opciones y los catálogos de tu negocio.
-                    </p>
-                  </div>
-                </section>
-                <nav
-                  className="settings-tabs"
-                  aria-label="Catálogos de configuración"
-                >
-                  {[
-                    ["profile", "Datos de empresa"],
-                    ["appearance", "Apariencia"],
-                    ["structure", "Corporaciones y accesos"],
-                    ["store", "Tienda y ventas"],
-                    ["origins", "Orígenes"],
-                    ["suppliers", "Proveedores"],
-                    ["presentations", "Presentaciones"],
-                    ["units", "Unidades"],
-                  ]
-                    .filter(
-                      ([key]) =>
-                        activeCompany?.manage ||
-                        [
-                          "origins",
-                          "suppliers",
-                          "presentations",
-                          "units",
-                        ].includes(key),
-                    )
-                    .map(([key, label]) => (
-                      <button
-                        key={key}
-                        className={configView === key ? "selected" : ""}
-                        onClick={() => {
-                          if (key === configView) return;
-                          if (!leaveSheet()) return;
-                          setConfigView(key);
-                          if (
-                            ![
-                              "origins",
-                              "profile",
-                              "appearance",
-                              "structure",
-                              "store",
-                            ].includes(key)
-                          )
-                            setTab(key as Tab);
-                          setEdit(undefined);
-                          setQuery("");
-                        }}
-                      >
-                        {label}
-                      </button>
-                    ))}
-                </nav>
-                {(configView === "profile" || configView === "appearance") &&
-                  activeCompany && (
-                    <CompanySettings
-                      key={company + configView}
-                      company={activeCompany}
-                      canManage={!!activeCompany.manage}
-                      appearance={configView === "appearance"}
-                      onSaved={refreshContext}
+    <IconProvider company={company}>
+      <div className="shell">
+        <Sidebar
+          section={section}
+          company={company}
+          companies={companies.filter((c) => c.active !== false)}
+          allowedSections={[
+            "dashboard",
+            ...(activeCompany?.catalog_read
+              ? ["materials", "products", "settings"]
+              : []),
+            ...(activeCompany?.inventory_read
+              ? ["purchases", "inventory"]
+              : []),
+            ...(activeCompany?.production_read
+              ? ["formulas", "production"]
+              : []),
+            ...(activeCompany?.sales_read ? ["sales", "customers"] : []),
+            ...(activeCompany?.reports_read ? ["reports"] : []),
+            ...(activeCompany?.manage || canCreate ? ["settings"] : []),
+          ]}
+          corporations={corporations}
+          onCorporation={(id) => {
+            if (!leaveSheet()) return;
+            setPickerCorp(id);
+            const list = companies.filter(
+              (c) => c.corporation_id === id && c.active !== false,
+            );
+            chooseCompany(list.length === 1 ? list[0].id : "");
+            setSection("dashboard");
+          }}
+          email={session.user.email}
+          onCompany={(value) => {
+            if (value === company) return;
+            if (leaveSheet()) chooseCompany(value);
+          }}
+          onNavigate={(next) => {
+            if (next === section) return true;
+            if (!leaveSheet()) return false;
+            setSection(next);
+            if (next === "settings" && !activeCompany?.manage)
+              setConfigView("origins");
+            if (next === "materials") setTab("raw_materials");
+            if (
+              next === "settings" &&
+              ![
+                "origins",
+                "profile",
+                "appearance",
+                "structure",
+                "store",
+              ].includes(configView)
+            )
+              setTab(configView as Tab);
+            setQuery("");
+            setEdit(undefined);
+            setImportNotice("");
+            setSheetDirty(false);
+            return true;
+          }}
+          onLogout={() => {
+            if (!leaveSheet()) return;
+            void db.auth.signOut().then(({ error }) => {
+              if (error) setError(error.message);
+            });
+          }}
+        />
+        <main>
+          <header>
+            <span>OHANA / {sectionTitle.toUpperCase()}</span>
+            <span className="badge">
+              {role === "viewer" ? "Solo lectura" : "Acceso de edición"}
+            </span>
+          </header>
+          {importNotice && (
+            <p className="sheet-notice" role="status">
+              <AppIcon name="status.info" />
+              {importNotice}
+            </p>
+          )}
+          {error && (
+            <p className="error" role="alert">
+              <AppIcon name="status.error" />
+              {error}
+            </p>
+          )}
+          {!company && section === "settings" && configView === "structure" ? (
+            <OrganizationAdmin
+              onConfigure={(id) => {
+                if (!leaveSheet()) return;
+                if (id !== company) chooseCompany(id);
+                setSection("settings");
+                setConfigView("profile");
+              }}
+              companies={companies}
+              corporations={corporations}
+              canCreate={canCreate}
+              onSaved={refreshContext}
+            />
+          ) : !company ? (
+            <CompanyPicker
+              key={pickerCorp}
+              initialCorporation={pickerCorp}
+              companies={companies}
+              corporations={corporations}
+              canCreate={canCreate}
+              onSelect={(id) => {
+                chooseCompany(id);
+                setSection("dashboard");
+              }}
+              onManage={() => {
+                setSection("settings");
+                setConfigView("structure");
+              }}
+            />
+          ) : (
+            <>
+              {section === "settings" && (
+                <>
+                  <section className="intro">
+                    <div>
+                      <p className="eyebrow">TU ESPACIO DE TRABAJO</p>
+                      <h1>Configuración</h1>
+                      <p>
+                        Administra las opciones y los catálogos de tu negocio.
+                      </p>
+                    </div>
+                  </section>
+                  <nav
+                    className="settings-tabs"
+                    aria-label="Catálogos de configuración"
+                  >
+                    {[
+                      ["profile", "Datos de empresa"],
+                      ["appearance", "Apariencia"],
+                      ["structure", "Corporaciones y accesos"],
+                      ["store", "Tienda y ventas"],
+                      ["origins", "Orígenes"],
+                      ["suppliers", "Proveedores"],
+                      ["presentations", "Presentaciones"],
+                      ["units", "Unidades"],
+                    ]
+                      .filter(
+                        ([key]) =>
+                          activeCompany?.manage ||
+                          [
+                            "origins",
+                            "suppliers",
+                            "presentations",
+                            "units",
+                          ].includes(key),
+                      )
+                      .map(([key, label]) => (
+                        <AppButton
+                          key={key}
+                          className={configView === key ? "selected" : ""}
+                          onClick={() => {
+                            if (key === configView) return;
+                            if (!leaveSheet()) return;
+                            setConfigView(key);
+                            if (
+                              ![
+                                "origins",
+                                "profile",
+                                "appearance",
+                                "structure",
+                                "store",
+                              ].includes(key)
+                            )
+                              setTab(key as Tab);
+                            setEdit(undefined);
+                            setQuery("");
+                          }}
+                        >
+                          {label}
+                        </AppButton>
+                      ))}
+                  </nav>
+                  {(configView === "profile" || configView === "appearance") &&
+                    activeCompany && (
+                      <CompanySettings
+                        key={company + configView}
+                        company={activeCompany}
+                        canManage={!!activeCompany.manage}
+                        appearance={configView === "appearance"}
+                        onSaved={refreshContext}
+                        onDirty={setSettingsDirty}
+                      />
+                    )}
+                  {configView === "store" && activeCompany?.manage && (
+                    <StoreSettings
+                      key={company}
+                      company={company}
+                      currency={activeCompany.currency}
                       onDirty={setSettingsDirty}
                     />
                   )}
-                {configView === "store" && activeCompany?.manage && (
-                  <StoreSettings
-                    key={company}
-                    company={company}
-                    currency={activeCompany.currency}
-                    onDirty={setSettingsDirty}
-                  />
-                )}
-                {configView === "structure" && (
-                  <OrganizationAdmin
-                    companies={companies}
-                    corporations={corporations}
-                    canCreate={canCreate}
-                    onSaved={refreshContext}
-                  />
-                )}
-                {configView === "origins" && (
-                  <OriginsSettings
-                    key={company}
-                    company={company}
-                    origins={data.catalog_origins}
-                    canWrite={canWrite}
-                    onSaved={load}
-                  />
-                )}
-              </>
-            )}
-            {section === "dashboard" && (
-              <>
-                <section className="intro">
-                  <div>
-                    <p className="eyebrow">{activeCompany?.corporation_name}</p>
-                    <h1>{activeCompany?.name}</h1>
-                    <p>Tu negocio, en armonía.</p>
-                  </div>
-                </section>
-                {activeCompany?.catalog_read && (
-                  <section className="stats">
-                    <div>
-                      <span>Materiales</span>
-                      <strong>
-                        {data.raw_materials.filter((m) => m.active).length}
-                      </strong>
-                    </div>
-                    <div>
-                      <span>Productos</span>
-                      <strong>
-                        {data.products.filter((p) => p.active).length}
-                      </strong>
-                    </div>
-                    <div>
-                      <span>Proveedores</span>
-                      <strong>
-                        {data.suppliers.filter((p) => p.active).length}
-                      </strong>
-                    </div>
-                  </section>
-                )}
-                <div className="form-actions">
-                  {(
-                    [
-                      ["materials", "Materiales", activeCompany?.catalog_read],
-                      ["products", "Productos", activeCompany?.catalog_read],
-                      ["purchases", "Compras", activeCompany?.inventory_read],
-                      [
-                        "inventory",
-                        "Inventario",
-                        activeCompany?.inventory_read,
-                      ],
-                      ["formulas", "Fórmulas", activeCompany?.production_read],
-                      [
-                        "production",
-                        "Producción",
-                        activeCompany?.production_read,
-                      ],
-                      ["sales", "Ventas", activeCompany?.sales_read],
-                      ["reports", "Reportes", activeCompany?.reports_read],
-                    ] as const
-                  )
-                    .filter(([, , allowed]) => allowed)
-                    .map(([key, label]) => (
-                      <button
-                        key={key}
-                        className="secondary"
-                        onClick={() => {
-                          setSection(key);
-                          if (key === "materials") setTab("raw_materials");
-                        }}
-                      >
-                        Abrir {label.toLowerCase()}
-                      </button>
-                    ))}
-                  {activeCompany?.manage && (
-                    <button
-                      onClick={() => {
+                  {configView === "structure" && (
+                    <OrganizationAdmin
+                      onConfigure={(id) => {
+                        if (!leaveSheet()) return;
+                        if (id !== company) chooseCompany(id);
                         setSection("settings");
                         setConfigView("profile");
                       }}
-                    >
-                      Configurar empresa
-                    </button>
+                      companies={companies}
+                      corporations={corporations}
+                      canCreate={canCreate}
+                      onSaved={refreshContext}
+                    />
                   )}
-                </div>
-              </>
-            )}
-            {section === "products" && (
-              <ProductsCatalog
-                key={company}
-                company={company}
-                products={data.products}
-                origins={data.catalog_origins}
-                units={data.units}
-                canWrite={canWrite}
-                onSaved={load}
-                onBarcode={setBarcode}
-              />
-            )}
-            {(section === "inventory" || section === "purchases") && (
-              <Inventory
-                key={company + section}
-                company={company}
-                currency={activeCompany?.currency}
-                purchases={section === "purchases"}
-              />
-            )}
-            {(section === "formulas" || section === "production") && (
-              <Production
-                key={company + section}
-                company={company}
-                formulasOnly={section === "formulas"}
-                manager={activeCompany?.manage}
-              />
-            )}
-            {(section === "sales" || section === "customers") && (
-              <Sales
-                key={company + section}
-                company={company}
-                currency={activeCompany?.currency}
-                customersOnly={section === "customers"}
-              />
-            )}
-            {section === "reports" && (
-              <Reports key={company} company={company} />
-            )}
-            {![
-              "dashboard",
-              "materials",
-              "products",
-              "settings",
-              "inventory",
-              "purchases",
-              "formulas",
-              "production",
-              "sales",
-              "customers",
-              "reports",
-            ].includes(section) && (
-              <section className="empty module-pending">
-                <p className="eyebrow">PRÓXIMAMENTE EN OHANA</p>
-                <h1>{sectionTitle}</h1>
-                <p>Este módulo está pendiente de desarrollo.</p>
-                <p className="muted">
-                  Ya puedes organizar Materiales, Productos y sus opciones desde
-                  Configuración.
-                </p>
-              </section>
-            )}
-            {legacyVisible && (
-              <>
-                <section className="intro">
-                  <div>
-                    <p className="eyebrow">LA BASE DE CADA CREACIÓN</p>
-                    <h1>{labels[tab]}</h1>
-                    <p>Conoce lo que compras. Cuida lo que creas.</p>
-                  </div>
-                  {canWrite && (
-                    <div className="catalog-entry-actions">
-                      <button
-                        disabled={loading}
+                  {configView === "origins" && (
+                    <OriginsSettings
+                      key={company}
+                      company={company}
+                      origins={data.catalog_origins}
+                      canWrite={canWrite}
+                      onSaved={load}
+                    />
+                  )}
+                </>
+              )}
+              {section === "dashboard" && (
+                <>
+                  <section className="intro">
+                    <div>
+                      <p className="eyebrow">
+                        {activeCompany?.corporation_name}
+                      </p>
+                      <h1>{activeCompany?.name}</h1>
+                      <p>Tu negocio, en armonía.</p>
+                    </div>
+                  </section>
+                  {activeCompany?.catalog_read && (
+                    <section className="stats">
+                      <div>
+                        <span>Materiales</span>
+                        <strong>
+                          {data.raw_materials.filter((m) => m.active).length}
+                        </strong>
+                      </div>
+                      <div>
+                        <span>Productos</span>
+                        <strong>
+                          {data.products.filter((p) => p.active).length}
+                        </strong>
+                      </div>
+                      <div>
+                        <span>Proveedores</span>
+                        <strong>
+                          {data.suppliers.filter((p) => p.active).length}
+                        </strong>
+                      </div>
+                    </section>
+                  )}
+                  <div className="form-actions">
+                    {(
+                      [
+                        [
+                          "materials",
+                          "Materiales",
+                          activeCompany?.catalog_read,
+                        ],
+                        ["products", "Productos", activeCompany?.catalog_read],
+                        ["purchases", "Compras", activeCompany?.inventory_read],
+                        [
+                          "inventory",
+                          "Inventario",
+                          activeCompany?.inventory_read,
+                        ],
+                        [
+                          "formulas",
+                          "Fórmulas",
+                          activeCompany?.production_read,
+                        ],
+                        [
+                          "production",
+                          "Producción",
+                          activeCompany?.production_read,
+                        ],
+                        ["sales", "Ventas", activeCompany?.sales_read],
+                        ["reports", "Reportes", activeCompany?.reports_read],
+                      ] as const
+                    )
+                      .filter(([, , allowed]) => allowed)
+                      .map(([key, label]) => (
+                        <AppButton
+                          key={key}
+                          className="secondary"
+                          onClick={() => {
+                            setSection(key);
+                            if (key === "materials") setTab("raw_materials");
+                          }}
+                        >
+                          Abrir {label.toLowerCase()}
+                        </AppButton>
+                      ))}
+                    {activeCompany?.manage && (
+                      <AppButton
                         onClick={() => {
-                          if (!leaveSheet()) return;
-                          if (tab === "raw_materials") setSheetView(false);
-                          setEdit(null);
+                          setSection("settings");
+                          setConfigView("profile");
                         }}
                       >
-                        {tab === "raw_materials"
-                          ? "Agregar material individual"
-                          : tab === "suppliers"
-                            ? "Agregar proveedor"
-                            : tab === "units"
-                              ? "Agregar unidad"
-                              : "Agregar presentación"}
-                      </button>
-                      {tab === "raw_materials" && (
-                        <button
-                          className="secondary"
+                        Configurar empresa
+                      </AppButton>
+                    )}
+                  </div>
+                </>
+              )}
+              {section === "products" && (
+                <ProductsCatalog
+                  key={company}
+                  company={company}
+                  products={data.products}
+                  origins={data.catalog_origins}
+                  units={data.units}
+                  canWrite={canWrite}
+                  onSaved={load}
+                  onBarcode={setBarcode}
+                />
+              )}
+              {(section === "inventory" || section === "purchases") && (
+                <Inventory
+                  key={company + section}
+                  company={company}
+                  currency={activeCompany?.currency}
+                  purchases={section === "purchases"}
+                />
+              )}
+              {(section === "formulas" || section === "production") && (
+                <Production
+                  key={company + section}
+                  company={company}
+                  formulasOnly={section === "formulas"}
+                  manager={activeCompany?.manage}
+                />
+              )}
+              {(section === "sales" || section === "customers") && (
+                <Sales
+                  key={company + section}
+                  company={company}
+                  currency={activeCompany?.currency}
+                  customersOnly={section === "customers"}
+                />
+              )}
+              {section === "reports" && (
+                <Reports key={company} company={company} />
+              )}
+              {![
+                "dashboard",
+                "materials",
+                "products",
+                "settings",
+                "inventory",
+                "purchases",
+                "formulas",
+                "production",
+                "sales",
+                "customers",
+                "reports",
+              ].includes(section) && (
+                <section className="empty module-pending">
+                  <p className="eyebrow">PRÓXIMAMENTE EN OHANA</p>
+                  <h1>{sectionTitle}</h1>
+                  <p>Este módulo está pendiente de desarrollo.</p>
+                  <p className="muted">
+                    Ya puedes organizar Materiales, Productos y sus opciones
+                    desde Configuración.
+                  </p>
+                </section>
+              )}
+              {legacyVisible && (
+                <>
+                  <section className="intro">
+                    <div>
+                      <p className="eyebrow">LA BASE DE CADA CREACIÓN</p>
+                      <h1>{labels[tab]}</h1>
+                      <p>Conoce lo que compras. Cuida lo que creas.</p>
+                    </div>
+                    {canWrite && (
+                      <div className="catalog-entry-actions">
+                        <AppButton
                           disabled={loading}
                           onClick={() => {
                             if (!leaveSheet()) return;
-                            setSheetView(false);
-                            setEdit(undefined);
-                            setImportNotice("");
-                            setImportOpen(true);
+                            if (tab === "raw_materials") setSheetView(false);
+                            setEdit(null);
                           }}
                         >
-                          Copiar de Tabla
-                        </button>
-                      )}
-                    </div>
-                  )}
-                </section>
-                <section className="stats">
-                  <div>
-                    <span>Materiales activas</span>
-                    <strong>
-                      {data.raw_materials
-                        .filter((r) => r.active)
-                        .length.toString()
-                        .padStart(2, "0")}
-                    </strong>
-                  </div>
-                  <div>
-                    <span>Proveedores activos</span>
-                    <strong>
-                      {data.suppliers
-                        .filter((r) => r.active)
-                        .length.toString()
-                        .padStart(2, "0")}
-                    </strong>
-                  </div>
-                  <div>
-                    <span>Presentaciones con precio vigente</span>
-                    <strong>
-                      {prices
-                        .filter((p) => p.active && p.amount !== null)
-                        .length.toString()
-                        .padStart(2, "0")}
-                    </strong>
-                  </div>
-                </section>
-                {tab === "raw_materials" && (
-                  <div className="sheet-view-switch">
-                    <button
-                      className="secondary"
-                      onClick={() => {
-                        if (leaveSheet()) setSheetView(!sheetView);
-                      }}
-                    >
-                      {sheetView
-                        ? "Volver al catálogo"
-                        : "Editar catálogo en tabla"}
-                    </button>
-                  </div>
-                )}
-                {tab === "raw_materials" && sheetView ? (
-                  <MaterialSheet
-                    currency={activeCompany?.currency}
-                    key={company}
-                    company={company}
-                    canWrite={canWrite}
-                    catalog={data}
-                    onBarcode={setBarcode}
-                    onSaved={load}
-                    onDirty={setSheetDirty}
-                  />
-                ) : (
-                  <section className="catalog">
-                    <div className="toolbar">
-                      <h2>
-                        Tu catálogo <small>{data[tab].length}</small>
-                      </h2>
-                      <input
-                        aria-label="Buscar en el catálogo"
-                        placeholder="Nombre, SKU o código de barras…"
-                        value={query}
-                        onChange={(e) => setQuery(e.target.value)}
-                      />
-                    </div>
-                    {tab === "raw_materials" && (
-                      <CatalogFilters
-                        classification={classification}
-                        onClassification={setClassification}
-                        origin={origin}
-                        onOrigin={setOrigin}
-                        origins={data.catalog_origins}
-                      />
-                    )}{" "}
-                    {loading ? (
-                      <p className="empty" role="status">
-                        Cargando catálogo…
-                      </p>
-                    ) : data[tab].length === 0 ? (
-                      <div className="empty">
-                        <span className="seed">✳</span>
-                        <h2>Un buen comienzo</h2>
-                        <p>
-                          Agrega {labels[tab].toLowerCase()} para construir tu
-                          catálogo.
-                        </p>
-                        <p className="muted">
-                          Tus datos se guardan de forma privada en tu empresa.
-                        </p>
-                      </div>
-                    ) : (
-                      <div className="table-wrap">
-                        <table>
-                          <thead>
-                            <tr>
-                              {tab === "raw_materials" && (
-                                <>
-                                  <th>SKU</th>
-                                  <th>Clasificación</th>
-                                  <th>Origen</th>
-                                  <th>Código de barras</th>
-                                </>
-                              )}
-                              {tab === "presentations" && (
-                                <>
-                                  <th>SKU</th>
-                                  <th>Código de barras</th>
-                                </>
-                              )}
-                              <th>Nombre</th>
-                              <th>
-                                {tab === "raw_materials"
-                                  ? "Unidad base"
-                                  : tab === "suppliers"
-                                    ? "Contacto"
-                                    : tab === "units"
-                                      ? "Equivalencia base"
-                                      : "Proveedor / contenido"}
-                              </th>
-                              <th>
-                                {tab === "presentations"
-                                  ? "Precio vigente"
-                                  : "Estado"}
-                              </th>
-                              <th>Acciones</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {filtered.map((r) => {
-                              const price = prices.find((p) => p.id === r.id);
-                              return (
-                                <tr key={r.id}>
-                                  {tab === "raw_materials" && (
-                                    <>
-                                      <td>{r.sku || "—"}</td>
-                                      <td>{r.classification || "Pendiente"}</td>
-                                      <td>
-                                        {data.catalog_origins.find(
-                                          (o) => o.id === r.origin_id,
-                                        )?.name || "Pendiente"}
-                                      </td>
-                                      <td>{r.barcode || "—"}</td>
-                                    </>
-                                  )}
-                                  {tab === "presentations" && (
-                                    <>
-                                      <td>{r.sku || "Pendiente"}</td>
-                                      <td>{r.barcode || "—"}</td>
-                                    </>
-                                  )}
-                                  <td>
-                                    <strong>{r.name}</strong>
-                                    {tab === "presentations" && (
-                                      <small>{r.alternative_name}</small>
-                                    )}
-                                    <small>
-                                      {tab === "presentations"
-                                        ? name(
-                                            "raw_materials",
-                                            r.raw_material_id,
-                                          )
-                                        : r.notes}
-                                    </small>
-                                  </td>
-                                  <td>
-                                    {tab === "raw_materials" ? (
-                                      name("units", r.unit_id)
-                                    ) : tab === "suppliers" ? (
-                                      r.contact || "—"
-                                    ) : tab === "units" ? (
-                                      `${r.base_factor} ${r.dimension === "mass" ? "g" : r.dimension === "volume" ? "ml" : "ud"}`
-                                    ) : (
-                                      <>
-                                        {name("suppliers", r.supplier_id)}
-                                        <small>
-                                          {r.quantity}{" "}
-                                          {name("units", r.unit_id)}
-                                        </small>
-                                      </>
-                                    )}
-                                  </td>
-                                  <td>
-                                    {tab === "presentations" ? (
-                                      <>
-                                        {price?.amount != null
-                                          ? money(price.amount, price.currency)
-                                          : "Sin precio"}
-                                        {price?.cost_per_material_unit !=
-                                          null && (
-                                          <small>
-                                            {money(
-                                              price.cost_per_material_unit,
-                                              price.currency,
-                                            )}{" "}
-                                            /{" "}
-                                            {name(
-                                              "units",
-                                              data.raw_materials.find(
-                                                (m) =>
-                                                  m.id === r.raw_material_id,
-                                              )?.unit_id,
-                                            )}
-                                          </small>
-                                        )}
-                                        {!r.active && <small>Archivada</small>}
-                                      </>
-                                    ) : (
-                                      <span
-                                        className={
-                                          "status " +
-                                          (!r.active ? "inactive" : "")
-                                        }
-                                      >
-                                        {r.active ? "Activo" : "Archivado"}
-                                      </span>
-                                    )}
-                                  </td>
-                                  <td className="actions">
-                                    {canWrite && (
-                                      <button onClick={() => setEdit(r)}>
-                                        Editar
-                                      </button>
-                                    )}
-                                    {(tab === "raw_materials" ||
-                                      tab === "presentations") &&
-                                      r.barcode && (
-                                        <button onClick={() => setBarcode(r)}>
-                                          Código de barras
-                                        </button>
-                                      )}
-                                    {tab === "presentations" && (
-                                      <button
-                                        onClick={() => void showHistory(r)}
-                                      >
-                                        Precios
-                                      </button>
-                                    )}
-                                    {(r.product_url || r.website_url) && (
-                                      <a
-                                        href={r.product_url || r.website_url}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                      >
-                                        Ver enlace ↗
-                                      </a>
-                                    )}
-                                  </td>
-                                </tr>
-                              );
-                            })}
-                          </tbody>
-                        </table>
-                        {!filtered.length && (
-                          <p className="empty">
-                            No hay resultados para esta búsqueda.
-                          </p>
+                          {tab === "raw_materials"
+                            ? "Agregar material individual"
+                            : tab === "suppliers"
+                              ? "Agregar proveedor"
+                              : tab === "units"
+                                ? "Agregar unidad"
+                                : "Agregar presentación"}
+                        </AppButton>
+                        {tab === "raw_materials" && (
+                          <AppButton
+                            className="secondary"
+                            disabled={loading}
+                            onClick={() => {
+                              if (!leaveSheet()) return;
+                              setSheetView(false);
+                              setEdit(undefined);
+                              setImportNotice("");
+                              setImportOpen(true);
+                            }}
+                          >
+                            Copiar de Tabla
+                          </AppButton>
                         )}
                       </div>
                     )}
                   </section>
-                )}
-                <footer>OHANA · Pequeños detalles, grandes creaciones.</footer>
-              </>
-            )}
-          </>
-        )}
-      </main>
-      {barcode && (
-        <Suspense fallback={<p role="status">Preparando código de barras…</p>}>
-          <BarcodeDialog item={barcode} onClose={() => setBarcode(null)} />
-        </Suspense>
-      )}{" "}
-      {importOpen && (
-        <ImportMaterials
-          currency={activeCompany?.currency}
-          company={company}
-          canWrite={canWrite}
-          catalog={data}
-          onBarcode={setBarcode}
-          onSaved={load}
-          onDirty={setSheetDirty}
-          onCancel={() => setImportOpen(false)}
-          onComplete={(count) => {
-            setImportOpen(false);
-            setImportNotice(`${count} filas guardadas correctamente.`);
-          }}
-        />
-      )}
-      {edit !== undefined && (
-        <div className="overlay">
-          <section
-            role="dialog"
-            aria-modal="true"
-            aria-label="Editar catálogo"
-            className="modal"
+                  <section className="stats">
+                    <div>
+                      <span>Materiales activas</span>
+                      <strong>
+                        {data.raw_materials
+                          .filter((r) => r.active)
+                          .length.toString()
+                          .padStart(2, "0")}
+                      </strong>
+                    </div>
+                    <div>
+                      <span>Proveedores activos</span>
+                      <strong>
+                        {data.suppliers
+                          .filter((r) => r.active)
+                          .length.toString()
+                          .padStart(2, "0")}
+                      </strong>
+                    </div>
+                    <div>
+                      <span>Presentaciones con precio vigente</span>
+                      <strong>
+                        {prices
+                          .filter((p) => p.active && p.amount !== null)
+                          .length.toString()
+                          .padStart(2, "0")}
+                      </strong>
+                    </div>
+                  </section>
+                  {tab === "raw_materials" && (
+                    <div className="sheet-view-switch">
+                      <AppButton
+                        className="secondary"
+                        onClick={() => {
+                          if (leaveSheet()) setSheetView(!sheetView);
+                        }}
+                      >
+                        {sheetView
+                          ? "Volver al catálogo"
+                          : "Editar catálogo en tabla"}
+                      </AppButton>
+                    </div>
+                  )}
+                  {tab === "raw_materials" && sheetView ? (
+                    <MaterialSheet
+                      currency={activeCompany?.currency}
+                      key={company}
+                      company={company}
+                      canWrite={canWrite}
+                      catalog={data}
+                      onBarcode={setBarcode}
+                      onSaved={load}
+                      onDirty={setSheetDirty}
+                    />
+                  ) : (
+                    <section className="catalog">
+                      <div className="toolbar">
+                        <h2>
+                          Tu catálogo <small>{data[tab].length}</small>
+                        </h2>
+                        <input
+                          aria-label="Buscar en el catálogo"
+                          placeholder="Nombre, SKU o código de barras…"
+                          value={query}
+                          onChange={(e) => setQuery(e.target.value)}
+                        />
+                      </div>
+                      {tab === "raw_materials" && (
+                        <CatalogFilters
+                          classification={classification}
+                          onClassification={setClassification}
+                          origin={origin}
+                          onOrigin={setOrigin}
+                          origins={data.catalog_origins}
+                        />
+                      )}{" "}
+                      {loading ? (
+                        <p className="empty" role="status">
+                          Cargando catálogo…
+                        </p>
+                      ) : data[tab].length === 0 ? (
+                        <div className="empty">
+                          <span className="seed">✳</span>
+                          <h2>Un buen comienzo</h2>
+                          <p>
+                            Agrega {labels[tab].toLowerCase()} para construir tu
+                            catálogo.
+                          </p>
+                          <p className="muted">
+                            Tus datos se guardan de forma privada en tu empresa.
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="table-wrap">
+                          <table>
+                            <thead>
+                              <tr>
+                                {tab === "raw_materials" && (
+                                  <>
+                                    <th>SKU</th>
+                                    <th>Clasificación</th>
+                                    <th>Origen</th>
+                                    <th>Código de barras</th>
+                                  </>
+                                )}
+                                {tab === "presentations" && (
+                                  <>
+                                    <th>SKU</th>
+                                    <th>Código de barras</th>
+                                  </>
+                                )}
+                                <th>Nombre</th>
+                                <th>
+                                  {tab === "raw_materials"
+                                    ? "Unidad base"
+                                    : tab === "suppliers"
+                                      ? "Contacto"
+                                      : tab === "units"
+                                        ? "Equivalencia base"
+                                        : "Proveedor / contenido"}
+                                </th>
+                                <th>
+                                  {tab === "presentations"
+                                    ? "Precio vigente"
+                                    : "Estado"}
+                                </th>
+                                <th>Acciones</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {filtered.map((r) => {
+                                const price = prices.find((p) => p.id === r.id);
+                                return (
+                                  <tr key={r.id}>
+                                    {tab === "raw_materials" && (
+                                      <>
+                                        <td>{r.sku || "—"}</td>
+                                        <td>
+                                          {r.classification || "Pendiente"}
+                                        </td>
+                                        <td>
+                                          {data.catalog_origins.find(
+                                            (o) => o.id === r.origin_id,
+                                          )?.name || "Pendiente"}
+                                        </td>
+                                        <td>{r.barcode || "—"}</td>
+                                      </>
+                                    )}
+                                    {tab === "presentations" && (
+                                      <>
+                                        <td>{r.sku || "Pendiente"}</td>
+                                        <td>{r.barcode || "—"}</td>
+                                      </>
+                                    )}
+                                    <td>
+                                      <strong>{r.name}</strong>
+                                      {tab === "presentations" && (
+                                        <small>{r.alternative_name}</small>
+                                      )}
+                                      <small>
+                                        {tab === "presentations"
+                                          ? name(
+                                              "raw_materials",
+                                              r.raw_material_id,
+                                            )
+                                          : r.notes}
+                                      </small>
+                                    </td>
+                                    <td>
+                                      {tab === "raw_materials" ? (
+                                        name("units", r.unit_id)
+                                      ) : tab === "suppliers" ? (
+                                        r.contact || "—"
+                                      ) : tab === "units" ? (
+                                        `${r.base_factor} ${r.dimension === "mass" ? "g" : r.dimension === "volume" ? "ml" : "ud"}`
+                                      ) : (
+                                        <>
+                                          {name("suppliers", r.supplier_id)}
+                                          <small>
+                                            {r.quantity}{" "}
+                                            {name("units", r.unit_id)}
+                                          </small>
+                                        </>
+                                      )}
+                                    </td>
+                                    <td>
+                                      {tab === "presentations" ? (
+                                        <>
+                                          {price?.amount != null
+                                            ? money(
+                                                price.amount,
+                                                price.currency,
+                                              )
+                                            : "Sin precio"}
+                                          {price?.cost_per_material_unit !=
+                                            null && (
+                                            <small>
+                                              {money(
+                                                price.cost_per_material_unit,
+                                                price.currency,
+                                              )}{" "}
+                                              /{" "}
+                                              {name(
+                                                "units",
+                                                data.raw_materials.find(
+                                                  (m) =>
+                                                    m.id === r.raw_material_id,
+                                                )?.unit_id,
+                                              )}
+                                            </small>
+                                          )}
+                                          {!r.active && (
+                                            <small>Archivada</small>
+                                          )}
+                                        </>
+                                      ) : (
+                                        <span
+                                          className={
+                                            "status " +
+                                            (!r.active ? "inactive" : "")
+                                          }
+                                        >
+                                          {r.active ? "Activo" : "Archivado"}
+                                        </span>
+                                      )}
+                                    </td>
+                                    <td className="actions">
+                                      {canWrite && (
+                                        <AppButton onClick={() => setEdit(r)}>
+                                          Editar
+                                        </AppButton>
+                                      )}
+                                      {(tab === "raw_materials" ||
+                                        tab === "presentations") &&
+                                        r.barcode && (
+                                          <AppButton
+                                            onClick={() => setBarcode(r)}
+                                          >
+                                            Código de barras
+                                          </AppButton>
+                                        )}
+                                      {tab === "presentations" && (
+                                        <AppButton
+                                          onClick={() => void showHistory(r)}
+                                        >
+                                          Precios
+                                        </AppButton>
+                                      )}
+                                      {(r.product_url || r.website_url) && (
+                                        <a
+                                          href={r.product_url || r.website_url}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                        >
+                                          Ver enlace ↗
+                                        </a>
+                                      )}
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                          {!filtered.length && (
+                            <p className="empty">
+                              No hay resultados para esta búsqueda.
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </section>
+                  )}
+                  <footer>
+                    OHANA · Pequeños detalles, grandes creaciones.
+                  </footer>
+                </>
+              )}
+            </>
+          )}
+        </main>
+        {barcode && (
+          <Suspense
+            fallback={<p role="status">Preparando código de barras…</p>}
           >
-            <button
-              className="close"
-              aria-label="Cerrar"
-              disabled={busy}
-              onClick={() => setEdit(undefined)}
+            <BarcodeDialog item={barcode} onClose={() => setBarcode(null)} />
+          </Suspense>
+        )}{" "}
+        {importOpen && (
+          <ImportMaterials
+            currency={activeCompany?.currency}
+            company={company}
+            canWrite={canWrite}
+            catalog={data}
+            onBarcode={setBarcode}
+            onSaved={load}
+            onDirty={setSheetDirty}
+            onCancel={() => setImportOpen(false)}
+            onComplete={(count) => {
+              setImportOpen(false);
+              setImportNotice(`${count} filas guardadas correctamente.`);
+            }}
+          />
+        )}
+        {edit !== undefined && (
+          <div className="overlay">
+            <section
+              role="dialog"
+              aria-modal="true"
+              aria-label="Editar catálogo"
+              className="modal"
             >
-              ×
-            </button>
-            <p className="eyebrow">{labels[tab]}</p>
-            <h2>{edit ? "Editar registro" : "Un nuevo comienzo"}</h2>
-            <form onSubmit={save}>
-              {input("name", "Nombre", "text", true)}
-              {tab === "raw_materials" && (
-                <>
-                  <CatalogFields
-                    key={edit?.id || "new"}
-                    company={company}
-                    kind="material"
-                    item={edit}
-                    origins={data.catalog_origins}
-                  />
-                  {select("unit_id", "Unidad base", data.units, !!edit)}
-                </>
-              )}
-              {tab === "suppliers" && (
-                <>
-                  {input("contact", "Contacto")}
-                  {input("website_url", "Sitio web", "url")}
-                </>
-              )}
-              {tab === "units" && (
-                <>
-                  {input("symbol", "Símbolo", "text", true)}
+              <AppButton
+                className="close"
+                aria-label="Cerrar"
+                disabled={busy}
+                onClick={() => setEdit(undefined)}
+              >
+                ×
+              </AppButton>
+              <p className="eyebrow">{labels[tab]}</p>
+              <h2>{edit ? "Editar registro" : "Un nuevo comienzo"}</h2>
+              <form onSubmit={save}>
+                {input("name", "Nombre", "text", true)}
+                {tab === "raw_materials" && (
+                  <>
+                    <CatalogFields
+                      key={edit?.id || "new"}
+                      company={company}
+                      kind="material"
+                      item={edit}
+                      origins={data.catalog_origins}
+                    />
+                    {select("unit_id", "Unidad base", data.units, !!edit)}
+                  </>
+                )}
+                {tab === "suppliers" && (
+                  <>
+                    {input("contact", "Contacto")}
+                    {input("website_url", "Sitio web", "url")}
+                  </>
+                )}
+                {tab === "units" && (
+                  <>
+                    {input("symbol", "Símbolo", "text", true)}
+                    <label>
+                      Tipo
+                      <select
+                        name="dimension"
+                        defaultValue={edit?.dimension || "mass"}
+                        disabled={!!edit}
+                      >
+                        <option value="mass">Masa (base: g)</option>
+                        <option value="volume">Volumen (base: ml)</option>
+                        <option value="count">Conteo (base: ud)</option>
+                      </select>
+                    </label>
+                    {edit && (
+                      <input
+                        type="hidden"
+                        name="dimension"
+                        value={edit.dimension}
+                      />
+                    )}{" "}
+                    {input(
+                      "base_factor",
+                      "Equivalencia en la unidad base",
+                      "number",
+                      true,
+                      !!edit,
+                    )}
+                    <p className="muted">
+                      Ejemplo: kilogramo = 1000 gramos. Las conversiones no
+                      cambian después de guardar.
+                    </p>
+                  </>
+                )}
+                {tab === "presentations" && (
+                  <>
+                    {input("sku", "SKU (se sugiere automáticamente)")}
+                    {input("barcode", "Código de barras personalizado")}
+                    <label>
+                      <input
+                        type="checkbox"
+                        name="barcode_custom"
+                        defaultChecked={edit?.barcode_custom ?? false}
+                      />{" "}
+                      Conservar código personalizado, incluso vacío
+                    </label>
+                    {input("alternative_name", "Nombre alternativo")}
+                    {select(
+                      "raw_material_id",
+                      "Material",
+                      data.raw_materials,
+                      !!edit,
+                    )}
+                    {select(
+                      "supplier_id",
+                      "Proveedor (opcional)",
+                      data.suppliers,
+                      !!edit,
+                      false,
+                    )}
+                    {input(
+                      "quantity",
+                      "Contenido de la presentación",
+                      "number",
+                      true,
+                      !!edit,
+                    )}
+                    {select(
+                      "unit_id",
+                      "Unidad del contenido",
+                      data.units,
+                      !!edit,
+                    )}
+                    {input("product_url", "Enlace de compra", "url")}
+                    <p className="muted">
+                      Usa unidades del mismo tipo que la material. Registra el
+                      precio desde “Precios” después de guardar.
+                    </p>
+                  </>
+                )}
+                {(tab === "raw_materials" || tab === "suppliers") && (
                   <label>
-                    Tipo
-                    <select
-                      name="dimension"
-                      defaultValue={edit?.dimension || "mass"}
-                      disabled={!!edit}
-                    >
-                      <option value="mass">Masa (base: g)</option>
-                      <option value="volume">Volumen (base: ml)</option>
-                      <option value="count">Conteo (base: ud)</option>
+                    Notas
+                    <textarea name="notes" defaultValue={edit?.notes || ""} />
+                  </label>
+                )}
+                {edit && (
+                  <label>
+                    Estado
+                    <select name="active" defaultValue={String(edit.active)}>
+                      <option value="true">Activo</option>
+                      <option value="false">Archivado</option>
                     </select>
                   </label>
-                  {edit && (
-                    <input
-                      type="hidden"
-                      name="dimension"
-                      value={edit.dimension}
-                    />
-                  )}{" "}
-                  {input(
-                    "base_factor",
-                    "Equivalencia en la unidad base",
-                    "number",
-                    true,
-                    !!edit,
-                  )}
-                  <p className="muted">
-                    Ejemplo: kilogramo = 1000 gramos. Las conversiones no
-                    cambian después de guardar.
+                )}
+                {error && (
+                  <p role="alert" className="error">
+                    <AppIcon name="status.error" />
+                    {error}
                   </p>
-                </>
-              )}
-              {tab === "presentations" && (
-                <>
-                  {input("sku", "SKU (se sugiere automáticamente)")}
-                  {input("barcode", "Código de barras personalizado")}
+                )}
+                <AppButton disabled={busy}>
+                  {busy ? "Guardando…" : "Guardar"}
+                </AppButton>
+              </form>
+            </section>
+          </div>
+        )}
+        {history && (
+          <div className="overlay">
+            <section
+              role="dialog"
+              aria-modal="true"
+              aria-label="Historial de precios"
+              className="modal"
+            >
+              <AppButton
+                className="close"
+                aria-label="Cerrar"
+                disabled={busy}
+                onClick={() => setHistory(null)}
+              >
+                ×
+              </AppButton>
+              <p className="eyebrow">PRECIOS HISTÓRICOS</p>
+              <h2>{history.name}</h2>
+              <p>
+                Cada precio es un registro nuevo. Los precios futuros se aplican
+                desde su fecha.
+              </p>
+              {canWrite && (
+                <form onSubmit={addPrice}>
                   <label>
+                    Precio por presentación
                     <input
-                      type="checkbox"
-                      name="barcode_custom"
-                      defaultChecked={edit?.barcode_custom ?? false}
-                    />{" "}
-                    Conservar código personalizado, incluso vacío
+                      name="amount"
+                      type="number"
+                      min="0"
+                      step="0.0001"
+                      required
+                    />
                   </label>
-                  {input("alternative_name", "Nombre alternativo")}
-                  {select(
-                    "raw_material_id",
-                    "Material",
-                    data.raw_materials,
-                    !!edit,
-                  )}
-                  {select(
-                    "supplier_id",
-                    "Proveedor (opcional)",
-                    data.suppliers,
-                    !!edit,
-                    false,
-                  )}
-                  {input(
-                    "quantity",
-                    "Contenido de la presentación",
-                    "number",
-                    true,
-                    !!edit,
-                  )}
-                  {select(
-                    "unit_id",
-                    "Unidad del contenido",
-                    data.units,
-                    !!edit,
-                  )}
-                  {input("product_url", "Enlace de compra", "url")}
-                  <p className="muted">
-                    Usa unidades del mismo tipo que la material. Registra el
-                    precio desde “Precios” después de guardar.
-                  </p>
-                </>
-              )}
-              {(tab === "raw_materials" || tab === "suppliers") && (
-                <label>
-                  Notas
-                  <textarea name="notes" defaultValue={edit?.notes || ""} />
-                </label>
-              )}
-              {edit && (
-                <label>
-                  Estado
-                  <select name="active" defaultValue={String(edit.active)}>
-                    <option value="true">Activo</option>
-                    <option value="false">Archivado</option>
-                  </select>
-                </label>
+                  <label>
+                    Moneda
+                    <select name="currency" defaultValue="GTQ">
+                      <option>GTQ</option>
+                      <option>USD</option>
+                    </select>
+                  </label>
+                  <label>
+                    Vigente desde
+                    <input
+                      name="effective_on"
+                      type="date"
+                      defaultValue={new Date().toLocaleDateString("en-CA")}
+                      required
+                    />
+                  </label>
+                  <label>
+                    Nota
+                    <input name="notes" />
+                  </label>
+                  <AppButton disabled={busy}>
+                    {busy ? "Guardando…" : "Registrar precio"}
+                  </AppButton>
+                </form>
               )}
               {error && (
-                <p role="alert" className="error">
+                <p className="error" role="alert">
+                  <AppIcon name="status.error" />
                   {error}
                 </p>
               )}
-              <button disabled={busy}>{busy ? "Guardando…" : "Guardar"}</button>
-            </form>
-          </section>
-        </div>
-      )}
-      {history && (
-        <div className="overlay">
-          <section
-            role="dialog"
-            aria-modal="true"
-            aria-label="Historial de precios"
-            className="modal"
-          >
-            <button
-              className="close"
-              aria-label="Cerrar"
-              disabled={busy}
-              onClick={() => setHistory(null)}
-            >
-              ×
-            </button>
-            <p className="eyebrow">PRECIOS HISTÓRICOS</p>
-            <h2>{history.name}</h2>
-            <p>
-              Cada precio es un registro nuevo. Los precios futuros se aplican
-              desde su fecha.
-            </p>
-            {canWrite && (
-              <form onSubmit={addPrice}>
-                <label>
-                  Precio por presentación
-                  <input
-                    name="amount"
-                    type="number"
-                    min="0"
-                    step="0.0001"
-                    required
-                  />
-                </label>
-                <label>
-                  Moneda
-                  <select name="currency" defaultValue="GTQ">
-                    <option>GTQ</option>
-                    <option>USD</option>
-                  </select>
-                </label>
-                <label>
-                  Vigente desde
-                  <input
-                    name="effective_on"
-                    type="date"
-                    defaultValue={new Date().toLocaleDateString("en-CA")}
-                    required
-                  />
-                </label>
-                <label>
-                  Nota
-                  <input name="notes" />
-                </label>
-                <button disabled={busy}>
-                  {busy ? "Guardando…" : "Registrar precio"}
-                </button>
-              </form>
-            )}
-            {error && (
-              <p className="error" role="alert">
-                {error}
-              </p>
-            )}
-            <ol className="history">
-              {entries.map((r) => (
-                <li key={r.id}>
-                  <strong>
-                    {r.amount == null
-                      ? "Precio pendiente"
-                      : money(r.amount, r.currency)}
-                  </strong>
-                  <span>{r.effective_on || "Fecha pendiente"}</span>
-                  <small>{r.notes}</small>
-                  {r.legacy_previous_amount != null && (
-                    <small>
-                      Referencia importada:{" "}
-                      {money(r.legacy_previous_amount, r.currency)} ·{" "}
-                      {r.legacy_previous_supplier || "Proveedor no indicado"} ·
-                      Fecha desconocida ·{" "}
-                      {r.legacy_previous_basis === "unknown"
-                        ? "Sin unidad conocida: no comparable"
-                        : r.legacy_previous_basis === "unit"
-                          ? "Precio por unidad indicada"
-                          : "Precio total de la misma presentación"}
-                    </small>
-                  )}
-                </li>
-              ))}
-            </ol>
-            {!entries.length && <p>Todavía no hay precios registrados.</p>}
-          </section>
-        </div>
-      )}
-    </div>
+              <ol className="history">
+                {entries.map((r) => (
+                  <li key={r.id}>
+                    <strong>
+                      {r.amount == null
+                        ? "Precio pendiente"
+                        : money(r.amount, r.currency)}
+                    </strong>
+                    <span>{r.effective_on || "Fecha pendiente"}</span>
+                    <small>{r.notes}</small>
+                    {r.legacy_previous_amount != null && (
+                      <small>
+                        Referencia importada:{" "}
+                        {money(r.legacy_previous_amount, r.currency)} ·{" "}
+                        {r.legacy_previous_supplier || "Proveedor no indicado"}{" "}
+                        · Fecha desconocida ·{" "}
+                        {r.legacy_previous_basis === "unknown"
+                          ? "Sin unidad conocida: no comparable"
+                          : r.legacy_previous_basis === "unit"
+                            ? "Precio por unidad indicada"
+                            : "Precio total de la misma presentación"}
+                      </small>
+                    )}
+                  </li>
+                ))}
+              </ol>
+              {!entries.length && <p>Todavía no hay precios registrados.</p>}
+            </section>
+          </div>
+        )}
+      </div>
+    </IconProvider>
   );
 }
 createRoot(document.getElementById("root")!).render(
@@ -1451,3 +1501,4 @@ createRoot(document.getElementById("root")!).render(
 );
 import "./admin.css";
 import "./admin-forms.css";
+import "./configuration.css";

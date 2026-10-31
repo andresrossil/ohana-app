@@ -1,3 +1,4 @@
+import { AppButton, AppIcon } from "./AppIcon";
 import { useEffect, useState } from "react";
 import { sales } from "./commerce";
 import { keyedRequest, money, useOperation, type Row } from "./operations";
@@ -59,7 +60,7 @@ export default function Sales({
         </div>
         <div className="actions">
           {state.canWrite && !customersOnly && (
-            <button
+            <AppButton
               onClick={() => {
                 setLines([
                   { key: crypto.randomUUID(), variant: "", quantity: 1 },
@@ -68,19 +69,20 @@ export default function Sales({
               }}
             >
               Registrar venta
-            </button>
+            </AppButton>
           )}
-          <button
+          <AppButton
             className="secondary"
             disabled={state.busy}
             onClick={() => state.run(load)}
           >
             Actualizar
-          </button>
+          </AppButton>
         </div>
       </section>
       {!mode && state.error && (
         <p className="error" role="alert">
+          <AppIcon name="status.error" />
           {state.error}
         </p>
       )}
@@ -104,6 +106,7 @@ export default function Sales({
             </h2>
             {state.error && (
               <p className="error" role="alert">
+                <AppIcon name="status.error" />
                 {state.error}
               </p>
             )}
@@ -229,7 +232,7 @@ export default function Sales({
                         />
                       </label>
                       {lines.length > 1 && (
-                        <button
+                        <AppButton
                           type="button"
                           className="secondary"
                           onClick={() =>
@@ -239,11 +242,11 @@ export default function Sales({
                           }
                         >
                           Quitar
-                        </button>
+                        </AppButton>
                       )}
                     </div>
                   ))}
-                  <button
+                  <AppButton
                     type="button"
                     className="secondary"
                     disabled={lines.length >= 30}
@@ -255,7 +258,7 @@ export default function Sales({
                     }
                   >
                     Añadir variante
-                  </button>
+                  </AppButton>
                 </>
               ) : (
                 <>
@@ -294,15 +297,15 @@ export default function Sales({
                     )}
                   </strong>
                 )}
-                <button disabled={state.busy}>Confirmar</button>
-                <button
+                <AppButton disabled={state.busy}>Confirmar</AppButton>
+                <AppButton
                   type="button"
                   className="secondary"
                   disabled={state.busy}
                   onClick={() => setMode(null)}
                 >
                   Volver
-                </button>
+                </AppButton>
               </div>
             </form>
           </section>
@@ -406,6 +409,15 @@ export default function Sales({
                       )}
                     </td>
                     <td>
+                      <AppIcon
+                        name={
+                          o.status === "dispatched"
+                            ? "status.success"
+                            : o.status === "pending"
+                              ? "status.pending"
+                              : "status.info"
+                        }
+                      />
                       {statusNames[o.status]}
                       {o.status === "pending" && (
                         <small>
@@ -418,26 +430,26 @@ export default function Sales({
                       {state.canWrite &&
                         !["cancelled", "expired"].includes(o.status) &&
                         !o.paid_at && (
-                          <button
+                          <AppButton
                             onClick={() => {
                               setOrder(o);
                               setMode("paid");
                             }}
                           >
                             Confirmar pago
-                          </button>
+                          </AppButton>
                         )}
                       {state.canWrite && o.status === "pending" && (
                         <>
-                          <button
+                          <AppButton
                             onClick={() => {
                               setOrder(o);
                               setMode("dispatch");
                             }}
                           >
                             Entregar
-                          </button>
-                          <button
+                          </AppButton>
+                          <AppButton
                             className="secondary"
                             onClick={() => {
                               setOrder(o);
@@ -445,7 +457,7 @@ export default function Sales({
                             }}
                           >
                             Cancelar pedido
-                          </button>
+                          </AppButton>
                         </>
                       )}
                     </td>
