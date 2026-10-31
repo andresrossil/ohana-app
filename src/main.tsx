@@ -27,6 +27,7 @@ type Row = { id: string; [key: string]: any };
 const Reports = lazy(() => import("./Reports"));
 const Inventory = lazy(() => import("./Inventory"));
 const Production = lazy(() => import("./Production"));
+const BusinessPartners = lazy(() => import("./BusinessPartners"));
 const Sales = lazy(() => import("./Sales"));
 const PublicStore = lazy(() => import("./PublicStore"));
 const StoreSettings = lazy(() => import("./StoreSettings"));
@@ -537,7 +538,13 @@ function App() {
             ...(activeCompany?.production_read
               ? ["formulas", "production"]
               : []),
-            ...(activeCompany?.sales_read ? ["sales", "customers"] : []),
+            ...(activeCompany?.sales_read ? ["sales"] : []),
+            ...(activeCompany?.manage ||
+            activeCompany?.catalog_read ||
+            activeCompany?.inventory_read ||
+            activeCompany?.sales_read
+              ? ["customers"]
+              : []),
             ...(activeCompany?.reports_read ? ["reports"] : []),
             ...(activeCompany?.manage || canCreate ? ["settings"] : []),
           ]}
@@ -658,7 +665,6 @@ function App() {
                       ["structure", "Corporaciones y accesos"],
                       ["store", "Tienda y ventas"],
                       ["origins", "Orígenes"],
-                      ["suppliers", "Proveedores"],
                       ["presentations", "Presentaciones"],
                       ["units", "Unidades"],
                     ]
@@ -699,8 +705,13 @@ function App() {
                       ))}
                   </nav>
                   {configView === "profile" && activeCompany?.manage && (
-                    <AppButton className="secondary company-back" iconKey="action.back"
-                      onClick={() => { if (leaveSheet()) setConfigView("structure"); }}>
+                    <AppButton
+                      className="secondary company-back"
+                      iconKey="action.back"
+                      onClick={() => {
+                        if (leaveSheet()) setConfigView("structure");
+                      }}
+                    >
                       Volver a la corporación
                     </AppButton>
                   )}
@@ -749,7 +760,10 @@ function App() {
                 </>
               )}
               {section === "dashboard" && (
-                <section className="admin-dashboard" aria-label="Resumen de empresa">
+                <section
+                  className="admin-dashboard"
+                  aria-label="Resumen de empresa"
+                >
                   <section className="intro">
                     <div>
                       <p className="eyebrow">
@@ -781,7 +795,6 @@ function App() {
                       </div>
                     </section>
                   )}
-
                 </section>
               )}
               {section === "products" && (
@@ -812,12 +825,19 @@ function App() {
                   manager={activeCompany?.manage}
                 />
               )}
-              {(section === "sales" || section === "customers") && (
+              {section === "sales" && (
                 <Sales
                   key={company + section}
                   company={company}
                   currency={activeCompany?.currency}
-                  customersOnly={section === "customers"}
+                />
+              )}
+              {section === "customers" && (
+                <BusinessPartners
+                  key={company}
+                  company={company}
+                  onDirty={setSettingsDirty}
+                  onSaved={load}
                 />
               )}
               {section === "reports" && (

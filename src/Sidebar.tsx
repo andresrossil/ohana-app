@@ -11,7 +11,7 @@ export const sections = [
   ["production", "Producción", "⚙"],
   ["inventory", "Inventario", "▤"],
   ["sales", "Ventas", "↗"],
-  ["customers", "Clientes", "♧"],
+  ["customers", "Socios de negocio", "♧"],
   ["reports", "Reportes", "▥"],
   ["settings", "Configuración", "☷"],
 ] as const;

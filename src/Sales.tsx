@@ -22,7 +22,8 @@ export default function Sales({
     [lines, setLines] = useState<Row[]>([
       { key: crypto.randomUUID(), variant: "", quantity: 1 },
     ]),
-    [query, setQuery] = useState("");
+    [query, setQuery] = useState(""),
+    [customerId, setCustomerId] = useState("");
   async function load() {
     setData(await sales(company));
   }
@@ -65,6 +66,7 @@ export default function Sales({
                 setLines([
                   { key: crypto.randomUUID(), variant: "", quantity: 1 },
                 ]);
+                setCustomerId("");
                 setMode("create");
               }}
             >
@@ -117,6 +119,7 @@ export default function Sales({
                 const payload =
                   mode === "create"
                     ? {
+                        customer_id: customerId || undefined,
                         customer: {
                           name: f.get("name"),
                           phone: f.get("phone"),
@@ -152,23 +155,55 @@ export default function Sales({
               {mode === "create" ? (
                 <>
                   <div className="settings-grid">
-                    <label>
-                      Nombre
-                      <input
-                        name="name"
-                        required
-                        minLength={2}
-                        maxLength={120}
-                      />
+                    <label className="form-wide">
+                      Cliente
+                      <select
+                        value={customerId}
+                        onChange={(e) => setCustomerId(e.target.value)}
+                      >
+                        <option value="">Nuevo contacto</option>
+                        {data.customers
+                          .filter((c: Row) => c.active)
+                          .map((c: Row) => (
+                            <option key={c.id} value={c.id}>
+                              {c.code} · {c.name}
+                            </option>
+                          ))}
+                      </select>
                     </label>
-                    <label>
-                      Teléfono
-                      <input name="phone" type="tel" required maxLength={25} />
-                    </label>
-                    <label>
-                      Correo (opcional)
-                      <input name="email" type="email" maxLength={254} />
-                    </label>
+                    {!customerId && (
+                      <>
+                        <label>
+                          Nombre
+                          <input
+                            name="name"
+                            required
+                            minLength={2}
+                            maxLength={120}
+                          />
+                        </label>
+                        <label>
+                          Teléfono
+                          <input
+                            name="phone"
+                            type="tel"
+                            required
+                            maxLength={25}
+                          />
+                        </label>
+                        <label>
+                          Correo (opcional)
+                          <input name="email" type="email" maxLength={254} />
+                        </label>
+                      </>
+                    )}
+                    {customerId && (
+                      <p className="form-wide">
+                        {data.customers.find((c: Row) => c.id === customerId)
+                          ?.phone ||
+                          "Este cliente no tiene teléfono. Completa sus datos en Socios de negocio antes de registrar la venta."}
+                      </p>
+                    )}
                     <label>
                       Pago
                       <select name="payment">
