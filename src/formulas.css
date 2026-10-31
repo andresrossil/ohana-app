@@ -6,8 +6,9 @@
   min-width: 260px;
   max-width: 360px;
 }
-.shell .formula-dialog {
+.shell .modal.formula-dialog {
   width: min(1120px, calc(100vw - 32px));
+  max-width: 1120px;
   max-height: 92dvh;
   overflow: auto;
 }
@@ -96,7 +97,7 @@
   max-width: 360px;
 }
 @media (max-width: 650px) {
-  .shell .formula-dialog {
+  .shell .modal.formula-dialog {
     width: calc(100vw - 24px);
     padding: 16px;
   }
