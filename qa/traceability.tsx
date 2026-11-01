@@ -47,8 +47,8 @@ const materials = [
   },
 ];
 const products = [
-    { id: "p1", name: "Producto de prueba", active: true },
-    { id: "p2", name: "Otro producto", active: true },
+    { id: "p1", name: "Producto de prueba", unit_id: "ml", active: true },
+    { id: "p2", name: "Otro producto", unit_id: "ml", active: true },
   ],
   variants = [
     {
@@ -65,7 +65,7 @@ let formulas: any[] = [
       product_id: "p1",
       product_name: products[0].name,
       name: "Receta de prueba",
-      code: "F0001",
+      code: "F000001",
       version: 1,
       state: "current",
       capture_mode: "quantity",
@@ -103,7 +103,7 @@ window.fetch = async (url, init) => {
   let out: any = null;
   if (u.includes("company_permission")) out = true;
   if (u.includes("formula_catalog"))
-    out = { materials, units, products, currency: "GTQ", next_code: "F0002" };
+    out = { materials, units, products, currency: "GTQ", next_code: "F000002" };
   if (u.includes("formula_command")) {
     if (p.p_action === "list")
       out = formulas.map((f) => ({
@@ -161,7 +161,7 @@ window.fetch = async (url, init) => {
         product_name:
           b.recipe_snapshot?.product.name ||
           products.find((p) => p.id === b.product_id)?.name,
-        formula_code: "F0001",
+        formula_code: "F000001",
         formula_version: formulas.find((f) => f.id === b.formula_id)?.version,
       }));
     if (p.p_action === "detail") {

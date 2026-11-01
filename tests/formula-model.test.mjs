@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { recipeMath } from "../src/formula-model.ts";
+import { recipeMath, estimatedUnitCost } from "../src/formula-model.ts";
 const units = [
   { id: "g", symbol: "g", dimension: "mass", base_factor: 1 },
   { id: "kg", symbol: "kg", dimension: "mass", base_factor: 1000 },
@@ -20,6 +20,57 @@ const line = (
   percentage = "",
   kind = "ingredient",
 ) => ({ key: material, material, unit, quantity, percentage, line_kind: kind });
+test("theoretical mass uses explicit density, excludes packaging and scales without inferred loss", () => {
+  const rows = [
+    line("a", "kg", 1),
+    { ...line("c", "ml", 100), density_g_ml: 0.9 },
+    line("p", "ud", 3, "", "packaging"),
+  ];
+  const r = recipeMath(rows, units, materials, "quantity", "", "", 2, true, 10);
+  assert.equal(r.theoreticalGrams, 2180);
+  assert.equal(r.massPartial, false);
+  assert.equal(rows[1].quantity, 100);
+  const partial = recipeMath(
+    [line("a", "g", 25), line("c", "ml", 100)],
+    units,
+    materials,
+    "quantity",
+    "",
+    "",
+    1,
+    false,
+    0,
+  );
+  assert.equal(partial.theoreticalGrams, 25);
+  assert.equal(partial.massPartial, true);
+});
+test("densities and quantities never substitute unknown volume with grams", () => {
+  const r = recipeMath(
+    [{ ...line("c", "ml", 100), density_g_ml: "" }],
+    units,
+    materials,
+    "quantity",
+    "",
+    "",
+    1,
+    false,
+    0,
+  );
+  assert.equal(r.theoreticalGrams, 0);
+  assert.equal(r.massPartial, true);
+  const bad = recipeMath(
+    [{ ...line("c", "ml", 100), density_g_ml: -2 }],
+    units,
+    materials,
+    "quantity",
+    "",
+    "",
+    1,
+    false,
+    0,
+  );
+  assert.match(bad.errors.join(" "), /densidad/);
+});
 test("quantity mode converts kg and grams, keeps packaging outside 100%, and scales only the preview", () => {
   const input = [
     line("a", "kg", 1),
@@ -120,4 +171,13 @@ test("duplicates and incompatible units cannot pass validation", () => {
     recipeMath([line("a", "ml", 10)], units, materials, "quantity", "", "")
       .errors.length > 0,
   );
+});
+
+test("estimated unit cost stays optional and stable when scaling the same recipe", () => {
+  assert.equal(estimatedUnitCost(27, 10), 2.7);
+  assert.equal(estimatedUnitCost(54, 10, 2), 2.7);
+  assert.equal(estimatedUnitCost(null, 10), null);
+  assert.equal(estimatedUnitCost(27, ""), null);
+  assert.equal(estimatedUnitCost(27, 0), null);
+  assert.equal(estimatedUnitCost(27, 10, 0), null);
 });

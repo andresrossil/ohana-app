@@ -2,7 +2,12 @@ import { useEffect, useRef, useState } from "react";
 import { AppButton, AppIcon } from "./AppIcon";
 import { request } from "./commerce";
 import { keyedRequest, money, useOperation, type Row } from "./operations";
-import { recipeMath, roundQuantity, type RecipeLine } from "./formula-model";
+import {
+  recipeMath,
+  roundQuantity,
+  estimatedUnitCost,
+  type RecipeLine,
+} from "./formula-model";
 import "./formulas.css";
 import BatchTrace, { lotCode } from "./BatchTrace";
 
@@ -50,6 +55,10 @@ const initial = (): Row => ({
   total_quantity: 1000,
   total_unit: "",
   state: "testing",
+  own_reference: "",
+  estimated_units: "",
+  estimate_unit_id: "",
+  quantity_per_unit: "",
   loss_enabled: false,
   loss_percent: 5,
 });
@@ -147,6 +156,7 @@ export default function Formulas({
       quantity: Number(i.quantity),
       percentage: i.percentage == null ? "" : Number(i.percentage),
       line_kind: i.line_kind || "ingredient",
+      density_g_ml: i.density_g_ml ?? "",
     }));
     setDraft(
       source
@@ -154,6 +164,15 @@ export default function Formulas({
             ...source,
             product: source.product_id,
             source: source.id,
+            locked: ["view", "edit", "notes"].includes(next)
+              ? source.locked
+              : false,
+            used_batches: ["view", "edit", "notes"].includes(next)
+              ? source.used_batches
+              : [],
+            own_reference: ["version", "view", "edit", "notes"].includes(next)
+              ? source.own_reference || ""
+              : "",
             code: ["version", "view", "edit", "notes"].includes(next)
               ? source.code
               : catalog.next_code,
@@ -278,7 +297,11 @@ export default function Formulas({
         await keyedRequest(
           company,
           "formula_command",
-          { id: draft.id, admin_notes: draft.admin_notes || "" },
+          {
+            id: draft.id,
+            admin_notes: draft.admin_notes || "",
+            own_reference: draft.own_reference || "",
+          },
           "notes",
         );
         setMode(null);
@@ -479,6 +502,28 @@ export default function Formulas({
                             ))}
                         </select>
                       )}
+                      {kind === "ingredient" &&
+                        computed.unit?.dimension === "volume" && (
+                          <label className="formula-density">
+                            Densidad (g/ml)
+                            <input
+                              aria-label={`Densidad fila ${index + 1}`}
+                              type="number"
+                              min="0.00000001"
+                              max="999999.99999999"
+                              step="any"
+                              placeholder="Opcional"
+                              readOnly={readOnly}
+                              disabled={state.busy}
+                              value={line.density_g_ml ?? ""}
+                              onChange={(e) =>
+                                changeLine(line.key, {
+                                  density_g_ml: e.target.value,
+                                })
+                              }
+                            />
+                          </label>
+                        )}
                     </td>
                     <td>
                       {!readOnly &&
@@ -559,7 +604,14 @@ export default function Formulas({
     );
   }
   const filtered = formulas.filter((f) =>
-    [f.code, f.name, f.product_name, labels[f.state], `v${f.version}`]
+    [
+      f.code,
+      f.own_reference,
+      f.name,
+      f.product_name,
+      labels[f.state],
+      `v${f.version}`,
+    ]
       .join(" ")
       .toLowerCase()
       .includes(query.toLowerCase()),
@@ -756,6 +808,31 @@ export default function Formulas({
                   fórmula.
                 </p>
               )}
+              <fieldset disabled={state.busy}>
+                <legend>Identidad</legend>
+                <label>
+                  Código automático
+                  <input
+                    value={draft.code || "Se asignará al guardar"}
+                    readOnly
+                  />
+                </label>
+                <label>
+                  Referencia propia
+                  <input
+                    maxLength={80}
+                    value={draft.own_reference || ""}
+                    disabled={mode === "view"}
+                    onChange={(e) => {
+                      setDraft((old) => ({
+                        ...old,
+                        own_reference: e.target.value,
+                      }));
+                      changed();
+                    }}
+                  />
+                </label>
+              </fieldset>
               <fieldset disabled={readOnly || state.busy}>
                 <legend>Datos generales</legend>
                 <label>
@@ -764,7 +841,10 @@ export default function Formulas({
                     required
                     disabled={["version", "variation", "edit"].includes(mode!)}
                     value={draft.product}
-                    onChange={(e) => field("product", e.target.value)}
+                    onChange={(e) => {
+                      field("product", e.target.value);
+                      field("estimate_unit_id", "");
+                    }}
                   >
                     <option value="">Seleccionar</option>
                     {catalog.products
@@ -786,102 +866,215 @@ export default function Formulas({
                     onChange={(e) => field("name", e.target.value)}
                   />
                 </label>
+              </fieldset>
+              <fieldset disabled={readOnly || state.busy}>
+                <legend>Producción estimada · opcional</legend>
                 <label>
-                  Código de fórmula
+                  Unidades estimadas
                   <input
-                    value={draft.code || ""}
-                    maxLength={40}
-                    required
-                    readOnly={mode === "version" || mode === "edit"}
-                    onChange={(e) => field("code", e.target.value)}
+                    type="number"
+                    min="1"
+                    max="999999999999"
+                    step="1"
+                    value={
+                      readOnly && Number(draft.estimated_units) > 0
+                        ? Number(draft.estimated_units) * Number(scale)
+                        : (draft.estimated_units ?? "")
+                    }
+                    onChange={(e) => field("estimated_units", e.target.value)}
                   />
                 </label>
                 <label>
-                  Estado
+                  Presentación
                   <select
-                    value={draft.state}
-                    onChange={(e) => field("state", e.target.value)}
+                    value={draft.estimate_unit_id || ""}
+                    onChange={(e) => field("estimate_unit_id", e.target.value)}
                   >
-                    {Object.entries(labels).map(([key, label]) => (
-                      <option key={key} value={key}>
-                        {label}
-                      </option>
-                    ))}
+                    <option value="">Sin definir</option>
+                    {catalog.units
+                      .filter((u: Row) => {
+                        const product = catalog.products.find(
+                            (p: Row) => p.id === draft.product,
+                          ),
+                          base = catalog.units.find(
+                            (b: Row) => b.id === product?.unit_id,
+                          );
+                        return (
+                          u.id === draft.estimate_unit_id ||
+                          (u.active &&
+                            base &&
+                            u.dimension === base.dimension &&
+                            ["g", "kg", "ml", "l"].includes(
+                              u.symbol.toLowerCase(),
+                            ))
+                        );
+                      })
+                      .map((u: Row) => (
+                        <option key={u.id} value={u.id}>
+                          {u.symbol}
+                        </option>
+                      ))}
                   </select>
+                  <small>
+                    Usa la unidad configurada en el producto o una equivalente.
+                  </small>
                 </label>
                 <label>
-                  Modalidad de captura
-                  <select
-                    value={draft.capture_mode}
-                    onChange={(e) =>
-                      switchCapture(e.target.value as "quantity" | "percentage")
-                    }
-                  >
-                    <option value="quantity">Por cantidades</option>
-                    <option value="percentage">Por porcentajes</option>
-                  </select>
+                  Cantidad por unidad
+                  <input
+                    type="number"
+                    min="0.00000001"
+                    max="999999999999"
+                    step="any"
+                    value={draft.quantity_per_unit ?? ""}
+                    onChange={(e) => field("quantity_per_unit", e.target.value)}
+                  />
                 </label>
-                {draft.capture_mode === "percentage" && (
-                  <>
+                <label>
+                  Peso teórico de ingredientes
+                  <input
+                    readOnly
+                    value={
+                      number(math.theoreticalGrams) +
+                      " g" +
+                      (math.massPartial ? " · cálculo parcial" : "")
+                    }
+                  />
+                  <small>
+                    Solo ingredientes con masa o densidad conocida. No equivale
+                    al peso terminado ni calcula merma.
+                  </small>
+                </label>
+              </fieldset>
+              <details className="formula-disclosure">
+                <summary>
+                  Modalidad de captura y estado · {labels[draft.state]}
+                </summary>
+                <fieldset disabled={readOnly || state.busy}>
+                  {" "}
+                  <label>
+                    Estado
+                    <select
+                      value={draft.state}
+                      onChange={(e) => field("state", e.target.value)}
+                    >
+                      {Object.entries(labels).map(([key, label]) => (
+                        <option key={key} value={key}>
+                          {label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    Modalidad de captura
+                    <select
+                      value={draft.capture_mode}
+                      onChange={(e) =>
+                        switchCapture(
+                          e.target.value as "quantity" | "percentage",
+                        )
+                      }
+                    >
+                      <option value="quantity">Por cantidades</option>
+                      <option value="percentage">Por porcentajes</option>
+                    </select>
+                  </label>
+                  {draft.capture_mode === "percentage" && (
+                    <>
+                      <label>
+                        {readOnly
+                          ? "Cantidad total base"
+                          : "Cantidad total a preparar"}
+                        <input
+                          type="number"
+                          min="0.00000001"
+                          max="999999999999"
+                          step="any"
+                          value={draft.total_quantity}
+                          required
+                          onChange={(e) =>
+                            field("total_quantity", e.target.value)
+                          }
+                        />
+                      </label>
+                      <label>
+                        Unidad del total
+                        <select
+                          required
+                          value={draft.total_unit}
+                          onChange={(e) => field("total_unit", e.target.value)}
+                        >
+                          {catalog.units
+                            .filter(
+                              (u: Row) => u.active || u.id === draft.total_unit,
+                            )
+                            .map((u: Row) => (
+                              <option key={u.id} value={u.id}>
+                                {u.symbol}
+                              </option>
+                            ))}
+                        </select>
+                      </label>
+                    </>
+                  )}
+                </fieldset>
+              </details>
+              <details className="formula-disclosure">
+                <summary>
+                  Merma informativa
+                  {draft.loss_enabled
+                    ? " · " + draft.loss_percent + " %"
+                    : " · sin aplicar"}
+                </summary>
+                <fieldset disabled={readOnly || state.busy}>
+                  {" "}
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={draft.loss_enabled}
+                      onChange={(e) => field("loss_enabled", e.target.checked)}
+                    />
+                    Aplicar merma
+                  </label>
+                  {draft.loss_enabled && (
                     <label>
-                      {readOnly
-                        ? "Cantidad total base"
-                        : "Cantidad total a preparar"}
+                      Porcentaje de merma
                       <input
                         type="number"
-                        min="0.00000001"
-                        max="999999999999"
+                        min="0"
+                        max="100"
                         step="any"
-                        value={draft.total_quantity}
+                        value={draft.loss_percent}
                         required
-                        onChange={(e) =>
-                          field("total_quantity", e.target.value)
-                        }
+                        onChange={(e) => field("loss_percent", e.target.value)}
                       />
                     </label>
-                    <label>
-                      Unidad del total
-                      <select
-                        required
-                        value={draft.total_unit}
-                        onChange={(e) => field("total_unit", e.target.value)}
-                      >
-                        {catalog.units
-                          .filter(
-                            (u: Row) => u.active || u.id === draft.total_unit,
-                          )
-                          .map((u: Row) => (
-                            <option key={u.id} value={u.id}>
-                              {u.symbol}
-                            </option>
-                          ))}
-                      </select>
-                    </label>
-                  </>
-                )}
-                <label>
-                  <input
-                    type="checkbox"
-                    checked={draft.loss_enabled}
-                    onChange={(e) => field("loss_enabled", e.target.checked)}
-                  />
-                  Aplicar merma
-                </label>
+                  )}
+                </fieldset>
                 {draft.loss_enabled && (
-                  <label>
-                    Porcentaje de merma
-                    <input
-                      type="number"
-                      min="0"
-                      max="100"
-                      step="any"
-                      value={draft.loss_percent}
-                      required
-                      onChange={(e) => field("loss_percent", e.target.value)}
-                    />
-                  </label>
+                  <div className="formula-loss">
+                    <h4>
+                      Merma informativa · {draft.loss_percent} % de ingredientes
+                    </h4>
+                    <p>
+                      {math.lossGroups
+                        .map((g) => `${number(g.quantity)} ${g.unit}`)
+                        .join(" · ") || "Completa las cantidades"}
+                    </p>
+                    <p>
+                      Costo estimado de merma:{" "}
+                      {money(math.lossCost, catalog.currency)}
+                    </p>
+                    <small>
+                      Se muestra separado del costo base. No aumenta el consumo
+                      ni descuenta inventario.
+                    </small>
+                  </div>
                 )}
-              </fieldset>
+                <p className="muted">
+                  No incrementa consumos ni descuenta inventario adicional.
+                </p>
+              </details>
               {mode === "view" && (
                 <label className="formula-scale">
                   Factor de escala para esta vista
@@ -905,7 +1098,13 @@ export default function Formulas({
                 </label>
               )}
               {rowsTable("ingredient")}
-              {rowsTable("packaging")}
+              <details className="formula-disclosure">
+                <summary>
+                  Materiales de empaque ·{" "}
+                  {lines.filter((l) => l.line_kind === "packaging").length}
+                </summary>
+                {rowsTable("packaging")}
+              </details>
               <section className="formula-summary">
                 <div>
                   <span>Porcentajes de ingredientes</span>
@@ -933,6 +1132,25 @@ export default function Formulas({
                   <span>Total base estimado</span>
                   <strong>{money(math.totalCost, catalog.currency)}</strong>
                 </div>
+                <div>
+                  <span>Costo estimado por unidad</span>
+                  <strong>
+                    {estimatedUnitCost(
+                      math.totalCost,
+                      draft.estimated_units,
+                      readOnly ? Number(scale) : 1,
+                    ) !== null
+                      ? money(
+                          estimatedUnitCost(
+                            math.totalCost,
+                            draft.estimated_units,
+                            readOnly ? Number(scale) : 1,
+                          ),
+                          catalog.currency,
+                        )
+                      : "Pendiente de unidades o costos"}
+                  </strong>
+                </div>
                 {math.missingCosts > 0 && (
                   <p className="form-wide muted">
                     Hay {math.missingCosts} fila(s) sin precio vigente en{" "}
@@ -940,26 +1158,6 @@ export default function Formulas({
                     {money(math.knownCost, catalog.currency)}. No se sustituyen
                     precios faltantes por cero.
                   </p>
-                )}
-                {draft.loss_enabled && (
-                  <div className="formula-loss">
-                    <h4>
-                      Merma informativa · {draft.loss_percent} % de ingredientes
-                    </h4>
-                    <p>
-                      {math.lossGroups
-                        .map((g) => `${number(g.quantity)} ${g.unit}`)
-                        .join(" · ") || "Completa las cantidades"}
-                    </p>
-                    <p>
-                      Costo estimado de merma:{" "}
-                      {money(math.lossCost, catalog.currency)}
-                    </p>
-                    <small>
-                      Se muestra separado del costo base. No aumenta el consumo
-                      ni descuenta inventario.
-                    </small>
-                  </div>
                 )}
               </section>
               {duplicates.length > 0 && (
@@ -998,21 +1196,24 @@ export default function Formulas({
                   </AppButton>
                 </section>
               )}
-              <label className="form-wide">
-                Notas administrativas
-                <textarea
-                  maxLength={4000}
-                  value={draft.admin_notes || ""}
-                  disabled={mode === "view" || state.busy}
-                  onChange={(e) => {
-                    setDraft((old) => ({
-                      ...old,
-                      admin_notes: e.target.value,
-                    }));
-                    changed();
-                  }}
-                />
-              </label>
+              <details className="formula-disclosure" open={mode === "notes"}>
+                <summary>Notas administrativas</summary>
+                <label className="form-wide">
+                  Notas administrativas
+                  <textarea
+                    maxLength={4000}
+                    value={draft.admin_notes || ""}
+                    disabled={mode === "view" || state.busy}
+                    onChange={(e) => {
+                      setDraft((old) => ({
+                        ...old,
+                        admin_notes: e.target.value,
+                      }));
+                      changed();
+                    }}
+                  />
+                </label>
+              </details>
               {draft.used_batches?.length > 0 && (
                 <section>
                   <h3>Lotes que utilizan esta versión</h3>
@@ -1047,6 +1248,7 @@ export default function Formulas({
                               ingredients: lines.map((l) => ({
                                 material_id: l.material,
                                 unit_id: l.unit,
+                                density_g_ml: l.density_g_ml,
                                 quantity: l.quantity,
                                 percentage: l.percentage,
                                 line_kind: l.line_kind,
@@ -1068,6 +1270,7 @@ export default function Formulas({
                             ingredients: lines.map((l) => ({
                               material_id: l.material,
                               unit_id: l.unit,
+                              density_g_ml: l.density_g_ml,
                               quantity: l.quantity,
                               percentage: l.percentage,
                               line_kind: l.line_kind,

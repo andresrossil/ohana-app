@@ -21,6 +21,7 @@ export type RecipeLine = {
   quantity: number | string;
   percentage: number | string;
   line_kind: "ingredient" | "packaging";
+  density_g_ml?: number | string | null;
   search?: string;
 };
 export const recipeNumber = (value: unknown): number | null => {
@@ -30,6 +31,21 @@ export const recipeNumber = (value: unknown): number | null => {
 };
 export const roundQuantity = (n: number) =>
   Math.round((n + Number.EPSILON) * 1e8) / 1e8;
+export function estimatedUnitCost(
+  total: number | null,
+  units: unknown,
+  scale = 1,
+): number | null {
+  const count = recipeNumber(units);
+  return total !== null &&
+    Number.isFinite(total) &&
+    count !== null &&
+    count > 0 &&
+    Number.isFinite(scale) &&
+    scale > 0
+    ? total / (count * scale)
+    : null;
+}
 export function recipeMath(
   lines: RecipeLine[],
   units: RecipeUnit[],
@@ -144,6 +160,25 @@ export function recipeMath(
     ingredientCost !== null && packagingCost !== null
       ? ingredientCost + packagingCost
       : null;
+  let theoreticalGrams = 0,
+    missingMass = 0;
+  for (const row of ingredients) {
+    const density = recipeNumber(row.density_g_ml);
+    if (row.physical === null) missingMass++;
+    else if (row.unit?.dimension === "mass")
+      theoreticalGrams += row.physical * scale;
+    else if (
+      row.unit?.dimension === "volume" &&
+      density !== null &&
+      density > 0
+    )
+      theoreticalGrams += row.physical * density * scale;
+    else missingMass++;
+    if (density !== null && (density <= 0 || density >= 1e6))
+      errors.push(
+        "La densidad debe ser mayor que cero y menor que un millón de g/ml.",
+      );
+  }
   const lossGroups: { dimension: string; quantity: number; unit: string }[] =
     [];
   if (lossEnabled)
@@ -173,6 +208,8 @@ export function recipeMath(
     ingredientCost,
     packagingCost,
     totalCost,
+    theoreticalGrams: roundQuantity(theoreticalGrams),
+    massPartial: missingMass > 0 || !ingredients.length,
     knownCost: rows.reduce((sum, r) => sum + (r.cost || 0), 0),
     missingCosts: rows.filter((r) => r.cost === null).length,
     lossCost:

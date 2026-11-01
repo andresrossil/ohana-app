@@ -22,7 +22,7 @@ insert into public.price_history(company_id,presentation_id,amount,currency,effe
 set local role authenticated;
 select set_config('request.jwt.claim.sub','17000000-0000-0000-0000-000000000001',true);
 do $$declare c uuid:='37000000-0000-0000-0000-000000000001';f uuid;f2 uuid;b uuid;v uuid;k uuid:=gen_random_uuid();p jsonb;out jsonb;recipe jsonb;hash text;rev integer;begin
- p:='{"kind":"new","product":"67000000-0000-0000-0000-000000000001","name":"Receta inicial","code":"F0001","state":"current","capture_mode":"quantity","loss_enabled":true,"loss_percent":5,"ingredients":[{"material":"57000000-0000-0000-0000-000000000003","unit":"47000000-0000-0000-0000-000000000003","quantity":200,"line_kind":"ingredient"},{"material":"57000000-0000-0000-0000-000000000004","unit":"47000000-0000-0000-0000-000000000004","quantity":2,"line_kind":"packaging"}]}';
+ p:='{"kind":"new","product":"67000000-0000-0000-0000-000000000001","name":"Receta inicial","code":"F0001","state":"current","capture_mode":"quantity","loss_enabled":true,"loss_percent":5,"ingredients":[{"material":"57000000-0000-0000-0000-000000000003","unit":"47000000-0000-0000-0000-000000000003","quantity":200,"density_g_ml":0.9,"line_kind":"ingredient"},{"material":"57000000-0000-0000-0000-000000000004","unit":"47000000-0000-0000-0000-000000000004","quantity":2,"line_kind":"packaging"}]}';
  f:=(public.formula_command(c,'save',gen_random_uuid(),p)->>'id')::uuid;
  p:=jsonb_set(p,'{ingredients,0,quantity}','230')||jsonb_build_object('kind','edit','source',f,'edit_revision',1,'name','Receta corregida');
  out:=public.formula_command(c,'edit',k,p);
@@ -49,6 +49,7 @@ do $$declare c uuid:='37000000-0000-0000-0000-000000000001';f uuid;f2 uuid;b uui
  k:=gen_random_uuid();out:=public.operations(c,'batch_finish',k,recipe);perform public.operations(c,'batch_finish',k,recipe);perform public.operations(c,'batch_finish',gen_random_uuid(),recipe);
  if (select on_hand from public.inventory_balances where company_id=c and item_id='57000000-0000-0000-0000-000000000003')<>765 or(select on_hand from public.inventory_balances where company_id=c and item_id='57000000-0000-0000-0000-000000000004')<>7 then raise exception 'Actual consumption wrong or repeated';end if;
  select recipe_snapshot into recipe from public.production_batches where id=b;
+ if(recipe->'lines'->0->>'density_g_ml')::numeric is distinct from 0.9 then raise exception 'Snapshot density missing';end if;
  if recipe#>>'{formula,name}'<>'Receta corregida' or(recipe#>>'{formula,version}')::int<>1 or(recipe->>'total_cost')::numeric<>29.5 or recipe#>>'{loss,enabled}'<>'true' then raise exception 'Wrong historical header/cost';end if;
  if not exists(select 1 from jsonb_array_elements(recipe->'lines')x where x->>'material_id'='57000000-0000-0000-0000-000000000003' and (x->>'planned_quantity')::numeric=230 and(x->>'actual_quantity')::numeric=235 and(x->>'applied_unit_cost')::numeric=0.1) then raise exception 'Planned/actual missing';end if;
  if not exists(select 1 from jsonb_array_elements(recipe->'lines')x where x->>'line_kind'='packaging' and(x->>'planned_quantity')::numeric=2 and(x->>'actual_quantity')::numeric=3) then raise exception 'Packaging history lost';end if;
