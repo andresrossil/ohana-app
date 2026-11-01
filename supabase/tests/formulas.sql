@@ -78,8 +78,8 @@ do $$begin
 end $$;
 reset role;
 do $$begin
- begin update public.formulas set name='Mutate revision' where company_id='37000000-0000-0000-0000-000000000001';raise exception 'Revision mutated';exception when raise_exception then if sqlerrm='Revision mutated' then raise;end if;end;
- begin update public.formula_ingredients set quantity=quantity*2 where company_id='37000000-0000-0000-0000-000000000001';raise exception 'Old ingredient mutated';exception when raise_exception then if sqlerrm='Old ingredient mutated' then raise;end if;end;
+ begin update public.formulas set name='Mutate revision' where company_id='37000000-0000-0000-0000-000000000001' and exists(select 1 from public.production_batches b where b.company_id=formulas.company_id and b.formula_id=formulas.id and b.state in('curing','released'));raise exception 'Revision mutated';exception when sqlstate '55000' then null;end;
+ begin update public.formula_ingredients set quantity=quantity*2 where company_id='37000000-0000-0000-0000-000000000001' and exists(select 1 from public.production_batches b where b.company_id=formula_ingredients.company_id and b.formula_id=formula_ingredients.formula_id and b.state in('curing','released'));raise exception 'Old ingredient mutated';exception when sqlstate '55000' then null;end;
 end $$;
 select 'PASS: formula revisions, percentages, unit conversions, packaging, costs, duplicate controls, independent copies, batch scales, immutable history and tenant permissions' result;
 rollback;

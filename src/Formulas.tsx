@@ -4,8 +4,16 @@ import { request } from "./commerce";
 import { keyedRequest, money, useOperation, type Row } from "./operations";
 import { recipeMath, roundQuantity, type RecipeLine } from "./formula-model";
 import "./formulas.css";
+import BatchTrace, { lotCode } from "./BatchTrace";
 
-type Mode = "new" | "version" | "variation" | "duplicate" | "view";
+type Mode =
+  | "new"
+  | "version"
+  | "variation"
+  | "duplicate"
+  | "view"
+  | "edit"
+  | "notes";
 const labels: Record<string, string> = {
   testing: "En pruebas",
   current: "Vigente",
@@ -16,7 +24,9 @@ const actionNames: Record<Mode, string> = {
   version: "Nueva versión",
   variation: "Crear variación",
   duplicate: "Duplicar fórmula",
-  view: "Ver y escalar fórmula",
+  view: "Detalle de fórmula",
+  edit: "Editar fórmula",
+  notes: "Datos administrativos de fórmula",
 };
 const number = (n: number | null) =>
   n == null
@@ -65,7 +75,8 @@ export default function Formulas({
     [dirty, setDirty] = useState(false),
     [scale, setScale] = useState<number | string>(1),
     [duplicates, setDuplicates] = useState<Row[]>([]),
-    [comparison, setComparison] = useState<string | null>(null);
+    [comparison, setComparison] = useState<string | null>(null),
+    [traceId, setTraceId] = useState<string | null>(null);
   const generation = useRef(0),
     heading = useRef<HTMLHeadingElement>(null);
   async function load() {
@@ -101,7 +112,7 @@ export default function Formulas({
   useEffect(() => {
     if (mode) heading.current?.focus();
   }, [mode]);
-  const readOnly = mode === "view",
+  const readOnly = mode === "view" || mode === "notes",
     math = recipeMath(
       lines,
       catalog.units,
@@ -143,10 +154,9 @@ export default function Formulas({
             ...source,
             product: source.product_id,
             source: source.id,
-            code:
-              next === "version" || next === "view"
-                ? source.code
-                : catalog.next_code,
+            code: ["version", "view", "edit", "notes"].includes(next)
+              ? source.code
+              : catalog.next_code,
             name: (
               source.name +
               (next === "variation"
@@ -155,7 +165,9 @@ export default function Formulas({
                   ? " · copia"
                   : "")
             ).slice(0, 120),
-            state: next === "view" ? source.state : "testing",
+            state: ["view", "edit", "notes"].includes(next)
+              ? source.state
+              : "testing",
             total_quantity: source.total_quantity || 1000,
             total_unit: source.total_unit_id || unit?.id || "",
           }
@@ -261,6 +273,21 @@ export default function Formulas({
     state.setError("");
   }
   async function save(confirmDuplicate = false) {
+    if (mode === "notes") {
+      await state.run(async () => {
+        await keyedRequest(
+          company,
+          "formula_command",
+          { id: draft.id, admin_notes: draft.admin_notes || "" },
+          "notes",
+        );
+        setMode(null);
+        setDirty(false);
+        state.setNotice("Notas administrativas guardadas.");
+        await load();
+      });
+      return;
+    }
     if (math.errors.length) {
       state.setError(math.errors.join(" "));
       return;
@@ -280,7 +307,7 @@ export default function Formulas({
         company,
         "formula_command",
         payload,
-        "save",
+        mode === "edit" ? "edit" : "save",
       );
       if (result.duplicates) {
         setDuplicates(result.duplicates);
@@ -288,7 +315,11 @@ export default function Formulas({
       }
       setMode(null);
       setDirty(false);
-      state.setNotice(`Fórmula guardada · versión ${result.version}`);
+      state.setNotice(
+        mode === "edit"
+          ? "Cambios guardados en la misma versión."
+          : `Fórmula guardada · versión ${result.version}`,
+      );
       await load();
     });
   }
@@ -633,6 +664,14 @@ export default function Formulas({
                         <AppButton
                           className="secondary"
                           disabled={state.busy}
+                          iconKey="action.edit"
+                          onClick={() => open(f.locked ? "notes" : "edit", f)}
+                        >
+                          Editar fórmula
+                        </AppButton>
+                        <AppButton
+                          className="secondary"
+                          disabled={state.busy}
                           onClick={() => open("version", f)}
                         >
                           Nueva versión
@@ -700,16 +739,30 @@ export default function Formulas({
             <form
               onSubmit={(e) => {
                 e.preventDefault();
-                if (!readOnly) save(false);
+                if (!readOnly || mode === "notes") save(false);
               }}
             >
+              {draft.locked && (
+                <p className="sheet-warning">
+                  Esta versión ya tiene producción confirmada. Puedes editar
+                  notas administrativas; para cambiar la receta crea una nueva
+                  versión.
+                </p>
+              )}
+              {mode === "edit" && (
+                <p className="muted">
+                  Corrección de captura en la misma versión. El producto y el
+                  código se conservan; para otro producto utiliza Duplicar
+                  fórmula.
+                </p>
+              )}
               <fieldset disabled={readOnly || state.busy}>
                 <legend>Datos generales</legend>
                 <label>
                   Producto
                   <select
                     required
-                    disabled={mode === "version" || mode === "variation"}
+                    disabled={["version", "variation", "edit"].includes(mode!)}
                     value={draft.product}
                     onChange={(e) => field("product", e.target.value)}
                   >
@@ -739,7 +792,7 @@ export default function Formulas({
                     value={draft.code || ""}
                     maxLength={40}
                     required
-                    readOnly={mode === "version"}
+                    readOnly={mode === "version" || mode === "edit"}
                     onChange={(e) => field("code", e.target.value)}
                   />
                 </label>
@@ -829,7 +882,7 @@ export default function Formulas({
                   </label>
                 )}
               </fieldset>
-              {readOnly && (
+              {mode === "view" && (
                 <label className="formula-scale">
                   Factor de escala para esta vista
                   <input
@@ -945,9 +998,93 @@ export default function Formulas({
                   </AppButton>
                 </section>
               )}
+              <label className="form-wide">
+                Notas administrativas
+                <textarea
+                  maxLength={4000}
+                  value={draft.admin_notes || ""}
+                  disabled={mode === "view" || state.busy}
+                  onChange={(e) => {
+                    setDraft((old) => ({
+                      ...old,
+                      admin_notes: e.target.value,
+                    }));
+                    changed();
+                  }}
+                />
+              </label>
+              {draft.used_batches?.length > 0 && (
+                <section>
+                  <h3>Lotes que utilizan esta versión</h3>
+                  {draft.used_batches.map((b: Row) => (
+                    <div key={b.id}>
+                      <AppButton
+                        type="button"
+                        className="secondary"
+                        onClick={() => setTraceId(b.id)}
+                      >
+                        {lotCode(b.batch_number)} ·{" "}
+                        {b.confirmed ? "Confirmado" : "Sin confirmar"} ·{" "}
+                        {b.production_date}
+                      </AppButton>
+                    </div>
+                  ))}
+                </section>
+              )}
               <div className="form-actions">
-                {!readOnly && (
-                  <AppButton disabled={state.busy}>Guardar</AppButton>
+                {(mode === "view" || mode === "notes" || mode === "edit") &&
+                  state.canWrite && (
+                    <>
+                      {mode === "view" && (
+                        <AppButton
+                          type="button"
+                          className="secondary"
+                          onClick={() =>
+                            open(draft.locked ? "notes" : "edit", {
+                              ...draft,
+                              product_id: draft.product,
+                              total_unit_id: draft.total_unit,
+                              ingredients: lines.map((l) => ({
+                                material_id: l.material,
+                                unit_id: l.unit,
+                                quantity: l.quantity,
+                                percentage: l.percentage,
+                                line_kind: l.line_kind,
+                              })),
+                            })
+                          }
+                        >
+                          Editar fórmula
+                        </AppButton>
+                      )}
+                      <AppButton
+                        type="button"
+                        className="secondary"
+                        onClick={() =>
+                          open("version", {
+                            ...draft,
+                            product_id: draft.product,
+                            total_unit_id: draft.total_unit,
+                            ingredients: lines.map((l) => ({
+                              material_id: l.material,
+                              unit_id: l.unit,
+                              quantity: l.quantity,
+                              percentage: l.percentage,
+                              line_kind: l.line_kind,
+                            })),
+                          })
+                        }
+                      >
+                        Crear nueva versión
+                      </AppButton>
+                    </>
+                  )}
+                {(!readOnly || mode === "notes") && (
+                  <AppButton disabled={state.busy}>
+                    {mode === "edit" || mode === "notes"
+                      ? "Guardar cambios"
+                      : "Guardar"}
+                  </AppButton>
                 )}
                 <AppButton
                   type="button"
@@ -961,6 +1098,13 @@ export default function Formulas({
             </form>
           </section>
         </div>
+      )}
+      {traceId && (
+        <BatchTrace
+          company={company}
+          id={traceId}
+          onClose={() => setTraceId(null)}
+        />
       )}
     </>
   );

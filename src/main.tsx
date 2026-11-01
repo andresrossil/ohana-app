@@ -829,6 +829,7 @@ function App() {
                 <Production
                   key={company + section}
                   company={company}
+                  onDirty={setSettingsDirty}
                   manager={activeCompany?.manage}
                 />
               )}

@@ -2,6 +2,9 @@
   width: 100%;
   overflow: auto;
 }
+.batch-trace table {
+  min-width: 860px;
+}
 .shell .formula-actions {
   min-width: 260px;
   max-width: 360px;

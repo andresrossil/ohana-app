@@ -1,8 +1,10 @@
 import { AppButton, AppIcon } from "./AppIcon";
 import Formulas from "./Formulas";
 import { request } from "./commerce";
+import BatchTrace, { lotCode } from "./BatchTrace";
 import { useEffect, useState } from "react";
 import {
+  keyedRequest,
   operation,
   mutate,
   useOperation,
@@ -15,19 +17,26 @@ export default function Production(props: {
   company: string;
   formulasOnly?: boolean;
   manager?: boolean;
+  onDirty?: (dirty: boolean) => void;
 }) {
   return props.formulasOnly ? (
     <Formulas company={props.company} onDirty={ignoreDirty} />
   ) : (
-    <ProductionBatches company={props.company} manager={props.manager} />
+    <ProductionBatches
+      company={props.company}
+      manager={props.manager}
+      onDirty={props.onDirty || ignoreDirty}
+    />
   );
 }
 function ProductionBatches({
   company,
   manager = false,
+  onDirty,
 }: {
   company: string;
   manager?: boolean;
+  onDirty: (dirty: boolean) => void;
 }) {
   const state = useOperation(company, "production"),
     [catalog, setCatalog] = useState<Row>({
@@ -40,12 +49,16 @@ function ProductionBatches({
     [batches, setBatches] = useState<Row[]>([]),
     [mode, setMode] = useState<"start" | "finish" | "release" | null>(null),
     [selected, setSelected] = useState<Row | null>(null),
-    [date, setDate] = useState(today());
+    [date, setDate] = useState(today()),
+    [draftProduct, setDraftProduct] = useState(""),
+    [draftFormula, setDraftFormula] = useState(""),
+    [traceId, setTraceId] = useState<string | null>(null),
+    [dirty, setDirty] = useState(false);
   async function load() {
     const [c, f, b] = await Promise.all([
       operation(company, "production_catalog"),
       request("formula_command", { p_company: company, p_action: "list" }),
-      operation(company, "batches"),
+      request("production_command", { p_company: company, p_action: "list" }),
     ]);
     setCatalog(c);
     setFormulas(f);
@@ -54,6 +67,26 @@ function ProductionBatches({
   useEffect(() => {
     state.run(load);
   }, [company]);
+  useEffect(() => {
+    onDirty(dirty);
+    return () => onDirty(false);
+  }, [dirty, onDirty]);
+  useEffect(() => {
+    const leave = (e: BeforeUnloadEvent) => {
+      if (dirty) {
+        e.preventDefault();
+        e.returnValue = "";
+      }
+    };
+    window.addEventListener("beforeunload", leave);
+    return () => window.removeEventListener("beforeunload", leave);
+  }, [dirty]);
+  function close() {
+    if (state.busy) return;
+    if (dirty && !confirm("Hay cambios sin guardar. ¿Descartarlos?")) return;
+    setMode(null);
+    setDirty(false);
+  }
   const formula = formulas.find((f) => f.id === selected?.formula_id);
   return (
     <>
@@ -72,10 +105,13 @@ function ProductionBatches({
               onClick={() => {
                 setSelected(null);
                 setDate(today());
+                setDraftProduct("");
+                setDraftFormula("");
+                setDirty(false);
                 setMode("start");
               }}
             >
-              Iniciar lote
+              Nuevo lote
             </AppButton>
           )}
           <AppButton
@@ -105,8 +141,8 @@ function ProductionBatches({
             <h2>
               {
                 {
-                  start: "Iniciar lote",
-                  finish: "Finalizar producción",
+                  start: "Lote borrador",
+                  finish: "Confirmar producción",
                   release: "Liberación manual",
                 }[mode]
               }
@@ -120,16 +156,25 @@ function ProductionBatches({
               )}
             </>
             <form
+              onChange={() => setDirty(true)}
               onSubmit={(e) => {
                 e.preventDefault();
                 const f = new FormData(e.currentTarget);
                 let payload: Row = Object.fromEntries(f);
                 let action = "";
-                if (mode === "start") action = "batch_start";
-                else if (mode === "finish") {
+                if (mode === "start") {
+                  action = "draft_save";
+                  payload = {
+                    ...payload,
+                    id: selected?.id,
+                    product: draftProduct,
+                    formula: draftFormula,
+                  };
+                } else if (mode === "finish") {
                   action = "batch_finish";
                   payload = {
                     batch: selected!.id,
+                    expected_revision: formula!.edit_revision,
                     scrap: f.get("scrap"),
                     weight: f.get("weight"),
                     consumptions: formula!.ingredients.map((r: Row) => ({
@@ -158,8 +203,16 @@ function ProductionBatches({
                   };
                 }
                 state.run(async () => {
-                  await mutate(company, action, payload);
+                  if (mode === "start")
+                    await keyedRequest(
+                      company,
+                      "production_command",
+                      payload,
+                      action,
+                    );
+                  else await mutate(company, action, payload);
                   setMode(null);
+                  setDirty(false);
                   state.setNotice("Operación guardada");
                   await load();
                 });
@@ -168,11 +221,39 @@ function ProductionBatches({
               {mode === "start" ? (
                 <div className="settings-grid">
                   <label>
-                    Fórmula
-                    <select name="formula" required>
+                    Producto
+                    <select
+                      required
+                      value={draftProduct}
+                      onChange={(e) => {
+                        setDraftProduct(e.target.value);
+                        setDraftFormula("");
+                      }}
+                    >
                       <option value="">Seleccionar</option>
+                      {catalog.products.map((p: Row) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    Fórmula
+                    <select
+                      name="formula"
+                      value={draftFormula}
+                      onChange={(e) => setDraftFormula(e.target.value)}
+                    >
+                      <option value="">
+                        Elegir una versión antes de preparar
+                      </option>
                       {formulas
-                        .filter((f) => f.state !== "inactive")
+                        .filter(
+                          (f) =>
+                            f.state !== "inactive" &&
+                            f.product_id === draftProduct,
+                        )
                         .map((f) => (
                           <option value={f.id} key={f.id}>
                             {f.product_name} · {f.code} · {f.name} · v
@@ -189,13 +270,14 @@ function ProductionBatches({
                       min="0.00000001"
                       step="any"
                       required
-                      defaultValue="1"
+                      defaultValue={selected?.formula_scale || 1}
                     />
                   </label>
                   <label>
                     Unidades previstas
                     <input
                       name="quantity"
+                      defaultValue={selected?.planned_quantity || 1}
                       type="number"
                       min="1"
                       step="1"
@@ -219,12 +301,16 @@ function ProductionBatches({
                       type="date"
                       required
                       min={date}
-                      defaultValue={date}
+                      defaultValue={selected?.available_on || date}
                     />
                   </label>
                   <label>
                     Notas
-                    <textarea name="notes" maxLength={1000} />
+                    <textarea
+                      name="notes"
+                      maxLength={1000}
+                      defaultValue={selected?.notes || ""}
+                    />
                   </label>
                 </div>
               ) : mode === "finish" ? (
@@ -256,6 +342,11 @@ function ProductionBatches({
                       />
                     </label>
                   ))}
+                  <label>
+                    <input type="checkbox" required />
+                    Confirmo las cantidades reales. Se descontarán del
+                    inventario una sola vez y se conservará la receta histórica.
+                  </label>
                   <h3>Variantes obtenidas</h3>
                   <p>
                     Deja en cero las variantes que no produjo este lote. El peso
@@ -348,16 +439,16 @@ function ProductionBatches({
               <div className="form-actions">
                 <AppButton disabled={state.busy}>
                   {mode === "finish"
-                    ? "Finalizar y enviar a curación"
+                    ? "Confirmar producción y enviar a curación"
                     : mode === "release"
                       ? "Liberar existencias"
-                      : "Guardar"}
+                      : "Guardar borrador"}
                 </AppButton>
                 <AppButton
                   type="button"
                   className="secondary"
                   disabled={state.busy}
-                  onClick={() => setMode(null)}
+                  onClick={close}
                 >
                   Cancelar
                 </AppButton>
@@ -383,14 +474,20 @@ function ProductionBatches({
               {batches.map((b) => (
                 <tr key={b.id}>
                   <td>
-                    {b.id.slice(0, 8)}
+                    {lotCode(b.batch_number)}
                     <small>{b.product_name}</small>
                     <small>{b.production_date}</small>
+                    <small>
+                      {b.formula_code
+                        ? `${b.formula_code} · v${b.formula_version}`
+                        : "Sin versión seleccionada"}
+                    </small>
                   </td>
                   <td>
                     {
                       {
-                        in_progress: "En producción",
+                        draft: "Borrador",
+                        in_progress: "En preparación",
                         curing: "En curación",
                         released: "Liberado",
                         cancelled: "Cancelado",
@@ -411,7 +508,50 @@ function ProductionBatches({
                       </small>
                     ))}
                   </td>
-                  <td>
+                  <td className="actions">
+                    <AppButton
+                      className="secondary"
+                      onClick={() => setTraceId(b.id)}
+                    >
+                      Ver lote
+                    </AppButton>
+                    {state.canWrite && b.state === "draft" && (
+                      <>
+                        <AppButton
+                          className="secondary"
+                          disabled={state.busy}
+                          onClick={() => {
+                            setSelected(b);
+                            setDate(b.production_date);
+                            setDraftProduct(b.product_id);
+                            setDraftFormula(b.formula_id || "");
+                            setDirty(false);
+                            setMode("start");
+                          }}
+                        >
+                          Editar borrador
+                        </AppButton>
+                        <AppButton
+                          disabled={state.busy}
+                          onClick={() =>
+                            state.run(async () => {
+                              await keyedRequest(
+                                company,
+                                "production_command",
+                                { id: b.id },
+                                "start",
+                              );
+                              await load();
+                              state.setNotice(
+                                "Lote en preparación. Registra los consumos reales antes de confirmar.",
+                              );
+                            })
+                          }
+                        >
+                          Preparar lote
+                        </AppButton>
+                      </>
+                    )}
                     {b.outputs?.map((o: Row) => (
                       <small key={o.id}>
                         {o.quantity} × {o.variant_name}
@@ -421,10 +561,11 @@ function ProductionBatches({
                       <AppButton
                         onClick={() => {
                           setSelected(b);
+                          setDirty(false);
                           setMode("finish");
                         }}
                       >
-                        Finalizar
+                        Confirmar producción
                       </AppButton>
                     )}
                     {state.canWrite && b.state === "curing" && (
@@ -432,6 +573,7 @@ function ProductionBatches({
                         disabled={b.available_on > today() && !manager}
                         onClick={() => {
                           setSelected(b);
+                          setDirty(false);
                           setMode("release");
                         }}
                       >
@@ -449,6 +591,13 @@ function ProductionBatches({
           )}
         </div>
       </section>
+      {traceId && (
+        <BatchTrace
+          company={company}
+          id={traceId}
+          onClose={() => setTraceId(null)}
+        />
+      )}
     </>
   );
 }
