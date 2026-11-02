@@ -461,3 +461,20 @@
 .shell .sheet-table td.cell-auto input {
   background: var(--admin-secondary);
 }
+
+.shell .catalog-sort {
+  background: transparent;
+  color: inherit;
+  border: 0;
+  padding: 0;
+  min-height: 36px;
+  box-shadow: none;
+  text-align: left;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+.shell .catalog-sort:focus-visible {
+  outline: 2px solid var(--admin-primary);
+  outline-offset: 4px;
+}

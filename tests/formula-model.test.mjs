@@ -20,6 +20,55 @@ const line = (
   percentage = "",
   kind = "ingredient",
 ) => ({ key: material, material, unit, quantity, percentage, line_kind: kind });
+test("cost shares use MP subtotal across mixed dimensions and exclude all packaging", () => {
+  const priced = materials.map((m) =>
+    m.id === "c" ? { ...m, unit_cost: 3 } : m,
+  );
+  const input = [
+    line("a", "g", 10),
+    line("c", "ml", 10),
+    line("p", "ud", 100, "", "packaging"),
+  ];
+  const r = recipeMath(input, units, priced, "quantity", "", "", 1, false, 0);
+  assert.equal(r.ingredientCost, 50);
+  assert.equal(r.packagingCost, 300);
+  assert.equal(r.totalCost, 350);
+  assert.deepEqual(
+    r.rows.map((r) => r.costPercentage),
+    [40, 60, null],
+  );
+  const scaled = recipeMath(
+    input,
+    units,
+    priced,
+    "quantity",
+    "",
+    "",
+    2,
+    false,
+    0,
+  );
+  assert.deepEqual(
+    scaled.rows.map((r) => r.costPercentage),
+    [40, 60, null],
+  );
+  const missing = recipeMath(
+    input,
+    units,
+    materials,
+    "quantity",
+    "",
+    "",
+    1,
+    false,
+    0,
+  );
+  assert.equal(missing.totalCost, null);
+  assert.deepEqual(
+    missing.rows.map((r) => r.costPercentage),
+    [null, null, null],
+  );
+});
 test("theoretical mass uses explicit density, excludes packaging and scales without inferred loss", () => {
   const rows = [
     line("a", "kg", 1),

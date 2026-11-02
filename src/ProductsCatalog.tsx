@@ -1,4 +1,5 @@
 import { AppButton, AppIcon } from "./AppIcon";
+import { orderedProducts } from "./product-view";
 import ProductImage from "./ProductImage";
 import VariantManager from "./VariantManager";
 import { useState, useEffect } from "react";
@@ -46,13 +47,60 @@ export default function ProductsCatalog({
     [origin, setOrigin] = useState(""),
     [busy, setBusy] = useState(false),
     [error, setError] = useState("");
-  const filtered = products.filter(
-    (p) =>
-      (matchesCatalog(p, query) ||
-        variantIndex.some(
-          (v) => v.product_id === p.id && matchesCatalog(v, query),
-        )) &&
-      originMatches(p.origin_id, origin),
+  const [sort, setSort] = useState<{
+    column: string;
+    direction: "asc" | "desc";
+  }>({ column: "created_at", direction: "asc" });
+  useEffect(
+    () => setSort({ column: "created_at", direction: "asc" }),
+    [company],
+  );
+  function sortHeader(column: string, label: string) {
+    return (
+      <th
+        aria-sort={
+          sort.column === column
+            ? sort.direction === "asc"
+              ? "ascending"
+              : "descending"
+            : "none"
+        }
+      >
+        <button
+          className="catalog-sort"
+          type="button"
+          onClick={() =>
+            setSort((old) => ({
+              column,
+              direction:
+                old.column === column && old.direction === "asc"
+                  ? "desc"
+                  : "asc",
+            }))
+          }
+        >
+          {label}{" "}
+          {sort.column === column
+            ? sort.direction === "asc"
+              ? "↑"
+              : "↓"
+            : "↕"}
+        </button>
+      </th>
+    );
+  }
+  const filtered = orderedProducts(
+    products.filter(
+      (p) =>
+        (matchesCatalog(p, query) ||
+          variantIndex.some(
+            (v) => v.product_id === p.id && matchesCatalog(v, query),
+          )) &&
+        originMatches(p.origin_id, origin),
+    ),
+    sort.column,
+    sort.direction,
+    origins as { id: string; name: string }[],
   );
   async function save(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -158,11 +206,12 @@ export default function ProductsCatalog({
           <table>
             <thead>
               <tr>
-                <th>SKU</th>
-                <th>Producto</th>
-                <th>Origen</th>
-                <th>Código de barras</th>
-                <th>Estado</th>
+                {sortHeader("sku", "SKU")}
+                {sortHeader("name", "Producto")}
+                {sortHeader("origin", "Origen")}
+                {sortHeader("barcode", "Código de barras")}
+                {sortHeader("active", "Estado")}
+                {sortHeader("created_at", "Fecha de creación")}
                 <th>Acciones</th>
               </tr>
             </thead>
@@ -186,6 +235,11 @@ export default function ProductsCatalog({
                     <span className={`status ${p.active ? "" : "inactive"}`}>
                       {p.active ? "Activo" : "Archivado"}
                     </span>
+                  </td>
+                  <td>
+                    {p.created_at && Number.isFinite(Date.parse(p.created_at))
+                      ? new Date(p.created_at).toLocaleString("es-GT")
+                      : "—"}
                   </td>
                   <td className="actions">
                     <AppButton onClick={() => setVariantProduct(p)}>

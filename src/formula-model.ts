@@ -117,7 +117,16 @@ export function recipeMath(
           unitCost *
           scale
         : null;
-    return { ...line, quantity, percentage, material, unit, physical, cost };
+    return {
+      ...line,
+      quantity,
+      percentage,
+      material,
+      unit,
+      physical,
+      cost,
+      costPercentage: null as number | null,
+    };
   });
   const ingredients = rows.filter((r) => r.line_kind === "ingredient"),
     packaging = rows.filter((r) => r.line_kind === "packaging");
@@ -156,6 +165,14 @@ export function recipeMath(
       : items.reduce((sum, r) => sum + r.cost!, 0);
   const ingredientCost = subtotal(ingredients),
     packagingCost = subtotal(packaging);
+  for (const row of rows)
+    row.costPercentage =
+      row.line_kind === "ingredient" &&
+      ingredientCost !== null &&
+      ingredientCost > 0 &&
+      row.cost !== null
+        ? (row.cost / ingredientCost) * 100
+        : null;
   const totalCost =
     ingredientCost !== null && packagingCost !== null
       ? ingredientCost + packagingCost

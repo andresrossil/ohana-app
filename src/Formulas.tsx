@@ -9,6 +9,7 @@ import {
   type RecipeLine,
 } from "./formula-model";
 import "./formulas.css";
+import { productLabel, resolveProduct } from "./product-view";
 import BatchTrace, { lotCode } from "./BatchTrace";
 
 type Mode =
@@ -81,6 +82,7 @@ export default function Formulas({
     [draft, setDraft] = useState<Row>(initial),
     [lines, setLines] = useState<RecipeLine[]>([blankLine()]),
     [query, setQuery] = useState(""),
+    [productText, setProductText] = useState(""),
     [dirty, setDirty] = useState(false),
     [scale, setScale] = useState<number | string>(1),
     [duplicates, setDuplicates] = useState<Row[]>([]),
@@ -192,6 +194,10 @@ export default function Formulas({
           }
         : { ...initial(), code: catalog.next_code, total_unit: unit?.id || "" },
     );
+    const product = catalog.products.find(
+      (p: Row) => p.id === source?.product_id,
+    );
+    setProductText(product ? productLabel(product) : "");
     setLines(copied || [blankLine()]);
     setScale(1);
     setMode(next);
@@ -311,6 +317,10 @@ export default function Formulas({
       });
       return;
     }
+    if (!draft.product) {
+      state.setError("Selecciona un producto de la lista por nombre o SKU.");
+      return;
+    }
     if (math.errors.length) {
       state.setError(math.errors.join(" "));
       return;
@@ -377,7 +387,11 @@ export default function Formulas({
                 <th>{kind === "ingredient" ? "Materia prima" : "Empaque"}</th>
                 <th>Cantidad</th>
                 <th>Unidad</th>
-                <th>Porcentaje</th>
+                <th>% costo MP</th>
+                {!readOnly &&
+                  kind === "ingredient" &&
+                  draft.capture_mode === "percentage" && <th>% composición</th>}
+                <th>Precio por presentación</th>
                 <th>Costo calculado</th>
                 {!readOnly && <th>Acciones</th>}
               </tr>
@@ -526,31 +540,61 @@ export default function Formulas({
                         )}
                     </td>
                     <td>
-                      {!readOnly &&
+                      {computed.costPercentage == null
+                        ? "—"
+                        : new Intl.NumberFormat("es-GT", {
+                            maximumFractionDigits: 2,
+                          }).format(computed.costPercentage) + " %"}
+                    </td>
+                    {!readOnly &&
                       kind === "ingredient" &&
-                      draft.capture_mode === "percentage" ? (
-                        <input
-                          disabled={state.busy}
-                          aria-label={`Porcentaje fila ${index + 1}`}
-                          type="number"
-                          min="0.00000001"
-                          max="100"
-                          step="any"
-                          required
-                          value={line.percentage}
-                          onChange={(e) =>
-                            changeLine(line.key, { percentage: e.target.value })
-                          }
-                        />
-                      ) : computed.percentage == null ? (
-                        "—"
+                      draft.capture_mode === "percentage" && (
+                        <td>
+                          {" "}
+                          <input
+                            disabled={state.busy}
+                            aria-label={`Porcentaje fila ${index + 1}`}
+                            type="number"
+                            min="0.00000001"
+                            max="100"
+                            step="any"
+                            required
+                            value={line.percentage}
+                            onChange={(e) =>
+                              changeLine(line.key, {
+                                percentage: e.target.value,
+                              })
+                            }
+                          />
+                        </td>
+                      )}
+                    <td>
+                      {material?.presentation_price != null ? (
+                        <>
+                          <strong>
+                            {money(
+                              material.presentation_price,
+                              catalog.currency,
+                            )}
+                          </strong>
+                          <small>
+                            {number(Number(material.presentation_quantity))}{" "}
+                            {material.presentation_unit} ·{" "}
+                            {material.presentation_name}
+                          </small>
+                          <small>
+                            {material.price_basis === "undated"
+                              ? "Referencia sin fecha"
+                              : material.effective_on}
+                          </small>
+                        </>
                       ) : (
-                        `${number(computed.percentage)} %`
+                        <span className="muted">Sin precio utilizable</span>
                       )}
                     </td>
                     <td>
                       {computed.cost == null ? (
-                        <span className="muted">Sin precio vigente</span>
+                        <span className="muted">Sin precio utilizable</span>
                       ) : (
                         money(computed.cost, catalog.currency)
                       )}
@@ -578,6 +622,32 @@ export default function Formulas({
                 );
               })}
             </tbody>
+            <tfoot>
+              <tr>
+                <td
+                  colSpan={
+                    readOnly ||
+                    kind !== "ingredient" ||
+                    draft.capture_mode !== "percentage"
+                      ? 5
+                      : 6
+                  }
+                >
+                  {kind === "ingredient"
+                    ? "Subtotal de materias primas"
+                    : "Subtotal de empaque"}
+                </td>
+                <td>
+                  {money(
+                    kind === "ingredient"
+                      ? math.ingredientCost
+                      : math.packagingCost,
+                    catalog.currency,
+                  )}
+                </td>
+                {!readOnly && <td />}
+              </tr>
+            </tfoot>
           </table>
         </div>
         {!lines.some((l) => l.line_kind === kind) && (
@@ -837,25 +907,33 @@ export default function Formulas({
                 <legend>Datos generales</legend>
                 <label>
                   Producto
-                  <select
+                  <input
+                    list="formula-products"
                     required
-                    disabled={["version", "variation", "edit"].includes(mode!)}
-                    value={draft.product}
+                    placeholder="Escribe nombre o SKU…"
+                    value={productText}
+                    readOnly={
+                      readOnly ||
+                      ["version", "variation", "edit"].includes(mode!)
+                    }
                     onChange={(e) => {
-                      field("product", e.target.value);
-                      field("estimate_unit_id", "");
+                      setProductText(e.target.value);
+                      const selected = resolveProduct(
+                        catalog.products,
+                        e.target.value,
+                      );
+                      field("product", selected?.id || "");
+                      if (selected?.id !== draft.product)
+                        field("estimate_unit_id", "");
                     }}
-                  >
-                    <option value="">Seleccionar</option>
+                  />
+                  <datalist id="formula-products">
                     {catalog.products
-                      .filter((p: Row) => p.active || p.id === draft.product)
+                      .filter((p: Row) => p.active)
                       .map((p: Row) => (
-                        <option key={p.id} value={p.id}>
-                          {p.name}
-                          {p.active ? "" : " (inactivo)"}
-                        </option>
+                        <option key={p.id} value={productLabel(p)} />
                       ))}
-                  </select>
+                  </datalist>
                 </label>
                 <label>
                   Nombre de fórmula
@@ -1105,21 +1183,22 @@ export default function Formulas({
                 </summary>
                 {rowsTable("packaging")}
               </details>
+              <p className="muted">
+                % costo MP = costo del ingrediente ÷ subtotal de materias
+                primas. Excluye el empaque; si falta un precio, el total y los
+                porcentajes quedan pendientes.
+              </p>
               <section className="formula-summary">
                 <div>
-                  <span>Porcentajes de ingredientes</span>
+                  <span>% de costos de MP · sin empaque</span>
                   <strong>
-                    {math.compatible || draft.capture_mode === "percentage"
-                      ? `${number(math.percentageTotal)} %`
-                      : math.rows.some(
-                            (r) => r.quantity === null || !r.material,
-                          )
-                        ? "Pendiente de completar"
-                        : "Unidades de distintas dimensiones"}
+                    {math.ingredientCost !== null && math.ingredientCost > 0
+                      ? "100 %"
+                      : "Pendiente de costos"}
                   </strong>
                 </div>
                 <div>
-                  <span>Ingredientes · costo base estimado</span>
+                  <span>Subtotal de materias primas</span>
                   <strong>
                     {money(math.ingredientCost, catalog.currency)}
                   </strong>
@@ -1129,7 +1208,7 @@ export default function Formulas({
                   <strong>{money(math.packagingCost, catalog.currency)}</strong>
                 </div>
                 <div>
-                  <span>Total base estimado</span>
+                  <span>Total MP + empaque</span>
                   <strong>{money(math.totalCost, catalog.currency)}</strong>
                 </div>
                 <div>
@@ -1153,7 +1232,7 @@ export default function Formulas({
                 </div>
                 {math.missingCosts > 0 && (
                   <p className="form-wide muted">
-                    Hay {math.missingCosts} fila(s) sin precio vigente en{" "}
+                    Hay {math.missingCosts} fila(s) sin precio utilizable en{" "}
                     {catalog.currency}. Subtotal conocido:{" "}
                     {money(math.knownCost, catalog.currency)}. No se sustituyen
                     precios faltantes por cero.

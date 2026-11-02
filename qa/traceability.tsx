@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { createRoot } from "react-dom/client";
 import Formulas from "../src/Formulas";
+import ProductsCatalog from "../src/ProductsCatalog";
 import Production from "../src/Production";
 import Sidebar from "../src/Sidebar";
 import "../src/style.css";
@@ -9,6 +10,14 @@ import "../src/admin.css";
 import "../src/admin-forms.css";
 import "../src/configuration.css";
 const units = [
+  {
+    id: "g",
+    name: "Gramo",
+    symbol: "g",
+    dimension: "mass",
+    base_factor: 1,
+    active: true,
+  },
   {
     id: "ml",
     name: "Mililitro",
@@ -28,11 +37,31 @@ const units = [
 ];
 const materials = [
   {
+    id: "sci",
+    name: "SCI · prueba",
+    unit_id: "g",
+    sku: "M0002",
+    unit_cost: 0.25,
+    active: true,
+    classification: "Materia prima",
+    presentation_price: 250,
+    presentation_quantity: 1000,
+    presentation_unit: "g",
+    presentation_name: "SCI 1 kg",
+    price_basis: "undated",
+  },
+  {
     id: "oil",
     name: "Aceite de prueba",
     unit_id: "ml",
     sku: "M0001",
     unit_cost: 0.1,
+    presentation_price: 100,
+    presentation_quantity: 1000,
+    presentation_unit: "ml",
+    presentation_name: "Aceite 1 L",
+    effective_on: "2026-11-01",
+    price_basis: "dated",
     active: true,
     classification: "Materia prima",
   },
@@ -47,8 +76,22 @@ const materials = [
   },
 ];
 const products = [
-    { id: "p1", name: "Producto de prueba", unit_id: "ml", active: true },
-    { id: "p2", name: "Otro producto", unit_id: "ml", active: true },
+    {
+      id: "p1",
+      name: "Producto de prueba",
+      sku: "P0001",
+      created_at: "2026-10-01T10:00:00Z",
+      unit_id: "ml",
+      active: true,
+    },
+    {
+      id: "p2",
+      name: "Otro producto",
+      sku: "P0002",
+      created_at: "2026-10-02T10:00:00Z",
+      unit_id: "ml",
+      active: true,
+    },
   ],
   variants = [
     {
@@ -75,10 +118,19 @@ let formulas: any[] = [
       admin_notes: "",
       ingredients: [
         {
+          material_id: "sci",
+          quantity: 55,
+          unit_id: "g",
+          name: "SCI · prueba",
+          unit: "g",
+          line_kind: "ingredient",
+          percentage: null,
+        },
+        {
           material_id: "oil",
           quantity: 230,
           unit_id: "ml",
-          name: materials[0].name,
+          name: "Aceite de prueba",
           unit: "ml",
           line_kind: "ingredient",
           percentage: 100,
@@ -87,7 +139,7 @@ let formulas: any[] = [
           material_id: "box",
           quantity: 2,
           unit_id: "ud",
-          name: materials[1].name,
+          name: "Caja de prueba",
           unit: "ud",
           line_kind: "packaging",
           percentage: null,
@@ -271,7 +323,9 @@ window.fetch = async (url, init) => {
   });
 };
 function Fixture() {
-  const [section, setSection] = useState<"formulas" | "production">("formulas"),
+  const [section, setSection] = useState<
+      "formulas" | "production" | "products"
+    >("formulas"),
     [dirty, setDirty] = useState(false);
   return (
     <div className="shell">
@@ -281,7 +335,7 @@ function Fixture() {
         companies={[{ id: "fixture", name: "Ohana · prueba" }]}
         onCompany={() => {}}
         onNavigate={(s) => {
-          if (s === "formulas" || s === "production") {
+          if (s === "formulas" || s === "production" || s === "products") {
             setSection(s);
             return true;
           }
@@ -313,6 +367,16 @@ function Fixture() {
         <p>{dirty ? "Cambios pendientes" : ""}</p>
         {section === "formulas" ? (
           <Formulas company="fixture" onDirty={setDirty} />
+        ) : section === "products" ? (
+          <ProductsCatalog
+            company="fixture"
+            products={products}
+            origins={[]}
+            units={units}
+            canWrite
+            onSaved={async () => {}}
+            onBarcode={() => {}}
+          />
         ) : (
           <Production company="fixture" manager onDirty={setDirty} />
         )}
