@@ -1,3 +1,5 @@
+import AdditionalCostsPanel from "./AdditionalCostsPanel";
+import { additionalCosts } from "./additional-costs";
 import ResponsiveTable from "./ResponsiveTable";
 import { confirmAction } from "./ConfirmDialog";
 import { IconDetails, SearchField } from "./PoolControls";
@@ -66,6 +68,8 @@ const initial = (): Row => ({
   estimate_unit_id: "",
   estimate_variant_id: "",
   quantity_per_unit: "",
+  labor_level_id: "",
+  advertising_level_id: "",
   loss_enabled: false,
   loss_percent: 5,
 });
@@ -141,6 +145,18 @@ export default function Formulas({
       draft.loss_enabled,
       Number(draft.loss_percent),
     );
+  const extraQuote = additionalCosts(
+    catalog.additional_costs || [],
+    catalog.currency,
+    Number(draft.estimated_units) > 0
+      ? Number(draft.estimated_units) * (readOnly ? Number(scale) : 1)
+      : null,
+    (catalog.presentations || []).find(
+      (v: Row) => v.id === draft.estimate_variant_id,
+    ),
+    draft.labor_level_id,
+    draft.advertising_level_id,
+  );
   function changed() {
     setDirty(true);
     setDuplicates([]);
@@ -170,6 +186,20 @@ export default function Formulas({
       source
         ? {
             ...source,
+            labor_level_id:
+              ["view", "edit", "notes"].includes(next) ||
+              (catalog.additional_costs || []).some(
+                (x: Row) => x.id === source.labor_level_id && x.active,
+              )
+                ? source.labor_level_id || ""
+                : "",
+            advertising_level_id:
+              ["view", "edit", "notes"].includes(next) ||
+              (catalog.additional_costs || []).some(
+                (x: Row) => x.id === source.advertising_level_id && x.active,
+              )
+                ? source.advertising_level_id || ""
+                : "",
             product: source.product_id,
             source: source.id,
             locked: ["view", "edit", "notes"].includes(next)
@@ -1315,7 +1345,7 @@ export default function Formulas({
                   <strong>{money(math.totalCost, catalog.currency)}</strong>
                 </div>
                 <div>
-                  <span>Costo estimado por unidad</span>
+                  <span>Costo MP + empaque por unidad</span>
                   <strong>
                     {estimatedUnitCost(
                       math.totalCost,
@@ -1342,6 +1372,14 @@ export default function Formulas({
                   </p>
                 )}
               </section>
+              <AdditionalCostsPanel
+                quote={extraQuote}
+                items={catalog.additional_costs || []}
+                laborId={draft.labor_level_id || ""}
+                advertisingId={draft.advertising_level_id || ""}
+                onSelect={!readOnly && !state.busy ? field : undefined}
+                baseCost={math.totalCost}
+              />
               {duplicates.length > 0 && (
                 <section className="formula-duplicates" role="status">
                   <h3>Hay una composición idéntica para este producto</h3>

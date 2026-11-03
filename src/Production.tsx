@@ -1,3 +1,6 @@
+import AdditionalCostsPanel from "./AdditionalCostsPanel";
+import { additionalCosts } from "./additional-costs";
+import { recipeMath } from "./formula-model";
 import ResponsiveTable from "./ResponsiveTable";
 import { confirmAction } from "./ConfirmDialog";
 import { AppButton, AppIcon } from "./AppIcon";
@@ -55,14 +58,25 @@ function ProductionBatches({
     [draftProduct, setDraftProduct] = useState(""),
     [draftFormula, setDraftFormula] = useState(""),
     [traceId, setTraceId] = useState<string | null>(null),
-    [dirty, setDirty] = useState(false);
+    [dirty, setDirty] = useState(false),
+    [costCatalog, setCostCatalog] = useState<Row>({
+      materials: [],
+      units: [],
+      presentations: [],
+      additional_costs: [],
+      currency: "GTQ",
+    }),
+    [draftScale, setDraftScale] = useState("1"),
+    [consumed, setConsumed] = useState<Record<string, string>>({});
   async function load() {
-    const [c, f, b] = await Promise.all([
+    const [c, f, b, costs] = await Promise.all([
       operation(company, "production_catalog"),
       request("formula_command", { p_company: company, p_action: "list" }),
       request("production_command", { p_company: company, p_action: "list" }),
+      request("formula_catalog", { p_company: company }),
     ]);
     setCatalog(c);
+    setCostCatalog(costs);
     setFormulas(f);
     setBatches(b);
   }
@@ -94,6 +108,46 @@ function ProductionBatches({
     setDirty(false);
   }
   const formula = formulas.find((f) => f.id === selected?.formula_id);
+  const estimating = formulas.find(
+    (f) => f.id === (mode === "start" ? draftFormula : selected?.formula_id),
+  );
+  const factor =
+    mode === "start"
+      ? Number(draftScale)
+      : Number(selected?.formula_scale || 1);
+  const baseMath = estimating
+    ? recipeMath(
+        estimating.ingredients.map((i: Row) => ({
+          key: i.material_id,
+          material: i.material_id,
+          unit: i.unit_id,
+          quantity:
+            mode === "finish"
+              ? (consumed[i.material_id] ?? Number(i.quantity) * factor)
+              : Number(i.quantity) * factor,
+          percentage: i.percentage,
+          line_kind: i.line_kind || "ingredient",
+          density_g_ml: i.density_g_ml,
+        })),
+        costCatalog.units,
+        costCatalog.materials,
+        "quantity",
+        "",
+        "",
+      )
+    : null;
+  const extraQuote = additionalCosts(
+    costCatalog.additional_costs,
+    costCatalog.currency,
+    Number(estimating?.estimated_units) > 0
+      ? Number(estimating!.estimated_units) * factor
+      : null,
+    costCatalog.presentations.find(
+      (v: Row) => v.id === estimating?.estimate_variant_id,
+    ),
+    estimating?.labor_level_id,
+    estimating?.advertising_level_id,
+  );
   return (
     <>
       <section className="intro">
@@ -113,6 +167,7 @@ function ProductionBatches({
             <AppButton
               onClick={() => {
                 setSelected(null);
+                setDraftScale("1");
                 setDate(today());
                 setDraftProduct("");
                 setDraftFormula("");
@@ -280,7 +335,8 @@ function ProductionBatches({
                       min="0.00000001"
                       step="any"
                       required
-                      defaultValue={selected?.formula_scale || 1}
+                      value={draftScale}
+                      onChange={(e) => setDraftScale(e.target.value)}
                     />
                   </label>
                   <label>
@@ -335,6 +391,12 @@ function ProductionBatches({
                       {r.name} ({r.unit})
                       <input
                         name={"consume_" + r.material_id}
+                        onChange={(e) =>
+                          setConsumed((old) => ({
+                            ...old,
+                            [r.material_id]: e.target.value,
+                          }))
+                        }
                         type="number"
                         min="0"
                         step="any"
@@ -446,6 +508,12 @@ function ProductionBatches({
                   )}
                 </>
               )}
+              {estimating && mode !== "release" && (
+                <AdditionalCostsPanel
+                  quote={extraQuote}
+                  baseCost={baseMath?.totalCost ?? null}
+                />
+              )}
               <div className="form-actions">
                 <AppButton disabled={state.busy}>
                   {mode === "finish"
@@ -520,6 +588,15 @@ function ProductionBatches({
                   <td>{b.available_on}</td>
                   <td>
                     {money(b.total_cost, b.currency)}
+                    {b.recipe_snapshot?.additional_costs && (
+                      <small>
+                        Total estimado con adicionales:{" "}
+                        {money(
+                          b.recipe_snapshot.estimated_total_cost,
+                          b.currency,
+                        )}
+                      </small>
+                    )}
                     {b.outputs?.map((o: Row) => (
                       <small key={o.id}>
                         {o.variant_name}: {money(o.unit_cost, b.currency)} / ud{" "}
@@ -541,6 +618,7 @@ function ProductionBatches({
                           disabled={state.busy}
                           onClick={() => {
                             setSelected(b);
+                            setDraftScale(String(b.formula_scale || 1));
                             setDate(b.production_date);
                             setDraftProduct(b.product_id);
                             setDraftFormula(b.formula_id || "");
@@ -580,6 +658,7 @@ function ProductionBatches({
                       <AppButton
                         onClick={() => {
                           setSelected(b);
+                          setConsumed({});
                           setDirty(false);
                           setMode("finish");
                         }}

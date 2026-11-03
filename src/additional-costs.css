@@ -1,0 +1,38 @@
+.shell .additional-cost-settings {
+  padding: 16px;
+  max-width: 1100px;
+}
+.shell .additional-costs {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+.additional-costs-content {
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+  min-width: 0;
+}
+.additional-costs-content .settings-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+  gap: 12px;
+}
+.additional-costs-content .formula-summary {
+  margin: 0;
+}
+.shell .additional-cost-settings .actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.shell .additional-cost-settings .actions small {
+  flex-basis: 100%;
+}
+@media (max-width: 760px) {
+  .shell .additional-cost-settings {
+    padding: 12px;
+  }
+  .additional-costs-content {
+    padding: 10px;
+  }
+}

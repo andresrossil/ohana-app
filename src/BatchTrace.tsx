@@ -1,3 +1,4 @@
+import AdditionalCostsPanel from "./AdditionalCostsPanel";
 import ResponsiveTable from "./ResponsiveTable";
 import { useEffect, useState } from "react";
 import { request } from "./commerce";
@@ -153,6 +154,17 @@ export default function BatchTrace({
                     {money(snapshot.total_cost, snapshot.currency)}
                   </strong>
                 </p>
+                {snapshot.additional_costs && (
+                  <AdditionalCostsPanel
+                    quote={snapshot.additional_costs}
+                    baseCost={
+                      snapshot.total_cost == null
+                        ? null
+                        : Number(snapshot.total_cost)
+                    }
+                    historical
+                  />
+                )}
                 <p>
                   Merma configurada:{" "}
                   {snapshot.loss.enabled

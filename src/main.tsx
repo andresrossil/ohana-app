@@ -38,6 +38,7 @@ const Production = lazy(() => import("./Production"));
 const BusinessPartners = lazy(() => import("./BusinessPartners"));
 const Sales = lazy(() => import("./Sales"));
 const PublicStore = lazy(() => import("./PublicStore"));
+const AdditionalCostSettings = lazy(() => import("./AdditionalCostSettings"));
 const StoreSettings = lazy(() => import("./StoreSettings"));
 type Tab = "raw_materials" | "suppliers" | "presentations" | "units";
 type Catalog = Record<Tab, Row[]> & { products: Row[]; catalog_origins: Row[] };
@@ -115,9 +116,16 @@ function App() {
   const legacyVisible =
     section === "materials" ||
     (section === "settings" &&
-      !["origins", "profile", "appearance", "structure", "store"].includes(
-        configView,
-      ));
+      ![
+        "origins",
+        "profile",
+        "appearance",
+        "structure",
+        "store",
+        "overhead",
+        "labor",
+        "advertising",
+      ].includes(configView));
   const filtered = data[tab].filter(
     (r) =>
       matchesCatalog(r, query) &&
@@ -741,6 +749,9 @@ function App() {
                       ["origins", "Orígenes"],
                       ["presentations", "Presentaciones"],
                       ["units", "Unidades"],
+                      ["overhead", "Otros gastos"],
+                      ["labor", "Mano de obra"],
+                      ["advertising", "Publicidad"],
                     ]
                       .filter(
                         ([key]) =>
@@ -767,6 +778,9 @@ function App() {
                                 "appearance",
                                 "structure",
                                 "store",
+                                "overhead",
+                                "labor",
+                                "advertising",
                               ].includes(key)
                             )
                               setTab(key as Tab);
@@ -797,6 +811,15 @@ function App() {
                         canManage={!!activeCompany.manage}
                         appearance={configView === "appearance"}
                         onSaved={refreshContext}
+                        onDirty={setSettingsDirty}
+                      />
+                    )}
+                  {["overhead", "labor", "advertising"].includes(configView) &&
+                    activeCompany?.manage && (
+                      <AdditionalCostSettings
+                        key={company + configView}
+                        company={company}
+                        kind={configView}
                         onDirty={setSettingsDirty}
                       />
                     )}
@@ -1637,7 +1660,7 @@ function App() {
 createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <Suspense fallback={<main className="store-loading">Cargando Ohana…</main>}>
-      <MobileViewport/>
+      <MobileViewport />
       {new URLSearchParams(location.search).get("shop") ? (
         <PublicStore
           key={new URLSearchParams(location.search).get("shop")!}
