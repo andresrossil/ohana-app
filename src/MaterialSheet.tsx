@@ -879,7 +879,11 @@ export default function MaterialSheet({
         `${dirty.length} fila(s) guardadas. El historial anterior se conservó.`,
       );
     } catch (e: any) {
-      setError(e.message);
+      setError(
+        e.code === "57014" || /statement timeout/i.test(e.message || "")
+          ? "El guardado excedió el tiempo permitido. El lote no se guardó; tus cambios siguen pendientes. Puedes volver a intentarlo."
+          : e.message,
+      );
     } finally {
       setBusy(false);
     }
