@@ -1,3 +1,4 @@
+import MaterialRequirements from "./MaterialRequirements";
 import { AppButton, AppIcon } from "./AppIcon";
 import { useEffect, useState } from "react";
 import { request } from "./commerce";
@@ -54,6 +55,7 @@ export default function Reports({ company }: { company: string }) {
               </div>
             ))}
           </section>
+          <MaterialRequirements key={company} company={company} />
           <section className="catalog">
             <h2>Ventas entregadas</h2>
             {data.sales.length ? (

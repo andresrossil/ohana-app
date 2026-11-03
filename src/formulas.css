@@ -177,3 +177,30 @@
 .formula-line-frame > .formula-table-scroll {
   border: 0;
 }
+.formula-line-notes {
+  margin-top: 6px;
+  min-width: 0;
+  font-size: 12px;
+}
+.formula-line-notes > summary {
+  cursor: pointer;
+  color: var(--admin-muted);
+}
+.formula-line-notes p {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  margin: 6px 0;
+}
+.shell .formula-line-notes textarea {
+  min-width: 0;
+  width: 100%;
+  margin-top: 6px;
+}
+.shell .material-requirements {
+  grid-column: 1 / -1;
+  margin: 10px 0;
+}
+.material-requirements .table-wrap {
+  margin-top: 10px;
+  max-width: 100%;
+}

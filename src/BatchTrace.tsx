@@ -1,3 +1,5 @@
+import { recipeLineKinds } from "./formula-model";
+import { IconDetails } from "./PoolControls";
 import AdditionalCostsPanel from "./AdditionalCostsPanel";
 import ResponsiveTable from "./ResponsiveTable";
 import { useEffect, useState } from "react";
@@ -115,15 +117,33 @@ export default function BatchTrace({
                           <td>
                             <strong>{line.material_name}</strong>
                             <small>
-                              {line.line_kind === "packaging"
-                                ? "Empaque"
-                                : "Ingrediente"}{" "}
+                              {
+                                recipeLineKinds[
+                                  (line.line_kind ||
+                                    "ingredient") as keyof typeof recipeLineKinds
+                                ]
+                              }{" "}
                               · {line.material_sku || line.material_id}
                             </small>
+                            {line.reference_notes && (
+                              <IconDetails className="formula-line-notes">
+                                <summary>Referencia / Observaciones</summary>
+                                <p>{line.reference_notes}</p>
+                              </IconDetails>
+                            )}
                           </td>
                           <td>
                             {num(line.planned_quantity)}{" "}
                             {line.planned_unit.symbol}
+                            {line.line_kind === "auxiliary" && (
+                              <small>
+                                {num(line.configured_quantity)}{" "}
+                                {line.planned_unit.symbol}{" "}
+                                {line.quantity_basis === "unit"
+                                  ? "por unidad producida"
+                                  : "fija por lote"}
+                              </small>
+                            )}
                           </td>
                           <td>
                             {num(line.actual_quantity)}{" "}

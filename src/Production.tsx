@@ -1,6 +1,12 @@
+import MaterialRequirements from "./MaterialRequirements";
+import { IconDetails } from "./PoolControls";
 import AdditionalCostsPanel from "./AdditionalCostsPanel";
 import { additionalCosts } from "./additional-costs";
-import { recipeMath } from "./formula-model";
+import {
+  recipeMath,
+  plannedLineQuantity,
+  recipeLineKinds,
+} from "./formula-model";
 import ResponsiveTable from "./ResponsiveTable";
 import { confirmAction } from "./ConfirmDialog";
 import { AppButton, AppIcon } from "./AppIcon";
@@ -67,7 +73,9 @@ function ProductionBatches({
       currency: "GTQ",
     }),
     [draftScale, setDraftScale] = useState("1"),
-    [consumed, setConsumed] = useState<Record<string, string>>({});
+    [consumed, setConsumed] = useState<Record<string, string>>({}),
+    [draftUnits, setDraftUnits] = useState("1"),
+    [outputUnits, setOutputUnits] = useState<Record<string, string>>({});
   async function load() {
     const [c, f, b, costs] = await Promise.all([
       operation(company, "production_catalog"),
@@ -115,6 +123,23 @@ function ProductionBatches({
     mode === "start"
       ? Number(draftScale)
       : Number(selected?.formula_scale || 1);
+  const producedUnits = Object.values(outputUnits).reduce(
+    (sum, n) => sum + Number(n || 0),
+    0,
+  );
+  const neededUnits =
+    mode === "start"
+      ? Number(draftUnits)
+      : producedUnits > 0
+        ? producedUnits
+        : Number(selected?.planned_quantity || 0);
+  const suggested = (r: Row) =>
+    plannedLineQuantity(
+      r.quantity,
+      r.quantity_basis || "recipe",
+      factor,
+      neededUnits,
+    );
   const baseMath = estimating
     ? recipeMath(
         estimating.ingredients.map((i: Row) => ({
@@ -123,8 +148,8 @@ function ProductionBatches({
           unit: i.unit_id,
           quantity:
             mode === "finish"
-              ? (consumed[i.material_id] ?? Number(i.quantity) * factor)
-              : Number(i.quantity) * factor,
+              ? (consumed[i.material_id] ?? suggested(i))
+              : suggested(i),
           percentage: i.percentage,
           line_kind: i.line_kind || "ingredient",
           density_g_ml: i.density_g_ml,
@@ -168,6 +193,7 @@ function ProductionBatches({
               onClick={() => {
                 setSelected(null);
                 setDraftScale("1");
+                setDraftUnits("1");
                 setDate(today());
                 setDraftProduct("");
                 setDraftFormula("");
@@ -343,7 +369,8 @@ function ProductionBatches({
                     Unidades previstas
                     <input
                       name="quantity"
-                      defaultValue={selected?.planned_quantity || 1}
+                      value={draftUnits}
+                      onChange={(e) => setDraftUnits(e.target.value)}
                       type="number"
                       min="1"
                       step="1"
@@ -389,6 +416,25 @@ function ProductionBatches({
                   {formula?.ingredients.map((r: Row) => (
                     <label key={r.material_id}>
                       {r.name} ({r.unit})
+                      <small>
+                        {
+                          recipeLineKinds[
+                            (r.line_kind ||
+                              "ingredient") as keyof typeof recipeLineKinds
+                          ]
+                        }
+                        {r.line_kind === "auxiliary"
+                          ? r.quantity_basis === "unit"
+                            ? " · por unidad producida"
+                            : " · fija por lote"
+                          : " · escalado de receta"}
+                      </small>
+                      {r.reference_notes && (
+                        <IconDetails className="formula-line-notes">
+                          <summary>Referencia / Observaciones</summary>
+                          <p>{r.reference_notes}</p>
+                        </IconDetails>
+                      )}
                       <input
                         name={"consume_" + r.material_id}
                         onChange={(e) =>
@@ -401,16 +447,7 @@ function ProductionBatches({
                         min="0"
                         step="any"
                         required
-                        defaultValue={
-                          Number(r.quantity) *
-                          Number(
-                            selected!.formula_scale ??
-                              (formula.standard_yield
-                                ? selected!.planned_quantity /
-                                  formula.standard_yield
-                                : 1),
-                          )
-                        }
+                        value={consumed[r.material_id] ?? suggested(r) ?? ""}
                       />
                     </label>
                   ))}
@@ -432,6 +469,12 @@ function ProductionBatches({
                           {v.name}
                           <input
                             name={"output_" + v.id}
+                            onChange={(e) =>
+                              setOutputUnits((old) => ({
+                                ...old,
+                                [v.id]: e.target.value,
+                              }))
+                            }
                             type="number"
                             min="0"
                             step="1"
@@ -507,6 +550,14 @@ function ProductionBatches({
                     </label>
                   )}
                 </>
+              )}
+              {estimating && mode === "start" && (
+                <MaterialRequirements
+                  company={company}
+                  formula={estimating.id}
+                  scale={factor}
+                  units={Number(draftUnits)}
+                />
               )}
               {estimating && mode !== "release" && (
                 <AdditionalCostsPanel
@@ -619,6 +670,7 @@ function ProductionBatches({
                           onClick={() => {
                             setSelected(b);
                             setDraftScale(String(b.formula_scale || 1));
+                            setDraftUnits(String(b.planned_quantity || 1));
                             setDate(b.production_date);
                             setDraftProduct(b.product_id);
                             setDraftFormula(b.formula_id || "");
@@ -659,6 +711,7 @@ function ProductionBatches({
                         onClick={() => {
                           setSelected(b);
                           setConsumed({});
+                          setOutputUnits({});
                           setDirty(false);
                           setMode("finish");
                         }}

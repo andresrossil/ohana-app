@@ -1,3 +1,4 @@
+import AutoTextarea from "./AutoTextarea";
 import AdditionalCostsPanel from "./AdditionalCostsPanel";
 import { additionalCosts } from "./additional-costs";
 import ResponsiveTable from "./ResponsiveTable";
@@ -46,7 +47,7 @@ const number = (n: number | null) =>
     ? "—"
     : new Intl.NumberFormat("es-GT", { maximumFractionDigits: 2 }).format(n);
 const blankLine = (
-  kind: "ingredient" | "packaging" = "ingredient",
+  kind: RecipeLine["line_kind"] = "ingredient",
 ): RecipeLine => ({
   key: crypto.randomUUID(),
   material: "",
@@ -54,6 +55,8 @@ const blankLine = (
   quantity: "",
   percentage: "",
   line_kind: kind,
+  quantity_basis: kind === "auxiliary" ? "batch" : "recipe",
+  reference_notes: "",
 });
 const initial = (): Row => ({
   product: "",
@@ -144,6 +147,7 @@ export default function Formulas({
       readOnly ? Number(scale) : 1,
       draft.loss_enabled,
       Number(draft.loss_percent),
+      draft.estimated_units,
     );
   const extraQuote = additionalCosts(
     catalog.additional_costs || [],
@@ -180,6 +184,8 @@ export default function Formulas({
       quantity: Number(i.quantity),
       percentage: i.percentage == null ? "" : Number(i.percentage),
       line_kind: i.line_kind || "ingredient",
+      quantity_basis: i.quantity_basis || "recipe",
+      reference_notes: i.reference_notes || "",
       density_g_ml: i.density_g_ml ?? "",
     }));
     setDraft(
@@ -264,9 +270,11 @@ export default function Formulas({
     const candidates = catalog.materials.filter(
       (m: Row) =>
         m.active &&
-        (line.line_kind === "packaging"
-          ? m.classification === "Material de empaque"
-          : m.classification !== "Material de empaque"),
+        (line.line_kind === "auxiliary"
+          ? true
+          : line.line_kind === "packaging"
+            ? m.classification === "Material de empaque"
+            : m.classification !== "Material de empaque"),
     );
     const found = candidates.find((m: Row) =>
       [materialLabel(m), m.name, m.sku].some(
@@ -414,18 +422,28 @@ export default function Formulas({
       await load();
     });
   }
-  function rowsTable(kind: "ingredient" | "packaging") {
+  function rowsTable(kind: RecipeLine["line_kind"]) {
     return (
       <section className="formula-lines">
         <h3>
-          {kind === "ingredient" ? "Materias primas" : "Materiales de empaque"}
+          {kind === "ingredient"
+            ? "Materias primas"
+            : kind === "packaging"
+              ? "Materiales de empaque"
+              : "Insumos adicionales"}
         </h3>
         <div className="formula-line-frame">
           <div className="formula-table-scroll">
             <ResponsiveTable>
               <thead>
                 <tr>
-                  <th>{kind === "ingredient" ? "Materia prima" : "Empaque"}</th>
+                  <th>
+                    {kind === "ingredient"
+                      ? "Materia prima"
+                      : kind === "packaging"
+                        ? "Empaque"
+                        : "Insumo adicional"}
+                  </th>
                   <th>Cantidad</th>
                   <th>Unidad</th>
                   <th>% costo MP</th>
@@ -452,9 +470,11 @@ export default function Formulas({
                     candidates = catalog.materials.filter(
                       (m: Row) =>
                         m.active &&
-                        (kind === "packaging"
-                          ? m.classification === "Material de empaque"
-                          : m.classification !== "Material de empaque"),
+                        (kind === "auxiliary"
+                          ? true
+                          : kind === "packaging"
+                            ? m.classification === "Material de empaque"
+                            : m.classification !== "Material de empaque"),
                     );
                   return (
                     <tr key={line.key}>
@@ -486,14 +506,58 @@ export default function Formulas({
                             </datalist>
                           </>
                         )}
+                        <IconDetails className="formula-line-notes" onToggle={e => { if (e.currentTarget.open) { const area = e.currentTarget.querySelector("textarea"); if (area) { area.style.height = "auto"; area.style.height = area.scrollHeight + "px"; } } }}>
+                          <summary>
+                            Referencia / Observaciones
+                            {line.reference_notes ? " · con nota" : ""}
+                          </summary>
+                          {readOnly ? (
+                            <p>{line.reference_notes || "Sin observaciones"}</p>
+                          ) : (
+                            <AutoTextarea
+                              aria-label={`Observaciones fila ${index + 1}`}
+                              maxLength={2000}
+                              disabled={state.busy}
+                              value={line.reference_notes || ""}
+                              placeholder="Indicaciones específicas de esta versión…"
+                              onChange={(e) =>
+                                changeLine(line.key, {
+                                  reference_notes: e.target.value,
+                                })
+                              }
+                            />
+                          )}
+                        </IconDetails>
                       </td>
                       <td>
+                        {kind === "auxiliary" &&
+                          (readOnly ? (
+                            <small>
+                              {line.quantity_basis === "unit"
+                                ? "Por unidad producida"
+                                : "Fija por lote"}{" "}
+                              · {number(Number(line.quantity))}{" "}
+                              {computed.unit?.symbol}
+                            </small>
+                          ) : (
+                            <select
+                              aria-label={`Base de cantidad fila ${index + 1}`}
+                              disabled={state.busy}
+                              value={line.quantity_basis || "batch"}
+                              onChange={(e) =>
+                                changeLine(line.key, {
+                                  quantity_basis: e.target.value as
+                                    | "batch"
+                                    | "unit",
+                                })
+                              }
+                            >
+                              <option value="batch">Por lote (fija)</option>
+                              <option value="unit">Por unidad producida</option>
+                            </select>
+                          ))}
                         {readOnly ? (
-                          number(
-                            computed.quantity === null
-                              ? null
-                              : computed.quantity * Number(scale),
-                          )
+                          number(computed.plannedQuantity)
                         ) : (
                           <DecimalInput
                             disabled={state.busy}
@@ -517,6 +581,13 @@ export default function Formulas({
                               changeLine(line.key, { quantity: e.target.value })
                             }
                           />
+                        )}
+                        {!readOnly && kind === "auxiliary" && (
+                          <small>
+                            Previsto para el lote:{" "}
+                            {number(computed.plannedQuantity)}{" "}
+                            {computed.unit?.symbol}
+                          </small>
                         )}
                       </td>
                       <td>
@@ -680,13 +751,17 @@ export default function Formulas({
                   >
                     {kind === "ingredient"
                       ? "Subtotal de materias primas"
-                      : "Subtotal de empaque"}
+                      : kind === "packaging"
+                        ? "Subtotal de empaque"
+                        : "Subtotal de insumos adicionales"}
                   </td>
                   <td>
                     {money(
                       kind === "ingredient"
                         ? math.ingredientCost
-                        : math.packagingCost,
+                        : kind === "packaging"
+                          ? math.packagingCost
+                          : math.suppliesCost,
                       catalog.currency,
                     )}
                   </td>
@@ -699,7 +774,9 @@ export default function Formulas({
             <p className="muted">
               {kind === "ingredient"
                 ? "Añade una materia prima."
-                : "Sin empaque asociado."}
+                : kind === "packaging"
+                  ? "Sin empaque asociado."
+                  : "Sin insumos adicionales."}
             </p>
           )}
           {!readOnly && (
@@ -723,7 +800,9 @@ export default function Formulas({
             >
               {kind === "ingredient"
                 ? "Agregar ingrediente"
-                : "Agregar empaque"}
+                : kind === "packaging"
+                  ? "Agregar empaque"
+                  : "Agregar insumo adicional"}
             </AppButton>
           )}
         </div>
@@ -1316,10 +1395,23 @@ export default function Formulas({
                 </summary>
                 {rowsTable("packaging")}
               </IconDetails>
+              <IconDetails className="formula-disclosure">
+                <summary>
+                  Insumos adicionales ·{" "}
+                  {lines.filter((l) => l.line_kind === "auxiliary").length}
+                </summary>
+                <p className="muted">
+                  Por lote: cantidad fija, independiente del factor de escala.
+                  Por unidad: cantidad × unidades estimadas del lote. Al
+                  producir, confirma el consumo real. No se suman al porcentaje
+                  de composición ni al peso teórico.
+                </p>
+                {rowsTable("auxiliary")}
+              </IconDetails>
               <p className="muted">
                 % costo MP = costo del ingrediente ÷ subtotal de materias
-                primas. Excluye el empaque; si falta un precio, el total y los
-                porcentajes quedan pendientes.
+                primas. Excluye el empaque y los insumos adicionales; si falta
+                un precio, el total y los porcentajes quedan pendientes.
               </p>
               <section className="formula-summary">
                 <div>
@@ -1341,11 +1433,15 @@ export default function Formulas({
                   <strong>{money(math.packagingCost, catalog.currency)}</strong>
                 </div>
                 <div>
-                  <span>Total MP + empaque</span>
+                  <span>Insumos adicionales · costo estimado</span>
+                  <strong>{money(math.suppliesCost, catalog.currency)}</strong>
+                </div>
+                <div>
+                  <span>Total de materiales inventariables</span>
                   <strong>{money(math.totalCost, catalog.currency)}</strong>
                 </div>
                 <div>
-                  <span>Costo MP + empaque por unidad</span>
+                  <span>Costo de materiales por unidad</span>
                   <strong>
                     {estimatedUnitCost(
                       math.totalCost,
@@ -1402,7 +1498,12 @@ export default function Formulas({
                       {compared.ingredients.map((i: Row) => (
                         <li key={i.material_id}>
                           {i.name} · {number(Number(i.quantity))} {i.unit}
-                          {i.line_kind === "packaging" ? " · empaque" : ""}
+                          {i.line_kind === "packaging"
+                            ? " · empaque"
+                            : i.line_kind === "auxiliary"
+                              ? " · insumo adicional"
+                              : ""}
+                          {i.reference_notes && ` · ${i.reference_notes}`}
                         </li>
                       ))}
                     </ul>
@@ -1475,6 +1576,8 @@ export default function Formulas({
                                 quantity: l.quantity,
                                 percentage: l.percentage,
                                 line_kind: l.line_kind,
+                                quantity_basis: l.quantity_basis,
+                                reference_notes: l.reference_notes,
                               })),
                             })
                           }
@@ -1497,6 +1600,8 @@ export default function Formulas({
                               quantity: l.quantity,
                               percentage: l.percentage,
                               line_kind: l.line_kind,
+                              quantity_basis: l.quantity_basis,
+                              reference_notes: l.reference_notes,
                             })),
                           })
                         }

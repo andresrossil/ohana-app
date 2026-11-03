@@ -20,7 +20,9 @@ export type RecipeLine = {
   unit: string;
   quantity: number | string;
   percentage: number | string;
-  line_kind: "ingredient" | "packaging";
+  line_kind: "ingredient" | "packaging" | "auxiliary";
+  quantity_basis?: "recipe" | "batch" | "unit";
+  reference_notes?: string;
   density_g_ml?: number | string | null;
   search?: string;
 };
@@ -31,6 +33,24 @@ export const recipeNumber = (value: unknown): number | null => {
 };
 export const roundQuantity = (n: number) =>
   Math.round((n + Number.EPSILON) * 1e8) / 1e8;
+export const recipeLineKinds = {
+  ingredient: "Materia prima",
+  packaging: "Empaque",
+  auxiliary: "Insumo adicional",
+};
+export function plannedLineQuantity(
+  quantity: unknown,
+  basis = "recipe",
+  scale = 1,
+  units: unknown = null,
+): number | null {
+  const q = recipeNumber(quantity),
+    n = recipeNumber(units);
+  if (q === null || !Number.isFinite(scale) || scale <= 0) return null;
+  if (basis === "batch") return q;
+  if (basis === "unit") return n !== null && n > 0 ? q * n : null;
+  return q * scale;
+}
 export function estimatedUnitCost(
   total: number | null,
   units: unknown,
@@ -56,6 +76,7 @@ export function recipeMath(
   scale = 1,
   lossEnabled = false,
   lossPercent = 5,
+  estimatedUnits: unknown = null,
 ) {
   const errors: string[] = [];
   const unitMap = new Map(units.map((u) => [u.id, u])),
@@ -106,20 +127,46 @@ export function recipeMath(
       errors.push(
         "Cada cantidad debe ser mayor que cero y menor que un billón.",
       );
+    const basis =
+      line.quantity_basis ||
+      (line.line_kind === "auxiliary" ? "batch" : "recipe");
+    if (
+      line.line_kind === "auxiliary"
+        ? !["batch", "unit"].includes(basis)
+        : basis !== "recipe"
+    )
+      errors.push("Revisa la base de cantidad de los materiales.");
+    const plannedQuantity = plannedLineQuantity(
+      quantity,
+      basis,
+      scale,
+      (recipeNumber(estimatedUnits) ?? 0) * scale,
+    );
+    if (
+      line.line_kind === "auxiliary" &&
+      basis === "unit" &&
+      plannedQuantity === null
+    )
+      errors.push("Define las unidades estimadas para los insumos por unidad.");
+    if ((line.reference_notes || "").length > 2000)
+      errors.push(
+        "Las observaciones admiten hasta 2000 caracteres por renglón.",
+      );
     const physical =
       compatible && quantity !== null
         ? quantity * Number(unit!.base_factor)
         : null;
     const unitCost = recipeNumber(material?.unit_cost);
     const cost =
-      compatible && quantity !== null && unitCost !== null
-        ? ((quantity * Number(unit!.base_factor)) / Number(base!.base_factor)) *
-          unitCost *
-          scale
+      compatible && plannedQuantity !== null && unitCost !== null
+        ? ((plannedQuantity * Number(unit!.base_factor)) /
+            Number(base!.base_factor)) *
+          unitCost
         : null;
     return {
       ...line,
       quantity,
+      plannedQuantity,
       percentage,
       material,
       unit,
@@ -129,7 +176,8 @@ export function recipeMath(
     };
   });
   const ingredients = rows.filter((r) => r.line_kind === "ingredient"),
-    packaging = rows.filter((r) => r.line_kind === "packaging");
+    packaging = rows.filter((r) => r.line_kind === "packaging"),
+    supplies = rows.filter((r) => r.line_kind === "auxiliary");
   const dimensions = new Set(
     ingredients.map((r) => r.unit?.dimension).filter(Boolean),
   );
@@ -164,7 +212,8 @@ export function recipeMath(
       ? null
       : items.reduce((sum, r) => sum + r.cost!, 0);
   const ingredientCost = subtotal(ingredients),
-    packagingCost = subtotal(packaging);
+    packagingCost = subtotal(packaging),
+    suppliesCost = subtotal(supplies);
   for (const row of rows)
     row.costPercentage =
       row.line_kind === "ingredient" &&
@@ -174,8 +223,8 @@ export function recipeMath(
         ? (row.cost / ingredientCost) * 100
         : null;
   const totalCost =
-    ingredientCost !== null && packagingCost !== null
-      ? ingredientCost + packagingCost
+    ingredientCost !== null && packagingCost !== null && suppliesCost !== null
+      ? ingredientCost + packagingCost + suppliesCost
       : null;
   let theoreticalGrams = 0,
     missingMass = 0;
@@ -224,6 +273,7 @@ export function recipeMath(
     percentageTotal,
     ingredientCost,
     packagingCost,
+    suppliesCost,
     totalCost,
     theoreticalGrams: roundQuantity(theoreticalGrams),
     massPartial: missingMass > 0 || !ingredients.length,

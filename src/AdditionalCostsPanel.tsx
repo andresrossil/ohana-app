@@ -137,7 +137,9 @@ export default function AdditionalCostsPanel({
             <strong>{amount(quote.additional_total)}</strong>
           </div>
           <div>
-            <span>Total estimado · MP + empaque + adicionales</span>
+            <span>
+              Total estimado · MP + empaque + insumos + costos adicionales
+            </span>
             <strong>{amount(total)}</strong>
           </div>
           <div>
