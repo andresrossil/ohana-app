@@ -138,7 +138,7 @@ export default forwardRef<
                           className: [
                             cell.props.className,
                             !visible[i] ? "mobile-extra" : "",
-                            /nombre|producto|materia|empaque|insumo|comentario|descripci[oó]n|acciones/i.test(
+                            /nombre|producto|materia|empaque|insumo|concepto|comentario|descripci[oó]n|acciones/i.test(
                               headers[i] || "",
                             )
                               ? "mobile-cell-wide"

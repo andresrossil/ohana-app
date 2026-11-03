@@ -36,3 +36,38 @@
     padding: 10px;
   }
 }
+.formula-overheads {
+  min-width: 0;
+  display: grid;
+  gap: 10px;
+}
+.formula-overheads h3,
+.formula-overheads p {
+  margin: 0;
+}
+.shell .formula-overheads .form-actions {
+  align-items: center;
+  justify-content: space-between;
+}
+.shell .formula-overheads table select {
+  min-width: 180px;
+  width: 100%;
+}
+.shell .formula-overheads table input {
+  min-width: 90px;
+  width: 100%;
+}
+.shell .formula-overheads td:first-child {
+  min-width: 210px;
+}
+@media (max-width: 760px) {
+  .shell .formula-overheads .form-actions {
+    align-items: stretch;
+  }
+  .shell .formula-overheads .form-actions strong {
+    flex-basis: 100%;
+  }
+  .shell .formula-overheads table :is(input, select) {
+    min-width: 0;
+  }
+}

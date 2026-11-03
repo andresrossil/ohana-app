@@ -4,6 +4,7 @@ import ResponsiveTable from "./ResponsiveTable";
 import { money, type Row } from "./operations";
 import { costCatalogNames } from "./additional-costs";
 import "./additional-costs.css";
+import FormulaOverheads from "./FormulaOverheads";
 export default function AdditionalCostsPanel({
   quote,
   items = [],
@@ -12,6 +13,8 @@ export default function AdditionalCostsPanel({
   onSelect,
   baseCost,
   historical = false,
+  overheadLines = [],
+  onOverheadChange,
 }: {
   quote: Row;
   items?: Row[];
@@ -20,6 +23,8 @@ export default function AdditionalCostsPanel({
   onSelect?: (field: string, id: string) => void;
   baseCost: number | null;
   historical?: boolean;
+  overheadLines?: Row[];
+  onOverheadChange?: (lines: Row[]) => void;
 }) {
   const total =
     baseCost !== null && quote.additional_total !== null
@@ -34,6 +39,13 @@ export default function AdditionalCostsPanel({
         {historical ? " · histórico confirmado" : ""}
       </summary>
       <div className="additional-costs-content">
+        <FormulaOverheads
+          items={items}
+          lines={overheadLines}
+          quote={quote}
+          onChange={onOverheadChange}
+          historical={historical}
+        />
         {onSelect && (
           <div className="settings-grid">
             {(["labor", "advertising"] as const).map((kind) => {
@@ -83,7 +95,9 @@ export default function AdditionalCostsPanel({
             : Number(quote.estimated_units).toLocaleString("es-GT", {
                 maximumFractionDigits: 2,
               })}
-          .
+          . Distribución por unidad:{" "}
+          {quote.unit_basis_count ?? quote.estimated_units ?? "Sin definir"}{" "}
+          unidades.
         </p>
         <div className="table-wrap">
           <ResponsiveTable>
@@ -98,7 +112,11 @@ export default function AdditionalCostsPanel({
             <tbody>
               <tr>
                 <td>Otros gastos</td>
-                <td>Total de conceptos activos</td>
+                <td>
+                  {historical && !quote.overhead_lines
+                    ? "Importe histórico aplicado"
+                    : "Conceptos seleccionados en la fórmula"}
+                </td>
                 <td>{amount(quote.overhead_unit)}</td>
                 <td>{amount(quote.overhead_total)}</td>
               </tr>
@@ -146,8 +164,10 @@ export default function AdditionalCostsPanel({
             <span>Costo estimado por unidad</span>
             <strong>
               {amount(
-                total !== null && Number(quote.estimated_units) > 0
-                  ? total / Number(quote.estimated_units)
+                total !== null &&
+                  Number(quote.unit_basis_count ?? quote.estimated_units) > 0
+                  ? total /
+                      Number(quote.unit_basis_count ?? quote.estimated_units)
                   : null,
               )}
             </strong>

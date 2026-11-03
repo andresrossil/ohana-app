@@ -204,3 +204,155 @@
   margin-top: 10px;
   max-width: 100%;
 }
+/* Formula gallery: compact header and independent image/state tracks. */
+.shell .intro.formula-intro {
+  padding: 20px 0 14px;
+  gap: 14px;
+}
+.shell .formula-intro h1 {
+  margin-bottom: 8px;
+}
+.shell .formula-intro .eyebrow {
+  margin-bottom: 6px;
+}
+.shell .formula-intro p:last-child {
+  margin-bottom: 0;
+}
+.shell .formula-intro .form-actions {
+  margin: 0;
+  gap: 8px;
+}
+.shell .formula-catalog .toolbar {
+  padding: 12px 16px;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.shell .formula-catalog .toolbar h2 {
+  margin: 0;
+  flex: 1 1 210px;
+}
+.shell .formula-catalog .toolbar .pool-search-field {
+  flex: 1 1 280px;
+  max-width: 440px;
+}
+.shell .formula-catalog .formula-gallery {
+  max-height: 65dvh;
+}
+.shell .formula-catalog td {
+  vertical-align: middle;
+}
+.formula-product {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.formula-product-image {
+  flex: 0 0 50px;
+  width: 50px;
+}
+.shell .formula-product-image .product-photo {
+  width: 50px;
+  height: 50px;
+  border-radius: 8px;
+  object-fit: cover;
+}
+.shell .formula-product-image .photo-empty {
+  color: var(--admin-muted);
+  background: var(--admin-secondary);
+}
+.formula-product-text {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.formula-product-text strong,
+.formula-product-text small {
+  display: block;
+}
+.formula-product-text small {
+  margin-top: 4px;
+}
+.shell .formula-state {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  min-width: 165px;
+  max-width: 220px;
+}
+.formula-state-icon {
+  display: inline-flex;
+  justify-content: center;
+  width: 24px;
+}
+.shell .formula-state select {
+  min-width: 0;
+  width: 100%;
+  margin: 0;
+  color: inherit;
+  font-size: 12px;
+}
+.shell .formula-state-current {
+  color: #176534;
+}
+.shell .formula-state-testing {
+  color: #946200;
+}
+.shell .formula-state-inactive {
+  color: #a12635;
+}
+.shell .formula-state-current select {
+  background: #edf8f0;
+  border-color: #8ebd9d;
+}
+.shell .formula-state-testing select {
+  background: #fff7da;
+  border-color: #d7b85e;
+}
+.shell .formula-state-inactive select {
+  background: #fff0f1;
+  border-color: #d49aa2;
+}
+.shell .formula-state option[value="current"] {
+  color: #176534;
+  background: #fff;
+}
+.shell .formula-state option[value="testing"] {
+  color: #946200;
+  background: #fff;
+}
+.shell .formula-state option[value="inactive"] {
+  color: #a12635;
+  background: #fff;
+}
+@media (min-width: 761px) {
+  .shell .formula-catalog td:nth-child(2) {
+    min-width: 240px;
+  }
+}
+@media (max-width: 760px) {
+  .shell .intro.formula-intro {
+    padding: 14px 0 12px;
+  }
+  .shell .formula-catalog .toolbar {
+    padding: 12px;
+  }
+  .shell .formula-catalog .toolbar h2 {
+    flex-basis: 100%;
+    font-size: 18px;
+  }
+  .shell .formula-catalog .toolbar .pool-search-field {
+    max-width: 100%;
+  }
+  .shell .formula-state {
+    min-width: 0;
+    max-width: 100%;
+    grid-template-columns: 22px minmax(0, 1fr);
+    gap: 6px;
+  }
+  .shell .formula-state select {
+    font-size: 16px;
+    padding-inline: 8px;
+  }
+}

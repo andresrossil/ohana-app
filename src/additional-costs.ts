@@ -13,15 +13,29 @@ export function additionalCosts(
   variant?: Row,
   laborId?: string,
   advertisingId?: string,
+  selectedExpenses: Row[] = [],
 ) {
   const units = numeric(count),
     n = units != null && units > 0 ? units : null;
-  const expenses = items.filter((x) => x.kind === "overhead" && x.active);
-  const overhead = expenses.every((x) => x.currency === currency)
-    ? expenses.reduce(
-        (sum, x) => sum + Number(x.quantity) * Number(x.unit_price),
-        0,
-      )
+  const expenses = selectedExpenses.map((line) => {
+    const item = items.find(
+      (x) => x.kind === "overhead" && x.id === line.cost_id,
+    );
+    const qty = numeric(line.quantity);
+    return {
+      cost_id: line.cost_id,
+      name: item?.name || "Concepto no disponible",
+      quantity: qty,
+      unit_price: item ? numeric(item.unit_price) : null,
+      currency: item?.currency,
+      total:
+        item && qty !== null && qty > 0 && item.currency === currency
+          ? qty * Number(item.unit_price)
+          : null,
+    };
+  });
+  const overhead = expenses.every((x) => x.total !== null)
+    ? expenses.reduce((sum, x) => sum + x.total!, 0)
     : null;
   const price = variant?.currency === currency ? numeric(variant.price) : null;
   const level = (id: string | undefined, kind: string) => {
@@ -51,6 +65,8 @@ export function additionalCosts(
     sale_price: price,
     variant_id: variant?.id || null,
     overhead_total: overhead,
+    overhead_lines: expenses,
+    unit_basis_count: n,
     overhead_unit: overhead !== null && n !== null ? overhead / n : null,
     labor,
     advertising,

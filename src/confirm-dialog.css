@@ -84,4 +84,27 @@
     font-size: 18px;
   }
 }
-.shell button .app-icon{flex-basis:16px}
+.shell button .app-icon {
+  flex-basis: 16px;
+}
+.shell .confirm-dialog button.confirm-cancel {
+  background: #a12635;
+  border-color: #a12635;
+  color: #fff;
+}
+.shell .confirm-dialog button.confirm-accept {
+  background: #18733d;
+  border-color: #18733d;
+  color: #fff;
+}
+.shell .confirm-dialog button.confirm-cancel:hover:not(:disabled) {
+  background: #811d29;
+  border-color: #811d29;
+}
+.shell .confirm-dialog button.confirm-accept:hover:not(:disabled) {
+  background: #125a2f;
+  border-color: #125a2f;
+}
+.shell .confirm-dialog h2 > .app-icon {
+  color: #946200;
+}

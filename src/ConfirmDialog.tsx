@@ -46,7 +46,7 @@ export function confirmAction(
                 ? "Eliminar"
                 : "Confirmar",
       cancelText: "Cancelar",
-      iconKey: discard || destructive ? "status.warning" : "action.confirm",
+      iconKey: "status.warning",
       danger: destructive,
       ...options,
       message,
@@ -63,7 +63,7 @@ export function ConfirmDialog({
   message,
   confirmText = "Confirmar",
   cancelText = "Cancelar",
-  iconKey = "action.confirm",
+  iconKey = "status.warning",
   danger = false,
   busyCheck,
   onCancel,
@@ -139,7 +139,7 @@ export function ConfirmDialog({
         <div className="form-actions">
           <AppButton
             type="button"
-            className="secondary"
+            className="confirm-cancel"
             iconKey="action.cancel"
             data-confirm-cancel
             onClick={onCancel}
@@ -148,7 +148,8 @@ export function ConfirmDialog({
           </AppButton>
           <AppButton
             type="button"
-            className={danger ? "danger" : ""}
+            className="confirm-accept"
+            iconKey="action.confirm"
             disabled={blocked}
             onClick={() => {
               if (!busyCheck?.()) onConfirm();

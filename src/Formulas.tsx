@@ -1,3 +1,4 @@
+import ProductImage from "./ProductImage";
 import AutoTextarea from "./AutoTextarea";
 import AdditionalCostsPanel from "./AdditionalCostsPanel";
 import { additionalCosts } from "./additional-costs";
@@ -73,6 +74,7 @@ const initial = (): Row => ({
   quantity_per_unit: "",
   labor_level_id: "",
   advertising_level_id: "",
+  overhead_lines: [],
   loss_enabled: false,
   loss_percent: 5,
 });
@@ -160,6 +162,7 @@ export default function Formulas({
     ),
     draft.labor_level_id,
     draft.advertising_level_id,
+    draft.overhead_lines || [],
   );
   function changed() {
     setDirty(true);
@@ -192,6 +195,15 @@ export default function Formulas({
       source
         ? {
             ...source,
+            overhead_lines: (source.overhead_lines || [])
+              .filter(
+                (line: Row) =>
+                  ["view", "edit", "notes"].includes(next) ||
+                  (catalog.additional_costs || []).some(
+                    (x: Row) => x.id === line.cost_id && x.active,
+                  ),
+              )
+              .map((line: Row) => ({ ...line })),
             labor_level_id:
               ["view", "edit", "notes"].includes(next) ||
               (catalog.additional_costs || []).some(
@@ -369,6 +381,22 @@ export default function Formulas({
       state.setError("Selecciona un producto de la lista por nombre o SKU.");
       return;
     }
+    const expenses: Row[] = draft.overhead_lines || [];
+    if (
+      expenses.some(
+        (line) =>
+          !line.cost_id ||
+          !Number.isFinite(Number(line.quantity)) ||
+          Number(line.quantity) <= 0 ||
+          Number(line.quantity) >= 1e12,
+      ) ||
+      new Set(expenses.map((line) => line.cost_id)).size !== expenses.length
+    ) {
+      state.setError(
+        "Selecciona cada concepto de Otros gastos una sola vez e indica una cantidad válida.",
+      );
+      return;
+    }
     if (math.errors.length) {
       state.setError(math.errors.join(" "));
       return;
@@ -506,7 +534,19 @@ export default function Formulas({
                             </datalist>
                           </>
                         )}
-                        <IconDetails className="formula-line-notes" onToggle={e => { if (e.currentTarget.open) { const area = e.currentTarget.querySelector("textarea"); if (area) { area.style.height = "auto"; area.style.height = area.scrollHeight + "px"; } } }}>
+                        <IconDetails
+                          className="formula-line-notes"
+                          onToggle={(e) => {
+                            if (e.currentTarget.open) {
+                              const area =
+                                e.currentTarget.querySelector("textarea");
+                              if (area) {
+                                area.style.height = "auto";
+                                area.style.height = area.scrollHeight + "px";
+                              }
+                            }
+                          }}
+                        >
                           <summary>
                             Referencia / Observaciones
                             {line.reference_notes ? " · con nota" : ""}
@@ -825,7 +865,7 @@ export default function Formulas({
   const compared = formulas.find((f) => f.id === comparison);
   return (
     <>
-      <section className="intro">
+      <section className="intro formula-intro">
         <div>
           <p className="eyebrow">DE LA RECETA AL PRODUCTO</p>
           <h1 className="module-title">
@@ -859,7 +899,7 @@ export default function Formulas({
         </p>
       )}
       {state.notice && <p role="status">{state.notice}</p>}
-      <section className="catalog">
+      <section className="catalog formula-catalog">
         <div className="toolbar">
           <h2>Fórmulas y versiones</h2>
           <SearchField
@@ -885,36 +925,56 @@ export default function Formulas({
                 <tr key={f.id}>
                   <td>{f.code}</td>
                   <td>
-                    <strong>{f.product_name}</strong>
-                    <small>{f.name}</small>
+                    <div className="formula-product">
+                      <div className="formula-product-image">
+                        <ProductImage
+                          path={
+                            catalog.products.find(
+                              (p: Row) => p.id === f.product_id,
+                            )?.photo_path
+                          }
+                          name={f.product_name}
+                        />
+                      </div>
+                      <div className="formula-product-text">
+                        <strong>{f.product_name}</strong>
+                        <small>{f.name}</small>
+                      </div>
+                    </div>
                   </td>
                   <td>v{f.version}</td>
                   <td>
-                    <AppIcon
-                      name={
-                        f.state === "current"
-                          ? "status.success"
-                          : f.state === "inactive"
-                            ? "status.archived"
-                            : "status.pending"
-                      }
-                    />{" "}
-                    {state.canWrite ? (
-                      <select
-                        aria-label={`Estado ${f.code} v${f.version}`}
-                        value={f.state}
-                        disabled={state.busy}
-                        onChange={(e) => changeState(f, e.target.value)}
-                      >
-                        {Object.entries(labels).map(([key, label]) => (
-                          <option key={key} value={key}>
-                            {label}
-                          </option>
-                        ))}
-                      </select>
-                    ) : (
-                      labels[f.state]
-                    )}
+                    <div className={"formula-state formula-state-" + f.state}>
+                      <span className="formula-state-icon">
+                        <AppIcon
+                          name={
+                            f.state === "current"
+                              ? "status.active"
+                              : f.state === "inactive"
+                                ? "status.archived"
+                                : "status.warning"
+                          }
+                        />
+                      </span>
+                      {state.canWrite ? (
+                        <select
+                          aria-label={`Estado ${f.code} v${f.version}`}
+                          value={f.state}
+                          disabled={state.busy}
+                          onChange={(e) => changeState(f, e.target.value)}
+                        >
+                          {Object.entries(labels).map(([key, label]) => (
+                            <option key={key} value={key}>
+                              {label}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <span className="formula-state-label">
+                          {labels[f.state]}
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td className="actions formula-actions">
                     <AppButton
@@ -1474,6 +1534,12 @@ export default function Formulas({
                 laborId={draft.labor_level_id || ""}
                 advertisingId={draft.advertising_level_id || ""}
                 onSelect={!readOnly && !state.busy ? field : undefined}
+                overheadLines={draft.overhead_lines || []}
+                onOverheadChange={
+                  !readOnly && !state.busy
+                    ? (rows) => field("overhead_lines", rows)
+                    : undefined
+                }
                 baseCost={math.totalCost}
               />
               {duplicates.length > 0 && (

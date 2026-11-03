@@ -92,7 +92,7 @@ export default function AdditionalCostSettings({
       </div>
       <p className="muted">
         {expense
-          ? "El total de conceptos activos se aplica una sola vez por lote y se distribuye entre las unidades estimadas."
+          ? "Los conceptos de este catálogo se seleccionan en cada fórmula. Solo los gastos elegidos se aplican una vez por lote."
           : "Selecciona un nivel en la fórmula. El porcentaje se calcula sobre el precio de venta de su presentación."}
       </p>
       {state.error && (
@@ -316,7 +316,7 @@ export default function AdditionalCostSettings({
       {expense && (
         <p>
           <strong>
-            Total activo por lote:{" "}
+            Total de referencia del catálogo:{" "}
             {totals.size
               ? [...totals].map(([c, n]) => money(n, c)).join(" + ")
               : money(0, data.currency)}

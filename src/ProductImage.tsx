@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase as db } from "./client";
+import { AppIcon } from "./AppIcon";
 export default function ProductImage({
   path,
   name,
@@ -40,7 +41,7 @@ export default function ProductImage({
       className="product-photo photo-empty"
       aria-label={`Sin fotografía de ${name}`}
     >
-      ✳
+      <AppIcon name="module.products" />
     </div>
   );
 }

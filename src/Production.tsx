@@ -172,6 +172,7 @@ function ProductionBatches({
     ),
     estimating?.labor_level_id,
     estimating?.advertising_level_id,
+    estimating?.overhead_lines || [],
   );
   return (
     <>
