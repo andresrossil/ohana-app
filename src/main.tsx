@@ -592,8 +592,13 @@ function App() {
             if (value === company) return;
             if (leaveSheet()) chooseCompany(value);
           }}
-          onNavigate={(next) => {
-            if (next === section && edit === undefined && !importOpen)
+          onNavigate={(next, fromLogo = false) => {
+            if (
+              !fromLogo &&
+              next === section &&
+              edit === undefined &&
+              !importOpen
+            )
               return true;
             if (
               sheetDirty ||
@@ -604,6 +609,13 @@ function App() {
             ) {
               setPendingNavigation(next);
               return false;
+            }
+            if (fromLogo) {
+              setImportOpen(false);
+              setHistory(null);
+              setBarcode(null);
+              setPendingNavigation(null);
+              protection.clear();
             }
             setSection(next);
             if (next === "settings" && !activeCompany?.manage)
@@ -1254,7 +1266,8 @@ function App() {
                                           target="_blank"
                                           rel="noopener noreferrer"
                                         >
-                                          <AppIcon name="action.expand" /> Ver enlace
+                                          <AppIcon name="action.expand" /> Ver
+                                          enlace
                                         </a>
                                       )}
                                     </td>
@@ -1338,6 +1351,7 @@ function App() {
                     setEdit(undefined);
                     setImportOpen(false);
                     setHistory(null);
+                    setBarcode(null);
                     setSheetDirty(false);
                     setSettingsDirty(false);
                     setSection(next);

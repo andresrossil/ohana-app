@@ -595,3 +595,13 @@
 .vs-icon > .app-icon {
   color: inherit;
 }
+
+.shell .brand-home,
+.shell .brand-home * {
+  cursor: pointer;
+}
+.shell .brand-home:focus-visible {
+  outline: 2px solid var(--admin-primary);
+  outline-offset: 4px;
+  border-radius: 6px;
+}

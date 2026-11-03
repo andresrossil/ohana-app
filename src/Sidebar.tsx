@@ -30,7 +30,7 @@ export default function Sidebar({
   allowedSections,
 }: {
   section: Section;
-  onNavigate: (s: Section) => boolean;
+  onNavigate: (s: Section, fromLogo?: boolean) => boolean;
   company: string;
   companies: CatalogRow[];
   onCompany: (value: string) => void;
@@ -47,9 +47,15 @@ export default function Sidebar({
         <button
           className="brand-home"
           type="button"
-          aria-label="Ir a Inicio"
+          aria-label={
+            "Ir al Dashboard de " +
+            (companies.find((c) => c.id === company)?.name ||
+              "la empresa actual")
+          }
+          title="Volver al Dashboard"
           onClick={() => {
-            if (onNavigate("dashboard")) setOpen(false);
+            onNavigate("dashboard", true);
+            setOpen(false);
           }}
         >
           {companies.find((c) => c.id === company) ? (
