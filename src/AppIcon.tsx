@@ -87,6 +87,17 @@ const defaults: Record<string, any> = {
   "circle-alert": CircleAlert,
 };
 const Context = createContext<Record<string, string>>({});
+export function notifyIconsChanged(company: string) {
+  window.dispatchEvent(
+    new CustomEvent("ohana-icons-saved", { detail: { company } }),
+  );
+  try {
+    localStorage.setItem(
+      "ohana-icons-refresh",
+      JSON.stringify({ company, at: Date.now() }),
+    );
+  } catch {}
+}
 export function IconProvider({
   company,
   children,
@@ -102,19 +113,43 @@ export function IconProvider({
     let live = true;
     setState({ company, icons: {} });
     if (!company) return;
-    const load = () =>
-      request("company_icons", { p_company: company })
+    let revision = 0;
+    const load = () => {
+      const ticket = ++revision;
+      return request("company_icons", { p_company: company })
         .then((icons) => {
-          if (live) setState({ company, icons: icons || {} });
+          if (live && ticket === revision)
+            setState({ company, icons: icons || {} });
         })
         .catch(() => {});
+    };
+    const changed = (e: Event) => {
+      if (
+        !(e instanceof CustomEvent) ||
+        !e.detail?.company ||
+        e.detail.company === company
+      )
+        void load();
+    };
+    const stored = (e: StorageEvent) => {
+      if (e.key !== "ohana-icons-refresh" || !e.newValue) return;
+      try {
+        if (JSON.parse(e.newValue).company === company) void load();
+      } catch {}
+    };
+    /* active names only: the option library stays lazy in Appearance */
+
     load();
     const timer = setInterval(load, 60000);
-    window.addEventListener("ohana-icons-saved", load);
+    window.addEventListener("ohana-icons-saved", changed);
+    window.addEventListener("storage", stored);
+    window.addEventListener("focus", load);
     return () => {
       live = false;
       clearInterval(timer);
-      window.removeEventListener("ohana-icons-saved", load);
+      window.removeEventListener("ohana-icons-saved", changed);
+      window.removeEventListener("storage", stored);
+      window.removeEventListener("focus", load);
     };
   }, [company]);
   return (
@@ -158,17 +193,53 @@ function textOf(node: ReactNode): string {
     )
     .join(" ");
 }
+function containsIcon(node: ReactNode): boolean {
+  return Children.toArray(node).some(
+    (n) =>
+      isValidElement<{ children?: ReactNode }>(n) &&
+      (n.type === AppIcon ||
+        n.type === "svg" ||
+        containsIcon(n.props.children)),
+  );
+}
 export function AppButton({
   children,
   iconKey,
   ...props
 }: ButtonHTMLAttributes<HTMLButtonElement> & { iconKey?: string }) {
-  const action = actionIcon(textOf(children));
-  const key = iconKey || (action ? "action." + action : "");
+  const label = props["aria-label"] || props.title || textOf(children);
+  const action = actionIcon(label);
+  const key =
+    iconKey ||
+    (/ordenar/i.test(label)
+      ? "control.sort"
+      : /filtrar/i.test(label)
+        ? "control.filter"
+        : /desactivar|archivar/i.test(label)
+          ? "status.archived"
+          : /reactivar|activar/i.test(label)
+            ? "status.active"
+            : action
+              ? "action." + action
+              : "");
+  const addIcon = !!key && !containsIcon(children);
+  const content = Children.map(children, (n) =>
+    typeof n === "string" && addIcon
+      ? /^[\s×✕✖▥↗]+$/.test(n)
+        ? null
+        : n.replace(/^\s*\+\s*(?=\S)/, "")
+      : n,
+  );
   return (
-    <button {...props}>
-      {key && <AppIcon name={key} />}
-      <span>{children}</span>
+    <button
+      {...props}
+      aria-label={
+        props["aria-label"] ||
+        (addIcon && /^[\s×✕✖▥]+$/.test(textOf(children)) ? label : undefined)
+      }
+    >
+      {addIcon && <AppIcon name={key} />}
+      <span>{content}</span>
     </button>
   );
 }

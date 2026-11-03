@@ -1,3 +1,4 @@
+import { IconDetails, SearchField } from "./PoolControls";
 // V2: compact dialog/mobile layout; reconsider separate capture group and visible informative loss.
 import DecimalInput from "./DecimalInput";
 import { useEffect, useRef, useState } from "react";
@@ -712,7 +713,10 @@ export default function Formulas({
       <section className="intro">
         <div>
           <p className="eyebrow">DE LA RECETA AL PRODUCTO</p>
-          <h1>Fórmulas</h1>
+          <h1 className="module-title">
+            <AppIcon name="module.formulas" />
+            Fórmulas
+          </h1>
           <p>
             Composición, versiones y costos estimados, sin modificar
             existencias.
@@ -743,7 +747,7 @@ export default function Formulas({
       <section className="catalog">
         <div className="toolbar">
           <h2>Fórmulas y versiones</h2>
-          <input
+          <SearchField
             aria-label="Buscar fórmula"
             placeholder="Código, producto, fórmula o estado…"
             value={query}
@@ -773,7 +777,11 @@ export default function Formulas({
                   <td>
                     <AppIcon
                       name={
-                        f.state === "current" ? "status.success" : "status.info"
+                        f.state === "current"
+                          ? "status.success"
+                          : f.state === "inactive"
+                            ? "status.archived"
+                            : "status.pending"
                       }
                     />{" "}
                     {state.canWrite ? (
@@ -1183,7 +1191,7 @@ export default function Formulas({
                   </small>
                 </label>
               </fieldset>
-              <details className="formula-disclosure" hidden>
+              <IconDetails className="formula-disclosure" hidden>
                 <summary>
                   Merma informativa
                   {draft.loss_enabled
@@ -1238,7 +1246,7 @@ export default function Formulas({
                 <p className="muted">
                   No incrementa consumos ni descuenta inventario adicional.
                 </p>
-              </details>
+              </IconDetails>
               {mode === "view" && (
                 <label className="formula-scale">
                   Factor de escala para esta vista
@@ -1261,17 +1269,17 @@ export default function Formulas({
                   )}
                 </label>
               )}
-              <details className="formula-disclosure" open>
+              <IconDetails className="formula-disclosure" open>
                 <summary>Materias primas</summary>
                 {rowsTable("ingredient")}
-              </details>
-              <details className="formula-disclosure">
+              </IconDetails>
+              <IconDetails className="formula-disclosure">
                 <summary>
                   Materiales de empaque ·{" "}
                   {lines.filter((l) => l.line_kind === "packaging").length}
                 </summary>
                 {rowsTable("packaging")}
-              </details>
+              </IconDetails>
               <p className="muted">
                 % costo MP = costo del ingrediente ÷ subtotal de materias
                 primas. Excluye el empaque; si falta un precio, el total y los
@@ -1364,7 +1372,10 @@ export default function Formulas({
                   </AppButton>
                 </section>
               )}
-              <details className="formula-disclosure" open={mode === "notes"}>
+              <IconDetails
+                className="formula-disclosure"
+                open={mode === "notes"}
+              >
                 <summary>Notas administrativas</summary>
                 <label className="form-wide">
                   Notas administrativas
@@ -1381,7 +1392,7 @@ export default function Formulas({
                     }}
                   />
                 </label>
-              </details>
+              </IconDetails>
               {draft.used_batches?.length > 0 && (
                 <section>
                   <h3>Lotes que utilizan esta versión</h3>

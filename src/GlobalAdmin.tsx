@@ -1,3 +1,5 @@
+import CatalogBadge from "./CatalogBadge";
+import { IconDetails } from "./PoolControls";
 import { AppButton, AppIcon } from "./AppIcon";
 import { useEffect, useState } from "react";
 import { request } from "./commerce";
@@ -54,7 +56,7 @@ export default function GlobalAdmin() {
       )}
       {data && (
         <>
-          <details>
+          <IconDetails>
             <summary>Cuentas y rol reservado</summary>
             <p>
               La asignación requiere una cuenta verificada. No puedes cambiar tu
@@ -100,12 +102,12 @@ export default function GlobalAdmin() {
               </label>
               <AppButton disabled={busy}>Guardar rol global</AppButton>
             </form>
-          </details>
+          </IconDetails>
           {[
             ["country", "Países", "countries"],
             ["currency", "Monedas", "currencies"],
           ].map(([action, title, key]) => (
-            <details key={action}>
+            <IconDetails key={action}>
               <summary>{title}</summary>
               <div className="table-wrap">
                 <table>
@@ -121,7 +123,12 @@ export default function GlobalAdmin() {
                       <tr key={r.code}>
                         <td>{r.code}</td>
                         <td>{r.name}</td>
-                        <td>{r.active ? "Activo" : "Inactivo"}</td>
+                        <td>
+                          <CatalogBadge
+                            active={r.active}
+                            label={r.active ? "Activo" : "Inactivo"}
+                          />
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -162,7 +169,7 @@ export default function GlobalAdmin() {
                 </label>
                 <AppButton disabled={busy}>Guardar código</AppButton>
               </form>
-            </details>
+            </IconDetails>
           ))}
         </>
       )}

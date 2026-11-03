@@ -1,3 +1,4 @@
+import { SearchField } from "./PoolControls";
 import CatalogBadge from "./CatalogBadge";
 import { AppButton, AppIcon } from "./AppIcon";
 import { orderedProducts } from "./product-view";
@@ -84,9 +85,9 @@ export default function ProductsCatalog({
           {label}{" "}
           {sort.column === column
             ? sort.direction === "asc"
-              ? "↑"
-              : "↓"
-            : "↕"}
+              ? " · Asc."
+              : " · Desc."
+            : ""}
         </button>
       </th>
     );
@@ -173,7 +174,10 @@ export default function ProductsCatalog({
       <section className="intro">
         <div>
           <p className="eyebrow">LO QUE CREAS</p>
-          <h1>Productos</h1>
+          <h1 className="module-title">
+            <AppIcon name="module.products" />
+            Productos
+          </h1>
           <p>Tu catálogo de productos terminados.</p>
         </div>
         {canWrite && (
@@ -192,7 +196,7 @@ export default function ProductsCatalog({
           <h2>
             Tu catálogo <small>{products.length}</small>
           </h2>
-          <input
+          <SearchField
             aria-label="Buscar productos"
             placeholder="Nombre, SKU o código de barras…"
             value={query}

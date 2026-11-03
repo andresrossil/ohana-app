@@ -1,3 +1,4 @@
+import CatalogBadge from "./CatalogBadge";
 import { AppButton, AppIcon } from "./AppIcon";
 import { useEffect, useState, lazy, Suspense } from "react";
 import { operation, mutate, useOperation, money, type Row } from "./operations";
@@ -233,7 +234,10 @@ export default function VariantManager({
                       {Object.entries(r.attributes)
                         .map(([k, v]) => `${k}: ${v}`)
                         .join(" · ")}{" "}
-                      · {r.active ? "Activa" : "Archivada"}
+                      <CatalogBadge
+                        active={r.active}
+                        label={r.active ? "Activa" : "Archivada"}
+                      />
                     </small>
                   </td>
                   <td>

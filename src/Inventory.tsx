@@ -1,3 +1,4 @@
+import { SearchField } from "./PoolControls";
 import { AppButton, AppIcon } from "./AppIcon";
 import { useEffect, useState } from "react";
 import {
@@ -354,7 +355,7 @@ export default function Inventory({
           <section className="catalog">
             <div className="toolbar">
               <h2>Existencias</h2>
-              <input
+              <SearchField
                 aria-label="Buscar existencias"
                 placeholder="Nombre, SKU, código de barras o clasificación"
                 value={query}

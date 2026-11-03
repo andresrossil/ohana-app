@@ -93,7 +93,10 @@ function ProductionBatches({
       <section className="intro">
         <div>
           <p className="eyebrow">DE LA RECETA AL PRODUCTO</p>
-          <h1>Producción</h1>
+          <h1 className="module-title">
+            <AppIcon name="module.production" />
+            Producción
+          </h1>
           <p>
             Finaliza con consumos reales y reparte el lote entre variantes.
             Libera el producto manualmente al terminar el curado.
@@ -485,6 +488,15 @@ function ProductionBatches({
                     </small>
                   </td>
                   <td>
+                    <AppIcon
+                      name={
+                        b.state === "released"
+                          ? "status.success"
+                          : b.state === "cancelled"
+                            ? "status.archived"
+                            : "status.pending"
+                      }
+                    />
                     {
                       {
                         draft: "Borrador",

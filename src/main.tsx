@@ -1,3 +1,4 @@
+import { SearchField } from "./PoolControls";
 import AutoTextarea from "./AutoTextarea";
 import CatalogBadge from "./CatalogBadge";
 import { useNavigationProtection } from "./navigation-protection";
@@ -916,7 +917,16 @@ function App() {
                   <section className="intro">
                     <div>
                       <p className="eyebrow">LA BASE DE CADA CREACIÓN</p>
-                      <h1>{labels[tab]}</h1>
+                      <h1 className="module-title">
+                        <AppIcon
+                          name={
+                            tab === "raw_materials"
+                              ? "module.materials"
+                              : "module.settings"
+                          }
+                        />
+                        {labels[tab]}
+                      </h1>
                       <p>Conoce lo que compras. Cuida lo que creas.</p>
                     </div>
                     {canWrite && (
@@ -1046,7 +1056,7 @@ function App() {
                         <h2>
                           Tu catálogo <small>{data[tab].length}</small>
                         </h2>
-                        <input
+                        <SearchField
                           aria-label="Buscar en el catálogo"
                           placeholder="Nombre, SKU o código de barras…"
                           value={query}
@@ -1244,7 +1254,7 @@ function App() {
                                           target="_blank"
                                           rel="noopener noreferrer"
                                         >
-                                          Ver enlace ↗
+                                          <AppIcon name="action.expand" /> Ver enlace
                                         </a>
                                       )}
                                     </td>
@@ -1294,7 +1304,7 @@ function App() {
           />
         )}
         {pendingNavigation && (
-          <div className="overlay" style={{zIndex:10000}}>
+          <div className="overlay" style={{ zIndex: 10000 }}>
             <section
               className="modal"
               role="dialog"

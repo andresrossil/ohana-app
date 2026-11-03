@@ -1,3 +1,4 @@
+import { SearchField } from "./PoolControls";
 import { AppButton, AppIcon } from "./AppIcon";
 import { useState } from "react";
 import type { CatalogRow } from "./sheet-model";
@@ -102,7 +103,7 @@ export default function CatalogOverview({
       <section className="catalog">
         <div className="toolbar">
           <h2>{rows.length} registros</h2>
-          <input
+          <SearchField
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             aria-label="Buscar catálogo consolidado"

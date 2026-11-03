@@ -1,3 +1,4 @@
+import CatalogBadge from "./CatalogBadge";
 import { AppButton, AppIcon } from "./AppIcon";
 import { useState } from "react";
 import type { FormEvent } from "react";
@@ -124,8 +125,15 @@ export default function OriginsSettings({
           <tbody>
             {origins.map((o) => (
               <tr key={o.id}>
-                <td>{o.name}</td>
-                <td>{o.active ? "Activo" : "Inactivo"}</td>
+                <td>
+                  <CatalogBadge origin={o.name} />
+                </td>
+                <td>
+                  <CatalogBadge
+                    active={o.active}
+                    label={o.active ? "Activo" : "Inactivo"}
+                  />
+                </td>
                 <td className="actions">
                   {canWrite && (
                     <>

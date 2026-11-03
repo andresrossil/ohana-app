@@ -121,6 +121,9 @@ export const iconRegistry: IconEntry[] = [
 export function actionIcon(text: string) {
   const s = text.toLocaleLowerCase();
   const rules: [RegExp, string][] = [
+    [/cerrar sesi[oó]n|salir|anterior/, "back"],
+    [/restaurar|reiniciar/, "refresh"],
+    [/permanecer|^\s*[×✕✖]\s*$/, "cancel"],
     [/guardar/, "save"],
     [/confirmar|liberar|finalizar|entregar/, "confirm"],
     [/cancelar|cerrar|descartar/, "cancel"],
@@ -139,6 +142,9 @@ export function actionIcon(text: string) {
     [/accesos/, "access"],
     [/volver/, "back"],
     [/agregar|añadir|crear|nueva|nuevo|iniciar/, "add"],
+    [/seleccionar|elegir|aplicar|aceptar/, "confirm"],
+    [/mostrar|\bver\b|detalle|abrir|siguiente|continuar/, "expand"],
+    [/preparar|generar|producir|f[oó]rmula/, "calculate"],
   ];
   return rules.find(([r]) => r.test(s))?.[1];
 }

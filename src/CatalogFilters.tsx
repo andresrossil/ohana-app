@@ -30,7 +30,9 @@ export default function CatalogFilters({
     <div className="catalog-filters">
       {onClassification && (
         <label>
-          <AppIcon name="control.filter" /> Clasificación
+          <span className="field-caption">
+            <AppIcon name="control.filter" /> Clasificación
+          </span>
           <select
             value={classification}
             onChange={(e) => onClassification(e.target.value)}
@@ -44,7 +46,9 @@ export default function CatalogFilters({
         </label>
       )}
       <label>
-        Origen
+        <span className="field-caption">
+          <AppIcon name="control.filter" /> Origen
+        </span>
         <select value={origin} onChange={(e) => onOrigin(e.target.value)}>
           <option value="">Todos los orígenes</option>
           {origins.map((o) => (

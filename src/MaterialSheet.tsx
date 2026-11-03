@@ -1,3 +1,4 @@
+import { SearchField } from "./PoolControls";
 import AutoTextarea from "./AutoTextarea";
 import { AppButton, AppIcon } from "./AppIcon";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -96,27 +97,17 @@ function VsIcon({
       aria-label={label}
       title={`${label}${variation === null ? "" : ` · Diferencia por unidad: ${numeric(variation)}`}`}
     >
-      {state === "neutral" ? (
-        variation === null ? (
-          "—"
-        ) : (
-          "="
-        )
-      ) : (
-        <svg width="21" height="21" viewBox="0 0 24 24" aria-hidden="true">
-          <circle cx="12" cy="12" r="10" fill="currentColor" />
-          <path
-            d={
-              state === "lower" ? "M6.5 12.5 10 16 17.5 8" : "m8 8 8 8m0-8-8 8"
-            }
-            fill="none"
-            stroke="white"
-            strokeWidth="2.2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      )}
+      <AppIcon
+        name={
+          state === "lower"
+            ? "status.success"
+            : state === "higher"
+              ? "status.error"
+              : variation === null
+                ? "status.pending"
+                : "action.compare"
+        }
+      />
     </span>
   );
 }
@@ -1039,7 +1030,7 @@ export default function MaterialSheet({
             </AppButton>
           </div>
           <div className="sheet-controls">
-            <input
+            <SearchField
               aria-label="Buscar en la hoja"
               placeholder="Buscar material o proveedor…"
               value={filter}
@@ -1142,7 +1133,7 @@ export default function MaterialSheet({
                     onClick={() => orderBy(-1)}
                     aria-label="Ordenar por fila"
                   >
-                    # ↕
+                    #
                   </AppButton>
                 </th>
                 {displayColumns.map((col, c) => (
@@ -1164,21 +1155,14 @@ export default function MaterialSheet({
                       onClick={() => orderBy(c)}
                       aria-label={`Ordenar por ${col}: ${sort?.column === c && sort.direction === "asc" ? "descendente" : "ascendente"}`}
                     >
-                      {col === "VS" && <AppIcon name="action.compare" />}
-                      {col === "PRECIO UN" && (
-                        <AppIcon name="action.calculate" />
-                      )}
-                      {col === "PRECIO ANTERIOR" && (
-                        <AppIcon name="action.history" />
-                      )}
                       {col}
                       {[2, 4, 5].includes(visualOrder[c]) ? " *" : ""}
                       <span aria-hidden="true" className="sort-direction">
                         {sort?.column === c
                           ? sort.direction === "asc"
-                            ? " ↑"
-                            : " ↓"
-                          : " ↕"}
+                            ? " · Asc."
+                            : " · Desc."
+                          : ""}
                       </span>
                     </AppButton>
                     <small>
@@ -1211,7 +1195,7 @@ export default function MaterialSheet({
                           aria-label={`Fila ${ri + 1}: ${rowErrors.join(" · ")}`}
                           title={rowErrors.join(" · ")}
                         >
-                          !
+                          <AppIcon name="status.error" />
                         </span>
                       )}
                       {r.dirty &&
@@ -1223,7 +1207,7 @@ export default function MaterialSheet({
                             aria-label={`Fila ${ri + 1}: ${rowWarnings.join(" · ")}`}
                             title={rowWarnings.join(" · ")}
                           >
-                            !
+                            <AppIcon name="status.warning" />
                           </span>
                         )}
                       {!importing && !r.id && canWrite && (

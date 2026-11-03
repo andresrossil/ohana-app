@@ -1,6 +1,8 @@
+import { AppButton } from "./AppIcon";
+import { SearchField } from "./PoolControls";
 import { useEffect, useState } from "react";
 import { request } from "./commerce";
-import { AppIcon } from "./AppIcon";
+import { AppIcon, notifyIconsChanged } from "./AppIcon";
 import { iconRegistry } from "./icon-registry";
 import { availableIconNames } from "./icon-names";
 import { defaultIconPools, type IconPools, type IconPool } from "./icon-pools";
@@ -137,7 +139,7 @@ export default function IconSettings({
             los colores de estado se conservan.
           </p>
         </div>
-        <button
+        <AppButton
           className="secondary"
           disabled={!editable}
           onClick={() => {
@@ -153,7 +155,7 @@ export default function IconSettings({
           }}
         >
           Restaurar todos
-        </button>
+        </AppButton>
       </div>
       {error && (
         <p className="error" role="alert">
@@ -165,7 +167,7 @@ export default function IconSettings({
       <div className="settings-grid">
         <label>
           Buscar función o icono
-          <input
+          <SearchField
             type="search"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -207,7 +209,7 @@ export default function IconSettings({
                       <div className="icon-pool-options">
                         {p.options.map((name, i) => (
                           <div className="icon-pool-option" key={name}>
-                            <button
+                            <AppButton
                               type="button"
                               className={
                                 "secondary icon-pool-choice " +
@@ -227,9 +229,9 @@ export default function IconSettings({
                               }}
                             >
                               <AppIcon name={e.key} override={name} />
-                            </button>
+                            </AppButton>
                             <div className="icon-pool-tools">
-                              <button
+                              <AppButton
                                 type="button"
                                 className="secondary"
                                 disabled={!editable}
@@ -244,8 +246,8 @@ export default function IconSettings({
                                 }}
                               >
                                 <AppIcon name="action.edit" />
-                              </button>
-                              <button
+                              </AppButton>
+                              <AppButton
                                 type="button"
                                 className="secondary"
                                 disabled={!editable || p.options.length === 1}
@@ -263,13 +265,13 @@ export default function IconSettings({
                                 }}
                               >
                                 <AppIcon name="action.delete" />
-                              </button>
+                              </AppButton>
                             </div>
                           </div>
                         ))}
                       </div>
                       <div className="icon-pool-controls">
-                        <button
+                        <AppButton
                           className="secondary"
                           disabled={!editable || p.options.length >= 5}
                           onClick={() => {
@@ -279,8 +281,8 @@ export default function IconSettings({
                           }}
                         >
                           Agregar
-                        </button>
-                        <button
+                        </AppButton>
+                        <AppButton
                           className="secondary"
                           disabled={!editable}
                           onClick={() =>
@@ -291,7 +293,7 @@ export default function IconSettings({
                           }
                         >
                           Restaurar
-                        </button>
+                        </AppButton>
                       </div>
                     </div>
                   );
@@ -305,7 +307,7 @@ export default function IconSettings({
         <p>No hay funciones que coincidan con la búsqueda.</p>
       )}
       <div className="icon-pool-save">
-        <button
+        <AppButton
           disabled={!editable || !dirty}
           onClick={async () => {
             setBusy(true);
@@ -317,7 +319,7 @@ export default function IconSettings({
               });
               setDirty(false);
               setNotice("Pools e iconos activos guardados para esta empresa.");
-              window.dispatchEvent(new Event("ohana-icons-saved"));
+              notifyIconsChanged(company);
             } catch (e: any) {
               setError(e.message);
             } finally {
@@ -326,7 +328,7 @@ export default function IconSettings({
           }}
         >
           Guardar iconos
-        </button>
+        </AppButton>
         {dirty && <span role="status">Cambios sin guardar</span>}
       </div>
       {picker && (
@@ -342,13 +344,13 @@ export default function IconSettings({
                 {picker.index === undefined ? "Agregar" : "Reemplazar"} icono ·{" "}
                 {iconRegistry.find((e) => e.key === picker.key)?.label}
               </h3>
-              <button className="secondary" onClick={() => setPicker(null)}>
+              <AppButton className="secondary" onClick={() => setPicker(null)}>
                 Cerrar
-              </button>
+              </AppButton>
             </div>
             <label>
               Buscar icono Lucide
-              <input
+              <SearchField
                 type="search"
                 value={query}
                 onChange={(e) => {
@@ -364,7 +366,7 @@ export default function IconSettings({
             </p>
             <div className="icon-gallery">
               {found.slice(0, count).map((name) => (
-                <button
+                <AppButton
                   type="button"
                   className="secondary"
                   key={name}
@@ -373,16 +375,16 @@ export default function IconSettings({
                 >
                   <AppIcon name={picker.key} override={name} />
                   <small>{name}</small>
-                </button>
+                </AppButton>
               ))}
             </div>
             {found.length > count && (
-              <button
+              <AppButton
                 className="secondary"
                 onClick={() => setCount(count + 40)}
               >
                 Mostrar más
-              </button>
+              </AppButton>
             )}
             <small>
               Lucide · licencia ISC. Se descargan únicamente los iconos

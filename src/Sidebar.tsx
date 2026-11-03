@@ -1,4 +1,4 @@
-import { AppIcon } from "./AppIcon";
+import { AppIcon, AppButton } from "./AppIcon";
 import NavIcon from "./NavIcon";
 import { useState } from "react";
 import type { CatalogRow } from "./sheet-model";
@@ -132,7 +132,9 @@ export default function Sidebar({
             grandes creaciones.
           </p>
           <small>{email}</small>
-          <button onClick={onLogout}>Cerrar sesión</button>
+          <AppButton iconKey="action.back" onClick={onLogout}>
+            Cerrar sesión
+          </AppButton>
         </div>
       </div>
     </aside>

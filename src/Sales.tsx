@@ -1,3 +1,4 @@
+import { SearchField } from "./PoolControls";
 import { AppButton, AppIcon } from "./AppIcon";
 import { useEffect, useState } from "react";
 import { sales } from "./commerce";
@@ -350,7 +351,7 @@ export default function Sales({
         <div className="toolbar">
           <h2>{customersOnly ? "Contactos" : "Pedidos recientes"}</h2>
           {!customersOnly && (
-            <input
+            <SearchField
               aria-label="Buscar pedido"
               placeholder="Pedido, nombre, teléfono o estado"
               value={query}

@@ -1,3 +1,4 @@
+import { IconDetails, SearchField } from "./PoolControls";
 import { AppButton, AppIcon } from "./AppIcon";
 import { useEffect, useState, lazy, Suspense } from "react";
 const GlobalAdmin = lazy(() => import("./GlobalAdmin"));
@@ -33,7 +34,7 @@ function ModuleAccess({
     [busy, setBusy] = useState(false),
     [error, setError] = useState("");
   return (
-    <details>
+    <IconDetails>
       <summary>Módulos de {member.email}</summary>
       <div className="module-access">
         {values.map((v: any, i: number) => (
@@ -105,7 +106,7 @@ function ModuleAccess({
       >
         Guardar módulos
       </AppButton>
-    </details>
+    </IconDetails>
   );
 }
 function Members({
@@ -333,7 +334,7 @@ export default function OrganizationAdmin({
       </div>
       <label>
         Buscar corporación o empresa
-        <input
+        <SearchField
           type="search"
           value={query}
           onChange={(e) => {
@@ -507,7 +508,12 @@ export default function OrganizationAdmin({
             <div className="hierarchy-toolbar">
               <h2>{dialog.title}</h2>
               {dialog.type.includes("company") && (
-                <AppButton className="secondary" iconKey="action.back" disabled={busy} onClick={close}>
+                <AppButton
+                  className="secondary"
+                  iconKey="action.back"
+                  disabled={busy}
+                  onClick={close}
+                >
                   Volver a la corporación
                 </AppButton>
               )}

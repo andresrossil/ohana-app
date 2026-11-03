@@ -1,3 +1,5 @@
+import CatalogBadge from "./CatalogBadge";
+import { SearchField } from "./PoolControls";
 import { useEffect, useRef, useState } from "react";
 import { AppButton, AppIcon } from "./AppIcon";
 import { request } from "./commerce";
@@ -262,7 +264,10 @@ export default function BusinessPartners({
       <section className="intro">
         <div>
           <p className="eyebrow">RELACIONES DE TU EMPRESA</p>
-          <h1>Socios de negocio</h1>
+          <h1 className="module-title">
+            <AppIcon name="module.customers" />
+            Socios de negocio
+          </h1>
           <p>
             Clientes y proveedores, cada uno con su información e historial.
           </p>
@@ -288,7 +293,7 @@ export default function BusinessPartners({
         <div className="partner-filters">
           <label>
             Buscar socio
-            <input
+            <SearchField
               type="search"
               placeholder="Código, nombre, teléfono o NIT…"
               value={query}
@@ -353,10 +358,15 @@ export default function BusinessPartners({
                   >
                     <AppButton
                       className="secondary partner-sort"
+                      iconKey="control.sort"
                       onClick={() => orderBy(key)}
                     >
                       {label}{" "}
-                      {sort === key ? (direction === "asc" ? "↑" : "↓") : "↕"}
+                      {sort === key
+                        ? direction === "asc"
+                          ? " · Asc."
+                          : " · Desc."
+                        : ""}
                     </AppButton>
                   </th>
                 ))}
@@ -370,7 +380,12 @@ export default function BusinessPartners({
                   <td>{row.name}</td>
                   <td>{typeName(row.partner_type)}</td>
                   <td>{row.phone || "—"}</td>
-                  <td>{row.active ? "Activo" : "Inactivo"}</td>
+                  <td>
+                    <CatalogBadge
+                      active={row.active}
+                      label={row.active ? "Activo" : "Inactivo"}
+                    />
+                  </td>
                   <td className="actions">
                     <AppButton
                       disabled={busy || loading}

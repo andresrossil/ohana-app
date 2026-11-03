@@ -535,3 +535,63 @@
   z-index: 2;
   background: var(--admin-secondary);
 }
+.pool-details > summary {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  list-style: none;
+}
+.pool-details > summary::-webkit-details-marker {
+  display: none;
+}
+.pool-details > summary::marker {
+  content: "";
+}
+.pool-details > summary > .app-icon {
+  flex-shrink: 0;
+}
+.pool-search-field {
+  display: inline-flex;
+  position: relative;
+  align-items: center;
+  min-width: 0;
+  max-width: 100%;
+  flex: 1;
+}
+.pool-search-field > .app-icon {
+  position: absolute;
+  left: 10px;
+  pointer-events: none;
+  color: var(--admin-muted);
+}
+.shell .pool-search-field > input {
+  width: 100%;
+  padding-left: 36px;
+  box-sizing: border-box;
+}
+.field-caption,
+.module-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.module-title > .app-icon {
+  flex-shrink: 0;
+}
+.module-title > .app-icon svg {
+  width: 24px;
+  height: 24px;
+}
+.row-error-marker .app-icon,
+.row-warning-marker .app-icon {
+  width: 12px;
+  height: 12px;
+}
+.row-error-marker svg,
+.row-warning-marker svg {
+  width: 12px;
+  height: 12px;
+}
+.vs-icon > .app-icon {
+  color: inherit;
+}

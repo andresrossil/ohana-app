@@ -16,7 +16,10 @@ export default function Reports({ company }: { company: string }) {
       <section className="intro">
         <div>
           <p className="eyebrow">UNA EMPRESA A LA VEZ</p>
-          <h1>Reportes</h1>
+          <h1 className="module-title">
+            <AppIcon name="module.reports" />
+            Reportes
+          </h1>
           <p>
             Resumen de la empresa seleccionada. Los importes se mantienen
             separados por moneda.
