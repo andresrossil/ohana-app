@@ -356,3 +356,8 @@
     padding-inline: 8px;
   }
 }
+@media (max-width: 760px) {
+  .shell .formula-catalog .responsive-table > tbody > tr > td:has(.formula-state) {
+    grid-column: 1 / -1;
+  }
+}
