@@ -13,7 +13,7 @@ do $$begin
  if public.company_icons('35000000-0000-0000-0000-000000000001')->>'module.materials'<>'flower' then raise exception 'Persistence failed';end if;
  if(select appearance from public.company_settings where company_id='35000000-0000-0000-0000-000000000001')<>'{"primary":"#123456"}'::jsonb then raise exception 'Store appearance changed';end if;
  begin perform public.save_company_icons('35000000-0000-0000-0000-000000000002','{}');raise exception 'Cross company edit';exception when insufficient_privilege then null;end;
- begin perform public.save_company_icons('35000000-0000-0000-0000-000000000001','{"action.save":"arbitrary-svg-url"}');raise exception 'Unknown icon accepted';exception when check_violation or raise_exception then null;end;
+ begin perform public.save_company_icons('35000000-0000-0000-0000-000000000001','{"action.save":"arbitrary-svg-url"}');raise exception 'Unknown icon accepted';exception when check_violation then null;when raise_exception then if sqlerrm='Unknown icon accepted' then raise;end if;end;
  begin perform public.save_company_icons('35000000-0000-0000-0000-000000000001','{"status.warning":"flower"}');raise exception 'Warning changed';exception when check_violation then null;end;
 end $$;
 select set_config('request.jwt.claim.sub','15000000-0000-0000-0000-000000000003',true);
