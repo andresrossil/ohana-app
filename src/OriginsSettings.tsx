@@ -1,3 +1,4 @@
+import ResponsiveTable from "./ResponsiveTable";
 import { confirmAction } from "./ConfirmDialog";
 import CatalogBadge from "./CatalogBadge";
 import { AppButton, AppIcon } from "./AppIcon";
@@ -115,7 +116,7 @@ export default function OriginsSettings({
         </form>
       )}
       <div className="table-wrap">
-        <table>
+        <ResponsiveTable>
           <thead>
             <tr>
               <th>Origen</th>
@@ -153,7 +154,7 @@ export default function OriginsSettings({
               </tr>
             ))}
           </tbody>
-        </table>
+        </ResponsiveTable>
       </div>
     </section>
   );

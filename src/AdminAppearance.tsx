@@ -1,3 +1,4 @@
+import ResponsiveTable from "./ResponsiveTable";
 import { confirmAction } from "./ConfirmDialog";
 import { AppButton, AppIcon } from "./AppIcon";
 import { lazy, Suspense } from "react";
@@ -261,7 +262,7 @@ export default function AdminAppearance({
                   Botón secundario
                 </AppButton>
               </div>
-              <table>
+              <ResponsiveTable>
                 <thead>
                   <tr>
                     <th>Elemento</th>
@@ -274,7 +275,7 @@ export default function AdminAppearance({
                     <td>Disponible</td>
                   </tr>
                 </tbody>
-              </table>
+              </ResponsiveTable>
             </div>
           </section>
           {issues.length > 0 ? (

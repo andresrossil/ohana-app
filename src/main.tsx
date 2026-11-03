@@ -1,3 +1,5 @@
+import MobileViewport from "./MobileViewport";
+import ResponsiveTable from "./ResponsiveTable";
 import { confirmAction, ConfirmHost, ConfirmDialog } from "./ConfirmDialog";
 import { SearchField } from "./PoolControls";
 import AutoTextarea from "./AutoTextarea";
@@ -1123,7 +1125,7 @@ function App() {
                         </div>
                       ) : (
                         <div className="table-wrap">
-                          <table>
+                          <ResponsiveTable>
                             <thead>
                               <tr>
                                 {tab === "raw_materials" && (
@@ -1296,7 +1298,7 @@ function App() {
                                 );
                               })}
                             </tbody>
-                          </table>
+                          </ResponsiveTable>
                           {!filtered.length && (
                             <p className="empty">
                               No hay resultados para esta búsqueda.
@@ -1635,6 +1637,7 @@ function App() {
 createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <Suspense fallback={<main className="store-loading">Cargando Ohana…</main>}>
+      <MobileViewport/>
       {new URLSearchParams(location.search).get("shop") ? (
         <PublicStore
           key={new URLSearchParams(location.search).get("shop")!}
@@ -1649,3 +1652,5 @@ createRoot(document.getElementById("root")!).render(
 import "./admin.css";
 import "./admin-forms.css";
 import "./configuration.css";
+
+import "./mobile.css";

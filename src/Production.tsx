@@ -1,3 +1,4 @@
+import ResponsiveTable from "./ResponsiveTable";
 import { confirmAction } from "./ConfirmDialog";
 import { AppButton, AppIcon } from "./AppIcon";
 import Formulas from "./Formulas";
@@ -468,7 +469,7 @@ function ProductionBatches({
       )}
       <section className="catalog">
         <div className="table-wrap">
-          <table>
+          <ResponsiveTable>
             <thead>
               <tr>
                 <th>Lote / producto</th>
@@ -602,7 +603,7 @@ function ProductionBatches({
                 </tr>
               ))}
             </tbody>
-          </table>
+          </ResponsiveTable>
 
           {!batches.length && (
             <p className="empty">No hay lotes de producción.</p>

@@ -1,3 +1,4 @@
+import ResponsiveTable from "./ResponsiveTable";
 import { SearchField } from "./PoolControls";
 import { AppButton, AppIcon } from "./AppIcon";
 import { useEffect, useState } from "react";
@@ -361,7 +362,7 @@ export default function Sales({
         </div>
         <div className="table-wrap">
           {customersOnly ? (
-            <table>
+            <ResponsiveTable>
               <thead>
                 <tr>
                   <th>Nombre</th>
@@ -380,9 +381,9 @@ export default function Sales({
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </ResponsiveTable>
           ) : (
-            <table>
+            <ResponsiveTable>
               <thead>
                 <tr>
                   <th>Pedido</th>
@@ -500,7 +501,7 @@ export default function Sales({
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </ResponsiveTable>
           )}
           {!(customersOnly ? data.customers : orders).length && (
             <p className="empty">Todavía no hay registros.</p>

@@ -1,3 +1,4 @@
+import ResponsiveTable from "./ResponsiveTable";
 import CatalogBadge from "./CatalogBadge";
 import { IconDetails } from "./PoolControls";
 import { AppButton, AppIcon } from "./AppIcon";
@@ -110,7 +111,7 @@ export default function GlobalAdmin() {
             <IconDetails key={action}>
               <summary>{title}</summary>
               <div className="table-wrap">
-                <table>
+                <ResponsiveTable>
                   <thead>
                     <tr>
                       <th>Código</th>
@@ -132,7 +133,7 @@ export default function GlobalAdmin() {
                       </tr>
                     ))}
                   </tbody>
-                </table>
+                </ResponsiveTable>
               </div>
               <form
                 onSubmit={(e) => {

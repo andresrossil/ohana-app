@@ -1,3 +1,4 @@
+import ResponsiveTable from "./ResponsiveTable";
 import { useEffect, useState } from "react";
 import { request } from "./commerce";
 import { AppButton, AppIcon } from "./AppIcon";
@@ -96,7 +97,7 @@ export default function BatchTrace({
                   · Factor de escala: {num(snapshot.scale)}
                 </p>
                 <div className="formula-table-scroll">
-                  <table>
+                  <ResponsiveTable>
                     <thead>
                       <tr>
                         <th>Materia prima / empaque</th>
@@ -144,7 +145,7 @@ export default function BatchTrace({
                         </tr>
                       ))}
                     </tbody>
-                  </table>
+                  </ResponsiveTable>
                 </div>
                 <p>
                   <strong>
@@ -179,7 +180,7 @@ export default function BatchTrace({
                       {money(data.batch.total_cost, data.batch.currency)}
                     </p>
                     <div className="formula-table-scroll">
-                      <table>
+                      <ResponsiveTable>
                         <thead>
                           <tr>
                             <th>ID de materia prima</th>
@@ -196,7 +197,7 @@ export default function BatchTrace({
                             </tr>
                           ))}
                         </tbody>
-                      </table>
+                      </ResponsiveTable>
                     </div>
                   </>
                 ) : (

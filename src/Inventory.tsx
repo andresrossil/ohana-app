@@ -1,3 +1,4 @@
+import ResponsiveTable from "./ResponsiveTable";
 import { SearchField } from "./PoolControls";
 import { AppButton, AppIcon } from "./AppIcon";
 import { useEffect, useState } from "react";
@@ -320,7 +321,7 @@ export default function Inventory({
         <section className="catalog">
           <h2>Compras recibidas</h2>
           <div className="table-wrap">
-            <table>
+            <ResponsiveTable>
               <thead>
                 <tr>
                   <th>Fecha</th>
@@ -344,7 +345,7 @@ export default function Inventory({
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </ResponsiveTable>
             {!receipts.length && (
               <p className="empty">No hay compras recibidas.</p>
             )}
@@ -363,7 +364,7 @@ export default function Inventory({
               />
             </div>
             <div className="table-wrap">
-              <table>
+              <ResponsiveTable>
                 <thead>
                   <tr>
                     <th>Artículo</th>
@@ -394,7 +395,7 @@ export default function Inventory({
                     </tr>
                   ))}
                 </tbody>
-              </table>
+              </ResponsiveTable>
               {!balances.length && (
                 <p className="empty">
                   No hay existencias para esta búsqueda. Recibe una compra o
@@ -406,7 +407,7 @@ export default function Inventory({
           <section className="catalog">
             <h2>Últimos movimientos</h2>
             <div className="table-wrap">
-              <table>
+              <ResponsiveTable>
                 <thead>
                   <tr>
                     <th>Fecha</th>
@@ -441,7 +442,7 @@ export default function Inventory({
                     </tr>
                   ))}
                 </tbody>
-              </table>
+              </ResponsiveTable>
             </div>
           </section>
         </>

@@ -1,3 +1,4 @@
+import ResponsiveTable from "./ResponsiveTable";
 import { confirmAction } from "./ConfirmDialog";
 import CatalogBadge from "./CatalogBadge";
 import { SearchField } from "./PoolControls";
@@ -341,7 +342,7 @@ export default function BusinessPartners({
           </label>
         </div>
         <div className="partner-table-scroll" aria-busy={loading}>
-          <table>
+          <ResponsiveTable>
             <thead>
               <tr>
                 {[
@@ -421,7 +422,7 @@ export default function BusinessPartners({
                 </tr>
               ))}
             </tbody>
-          </table>
+          </ResponsiveTable>
         </div>
         <div className="partner-pagination">
           <span role="status">

@@ -1,3 +1,4 @@
+import ResponsiveTable from "./ResponsiveTable";
 import { confirmAction } from "./ConfirmDialog";
 import { IconDetails, SearchField } from "./PoolControls";
 // V2: compact dialog/mobile layout; reconsider separate capture group and visible informative loss.
@@ -391,7 +392,7 @@ export default function Formulas({
         </h3>
         <div className="formula-line-frame">
           <div className="formula-table-scroll">
-            <table>
+            <ResponsiveTable>
               <thead>
                 <tr>
                   <th>{kind === "ingredient" ? "Materia prima" : "Empaque"}</th>
@@ -662,7 +663,7 @@ export default function Formulas({
                   {!readOnly && <td />}
                 </tr>
               </tfoot>
-            </table>
+            </ResponsiveTable>
           </div>
           {!lines.some((l) => l.line_kind === kind) && (
             <p className="muted">
@@ -760,7 +761,7 @@ export default function Formulas({
           />
         </div>
         <div className="formula-table-scroll formula-gallery">
-          <table>
+          <ResponsiveTable>
             <thead>
               <tr>
                 <th>Código</th>
@@ -851,7 +852,7 @@ export default function Formulas({
                 </tr>
               ))}
             </tbody>
-          </table>
+          </ResponsiveTable>
         </div>
         {!filtered.length && (
           <p className="empty">

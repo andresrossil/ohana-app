@@ -1,3 +1,4 @@
+import ResponsiveTable from "./ResponsiveTable";
 import { SearchField } from "./PoolControls";
 import CatalogBadge from "./CatalogBadge";
 import { AppButton, AppIcon } from "./AppIcon";
@@ -209,7 +210,7 @@ export default function ProductsCatalog({
           origins={origins}
         />
         <div className="table-wrap">
-          <table>
+          <ResponsiveTable>
             <thead>
               <tr>
                 {sortHeader("sku", "SKU")}
@@ -274,7 +275,7 @@ export default function ProductsCatalog({
                 </tr>
               ))}
             </tbody>
-          </table>
+          </ResponsiveTable>
           {!filtered.length && (
             <p className="empty">
               {products.length

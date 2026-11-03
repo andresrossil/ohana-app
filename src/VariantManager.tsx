@@ -1,3 +1,4 @@
+import ResponsiveTable from "./ResponsiveTable";
 import { confirmAction } from "./ConfirmDialog";
 import CatalogBadge from "./CatalogBadge";
 import { AppButton, AppIcon } from "./AppIcon";
@@ -217,7 +218,7 @@ export default function VariantManager({
           </form>
         )}
         <div className="table-wrap">
-          <table>
+          <ResponsiveTable>
             <thead>
               <tr>
                 <th>Variante</th>
@@ -269,7 +270,7 @@ export default function VariantManager({
                 </tr>
               ))}
             </tbody>
-          </table>
+          </ResponsiveTable>
           {!rows.length && (
             <p className="empty">
               Agrega la primera variante para producir o vender este producto.

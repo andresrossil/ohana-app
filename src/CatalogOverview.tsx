@@ -1,3 +1,4 @@
+import ResponsiveTable from "./ResponsiveTable";
 import { SearchField } from "./PoolControls";
 import { AppButton, AppIcon } from "./AppIcon";
 import { useState } from "react";
@@ -127,7 +128,7 @@ export default function CatalogOverview({
           origins={origins}
         />
         <div className="table-wrap">
-          <table>
+          <ResponsiveTable>
             <thead>
               <tr>
                 <th>Tipo</th>
@@ -156,7 +157,7 @@ export default function CatalogOverview({
                 </tr>
               ))}
             </tbody>
-          </table>
+          </ResponsiveTable>
           {!rows.length && (
             <p className="empty">No hay registros para estos filtros.</p>
           )}
