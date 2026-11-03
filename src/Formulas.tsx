@@ -404,6 +404,8 @@ export default function Formulas({
     await state.run(async () => {
       const payload = {
         ...draft,
+        labor_level_id: "",
+        advertising_level_id: "",
         kind: mode,
         confirm_duplicate: confirmDuplicate,
         ingredients: lines.map((line, i) => ({
@@ -1531,9 +1533,6 @@ export default function Formulas({
               <AdditionalCostsPanel
                 quote={extraQuote}
                 items={catalog.additional_costs || []}
-                laborId={draft.labor_level_id || ""}
-                advertisingId={draft.advertising_level_id || ""}
-                onSelect={!readOnly && !state.busy ? field : undefined}
                 overheadLines={draft.overhead_lines || []}
                 onOverheadChange={
                   !readOnly && !state.busy

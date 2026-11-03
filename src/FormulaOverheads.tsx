@@ -2,6 +2,7 @@ import { AppButton } from "./AppIcon";
 import ResponsiveTable from "./ResponsiveTable";
 import DecimalInput from "./DecimalInput";
 import { money, type Row } from "./operations";
+import { costCatalogNames } from "./additional-costs";
 export default function FormulaOverheads({
   items,
   lines,
@@ -15,136 +16,19 @@ export default function FormulaOverheads({
   onChange?: (lines: Row[]) => void;
   historical?: boolean;
 }) {
-  const display = onChange ? lines : quote.overhead_lines || [];
-  const change = (index: number, patch: Row) =>
-    onChange?.(
-      lines.map((line, i) => (i === index ? { ...line, ...patch } : line)),
-    );
-  const amount = (n: unknown, currency = quote.currency) =>
-    n == null ? "Pendiente" : money(n, currency);
+  const legacy = [
+    ...(quote.overhead_lines || []),
+    ...["labor", "advertising"]
+      .filter((k) => quote[k]?.id)
+      .map((k) => ({ ...quote[k], cost_id: quote[k].id, kind: k })),
+  ];
+  const display = onChange ? lines : quote.cost_lines || legacy;
+  const change = (i: number, patch: Row) =>
+    onChange?.(lines.map((l, n) => (n === i ? { ...l, ...patch } : l)));
+  const amount = (v: unknown) =>
+    v == null ? "Pendiente" : money(v, quote.currency);
   return (
     <section className="formula-overheads">
-      <h3>Otros gastos seleccionados</h3>
-      <p className="muted">
-        {historical
-          ? "Cantidades y precios conservados al confirmar el lote."
-          : "Agrega únicamente los conceptos que aplican a esta versión. Se cobran una sola vez por lote y no descuentan inventario."}
-      </p>
-      {display.length > 0 && (
-        <div className="table-wrap">
-          <ResponsiveTable>
-            <thead>
-              <tr>
-                <th>Concepto</th>
-                <th>Cantidad por lote</th>
-                <th>Precio unitario</th>
-                <th>Importe por lote</th>
-                {onChange && <th>Acciones</th>}
-              </tr>
-            </thead>
-            <tbody>
-              {display.map((line: Row, index: number) => {
-                const row = onChange ? quote.overhead_lines?.[index] : line;
-                return (
-                  <tr key={index}>
-                    <td>
-                      {onChange ? (
-                        <select
-                          aria-label={`Gasto fila ${index + 1}`}
-                          value={line.cost_id}
-                          onChange={(e) => {
-                            const item = items.find(
-                              (x) => x.id === e.target.value,
-                            );
-                            change(index, {
-                              cost_id: e.target.value,
-                              quantity:
-                                item && Number(item.quantity) > 0
-                                  ? Number(item.quantity)
-                                  : 1,
-                            });
-                          }}
-                        >
-                          <option value="">Seleccionar concepto</option>
-                          {items
-                            .filter(
-                              (x) =>
-                                x.kind === "overhead" &&
-                                (x.active || x.id === line.cost_id) &&
-                                !lines.some(
-                                  (other, i) =>
-                                    i !== index && other.cost_id === x.id,
-                                ),
-                            )
-                            .map((x) => (
-                              <option
-                                key={x.id}
-                                value={x.id}
-                                disabled={!x.active}
-                              >
-                                {x.name}
-                                {!x.active ? " · Inactivo" : ""}
-                              </option>
-                            ))}
-                        </select>
-                      ) : (
-                        row.name
-                      )}
-                    </td>
-                    <td>
-                      {onChange ? (
-                        <DecimalInput
-                          aria-label={`Cantidad de gasto fila ${index + 1}`}
-                          type="number"
-                          min="0.00000001"
-                          step="any"
-                          required
-                          value={line.quantity}
-                          onChange={(e) =>
-                            change(index, { quantity: e.target.value })
-                          }
-                        />
-                      ) : (
-                        Number(row.quantity).toLocaleString("es-GT", {
-                          maximumFractionDigits: 2,
-                        })
-                      )}
-                    </td>
-                    <td>
-                      {amount(row?.unit_price, row?.currency || quote.currency)}
-                    </td>
-                    <td>
-                      {amount(row?.total, row?.currency || quote.currency)}
-                    </td>
-                    {onChange && (
-                      <td className="actions">
-                        <AppButton
-                          type="button"
-                          className="secondary"
-                          iconKey="action.delete"
-                          aria-label={`Quitar gasto fila ${index + 1}`}
-                          onClick={() =>
-                            onChange(lines.filter((_, i) => i !== index))
-                          }
-                        >
-                          Quitar gasto
-                        </AppButton>
-                      </td>
-                    )}
-                  </tr>
-                );
-              })}
-            </tbody>
-          </ResponsiveTable>
-        </div>
-      )}
-      {!display.length && (
-        <p className="muted">
-          {historical && !quote.overhead_lines
-            ? "Importe histórico aplicado conservado sin desglose de conceptos."
-            : "Sin gastos seleccionados."}
-        </p>
-      )}
       <div className="form-actions">
         {onChange && (
           <AppButton
@@ -153,21 +37,188 @@ export default function FormulaOverheads({
             iconKey="action.add"
             disabled={
               lines.length >= 100 ||
-              lines.some((x) => !x.cost_id) ||
+              lines.some((l) => !l.cost_id) ||
               !items.some(
-                (x) =>
-                  x.kind === "overhead" &&
-                  x.active &&
-                  !lines.some((line) => line.cost_id === x.id),
+                (x) => x.active && !lines.some((l) => l.cost_id === x.id),
               )
             }
-            onClick={() => onChange([...lines, { cost_id: "", quantity: 1 }])}
+            onClick={() =>
+              onChange([...lines, { cost_id: "", quantity: 1, percent: null }])
+            }
           >
-            Agregar gasto
+            Agregar costo
           </AppButton>
         )}
-        <strong>Total por lote: {amount(quote.overhead_total)}</strong>
       </div>
+      <div className="table-wrap">
+        <ResponsiveTable>
+          <thead>
+            <tr>
+              <th>Concepto</th>
+              <th>Cantidad / porcentaje</th>
+              <th>Base de cálculo</th>
+              <th>Importe por lote</th>
+              {onChange && <th>Acciones</th>}
+            </tr>
+          </thead>
+          <tbody>
+            {display.map((line: Row, i: number) => {
+              const item = items.find((x) => x.id === line.cost_id),
+                row = onChange
+                  ? quote.cost_lines?.find(
+                      (x: Row) => x.cost_id === line.cost_id,
+                    )
+                  : line,
+                fixed = (item?.kind || row?.kind || "overhead") === "overhead";
+              return (
+                <tr key={line.cost_id || i}>
+                  <td>
+                    {onChange ? (
+                      <select
+                        aria-label={`Costo fila ${i + 1}`}
+                        required
+                        value={line.cost_id}
+                        onChange={(e) => {
+                          const selected = items.find(
+                            (x) => x.id === e.target.value,
+                          );
+                          change(i, {
+                            cost_id: e.target.value,
+                            quantity: Number(selected?.quantity) || 1,
+                            percent: null,
+                          });
+                        }}
+                      >
+                        <option value="">Seleccionar concepto</option>
+                        {Object.entries(costCatalogNames).map(
+                          ([kind, name]) => (
+                            <optgroup key={kind} label={name}>
+                              {items
+                                .filter(
+                                  (x) =>
+                                    x.kind === kind &&
+                                    (x.active || x.id === line.cost_id) &&
+                                    !lines.some(
+                                      (l, n) => n !== i && l.cost_id === x.id,
+                                    ),
+                                )
+                                .map((x) => (
+                                  <option
+                                    key={x.id}
+                                    value={x.id}
+                                    disabled={!x.active}
+                                  >
+                                    {x.name}
+                                    {!x.active ? " · Inactivo" : ""}
+                                  </option>
+                                ))}
+                            </optgroup>
+                          ),
+                        )}
+                      </select>
+                    ) : (
+                      <>
+                        {costCatalogNames[row?.kind || "overhead"]} ·{" "}
+                        {row?.name}
+                      </>
+                    )}
+                  </td>
+                  <td>
+                    {onChange ? (
+                      <>
+                        <DecimalInput
+                          aria-label={`Valor costo ${i + 1}`}
+                          type="number"
+                          min={fixed ? "0.00000001" : "0"}
+                          max={fixed ? undefined : "100"}
+                          step="any"
+                          required
+                          value={
+                            fixed
+                              ? line.quantity
+                              : (line.percent ?? item?.percent ?? "")
+                          }
+                          onChange={(e) =>
+                            change(
+                              i,
+                              fixed
+                                ? { quantity: e.target.value }
+                                : { percent: e.target.value },
+                            )
+                          }
+                        />
+                        <small>
+                          {fixed
+                            ? "Una vez por lote"
+                            : "% del precio base × unidades"}
+                        </small>
+                        {!fixed && line.percent != null && (
+                          <AppButton
+                            type="button"
+                            className="secondary"
+                            iconKey="action.refresh"
+                            onClick={() => change(i, { percent: null })}
+                          >
+                            Usar catálogo
+                          </AppButton>
+                        )}
+                      </>
+                    ) : fixed ? (
+                      row?.quantity
+                    ) : (
+                      `${row?.percent ?? "—"} %`
+                    )}
+                  </td>
+                  <td>
+                    {fixed
+                      ? amount(row?.unit_price)
+                      : quote.sale_price == null
+                        ? "Pendiente de precio"
+                        : amount(quote.sale_price)}
+                  </td>
+                  <td>
+                    {!fixed && quote.sale_price == null
+                      ? "Pendiente de precio"
+                      : amount(row?.total)}
+                  </td>
+                  {onChange && (
+                    <td className="actions">
+                      <AppButton
+                        type="button"
+                        className="secondary"
+                        iconKey="action.delete"
+                        onClick={() =>
+                          onChange(lines.filter((_, n) => n !== i))
+                        }
+                      >
+                        Quitar
+                      </AppButton>
+                    </td>
+                  )}
+                </tr>
+              );
+            })}
+            {!display.length && (
+              <tr>
+                <td colSpan={onChange ? 5 : 4}>
+                  Sin costos adicionales seleccionados.
+                </td>
+              </tr>
+            )}
+          </tbody>
+          <tfoot>
+            <tr>
+              <th colSpan={onChange ? 4 : 3}>
+                Total de costos adicionales por lote
+              </th>
+              <td>{amount(quote.additional_total)}</td>
+            </tr>
+          </tfoot>
+        </ResponsiveTable>
+      </div>
+      {historical && (
+        <small>Importes históricos conservados al confirmar el lote.</small>
+      )}
     </section>
   );
 }

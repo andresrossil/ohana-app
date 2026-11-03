@@ -166,21 +166,10 @@ export default function VariantManager({
                 defaultValue={edit?.weight_max}
               />
             </label>
-            <label>
-              Precio de venta
-              <input
-                name="price"
-                type="number"
-                required
-                min="0"
-                step="0.01"
-                defaultValue={edit?.price}
-              />
-              <small>
-                {edit?.currency || "Moneda actual de la empresa"}. Al guardar se
-                usa la moneda actual.
-              </small>
-            </label>
+            <p className="form-wide muted">
+              Los precios de venta se administran en Configuración → Listas de
+              precios.
+            </p>
             <label>
               <input
                 name="active"
@@ -253,7 +242,11 @@ export default function VariantManager({
                       ? `${r.weight_min}–${r.weight_max} g`
                       : "Sin rango"}
                   </td>
-                  <td>{money(r.price, r.currency)}</td>
+                  <td>
+                    {r.price == null
+                      ? "Pendiente de precio"
+                      : money(r.price, r.currency)}
+                  </td>
                   <td>
                     {r.available} / {r.blocked}
                   </td>

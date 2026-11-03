@@ -11,65 +11,54 @@ export function additionalCosts(
   currency: string,
   count: unknown,
   variant?: Row,
-  laborId?: string,
-  advertisingId?: string,
-  selectedExpenses: Row[] = [],
+  _laborId?: string,
+  _advertisingId?: string,
+  selected: Row[] = [],
 ) {
   const units = numeric(count),
     n = units != null && units > 0 ? units : null;
-  const expenses = selectedExpenses.map((line) => {
-    const item = items.find(
-      (x) => x.kind === "overhead" && x.id === line.cost_id,
-    );
-    const qty = numeric(line.quantity);
+  const price = variant?.currency === currency ? numeric(variant.price) : null;
+  const lines = selected.map((line) => {
+    const item = items.find((x) => x.id === line.cost_id),
+      quantity = numeric(line.quantity),
+      percent = numeric(line.percent) ?? numeric(item?.percent);
+    const fixed = item?.kind === "overhead";
     return {
       cost_id: line.cost_id,
-      name: item?.name || "Concepto no disponible",
-      quantity: qty,
-      unit_price: item ? numeric(item.unit_price) : null,
-      currency: item?.currency,
-      total:
-        item && qty !== null && qty > 0 && item.currency === currency
-          ? qty * Number(item.unit_price)
-          : null,
+      kind: item?.kind,
+      name: item?.name || "Selecciona un concepto",
+      quantity,
+      percent: fixed ? null : percent,
+      unit_price: fixed ? numeric(item!.unit_price) : null,
+      currency: fixed ? item!.currency : currency,
+      total: !item
+        ? null
+        : fixed
+          ? quantity !== null && quantity > 0 && item.currency === currency
+            ? quantity * Number(item.unit_price)
+            : null
+          : price !== null && percent !== null && n !== null
+            ? ((price * percent) / 100) * n
+            : null,
     };
   });
-  const overhead = expenses.every((x) => x.total !== null)
-    ? expenses.reduce((sum, x) => sum + x.total!, 0)
-    : null;
-  const price = variant?.currency === currency ? numeric(variant.price) : null;
-  const level = (id: string | undefined, kind: string) => {
-    const row = items.find((x) => x.id === id && x.kind === kind);
-    const unit = !id
-      ? 0
-      : row && price !== null
-        ? (price * Number(row.percent)) / 100
-        : null;
-    return {
-      id: id || null,
-      name: row?.name,
-      percent: row?.percent ?? null,
-      unit,
-      total: !id ? 0 : unit !== null && n !== null ? unit * n : null,
-    };
-  };
-  const labor = level(laborId, "labor"),
-    advertising = level(advertisingId, "advertising");
-  const total =
-    overhead !== null && labor.total !== null && advertising.total !== null
-      ? overhead + labor.total + advertising.total
+  const sum = (rows: Row[]) =>
+    rows.every((x) => x.total != null)
+      ? rows.reduce((s, x) => s + x.total, 0)
       : null;
+  const overheadLines = lines.filter((x) => x.kind === "overhead"),
+    overhead = sum(overheadLines),
+    total = sum(lines);
   return {
     currency,
     estimated_units: n,
+    unit_basis_count: n,
     sale_price: price,
     variant_id: variant?.id || null,
+    cost_lines: lines,
+    overhead_lines: overheadLines,
     overhead_total: overhead,
-    overhead_lines: expenses,
-    unit_basis_count: n,
     overhead_unit: overhead !== null && n !== null ? overhead / n : null,
-    labor,
-    advertising,
     additional_total: total,
     additional_unit: total !== null && n !== null ? total / n : null,
   };

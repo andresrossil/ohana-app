@@ -39,6 +39,7 @@ const BusinessPartners = lazy(() => import("./BusinessPartners"));
 const Sales = lazy(() => import("./Sales"));
 const PublicStore = lazy(() => import("./PublicStore"));
 const AdditionalCostSettings = lazy(() => import("./AdditionalCostSettings"));
+const PriceLists = lazy(() => import("./PriceLists"));
 const StoreSettings = lazy(() => import("./StoreSettings"));
 type Tab = "raw_materials" | "suppliers" | "presentations" | "units";
 type Catalog = Record<Tab, Row[]> & { products: Row[]; catalog_origins: Row[] };
@@ -752,6 +753,7 @@ function App() {
                       ["overhead", "Otros gastos"],
                       ["labor", "Mano de obra"],
                       ["advertising", "Publicidad"],
+                      ["prices", "Listas de precios"],
                     ]
                       .filter(
                         ([key]) =>
@@ -781,6 +783,7 @@ function App() {
                                 "overhead",
                                 "labor",
                                 "advertising",
+                                "prices",
                               ].includes(key)
                             )
                               setTab(key as Tab);
@@ -823,6 +826,13 @@ function App() {
                         onDirty={setSettingsDirty}
                       />
                     )}
+                  {configView === "prices" && activeCompany?.manage && (
+                    <PriceLists
+                      key={company}
+                      company={company}
+                      onDirty={setSettingsDirty}
+                    />
+                  )}
                   {configView === "store" && activeCompany?.manage && (
                     <StoreSettings
                       key={company}

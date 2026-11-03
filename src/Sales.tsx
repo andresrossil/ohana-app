@@ -1,4 +1,5 @@
 import ResponsiveTable from "./ResponsiveTable";
+import DecimalInput from "./DecimalInput";
 import { SearchField } from "./PoolControls";
 import { AppButton, AppIcon } from "./AppIcon";
 import { useEffect, useState } from "react";
@@ -132,8 +133,11 @@ export default function Sales({
                           (sum, l) =>
                             sum +
                             Number(
-                              data.variants.find((v: Row) => v.id === l.variant)
-                                ?.price || 0,
+                              l.unit_price ??
+                                data.variants.find(
+                                  (v: Row) => v.id === l.variant,
+                                )?.price ??
+                                0,
                             ) *
                               l.quantity,
                           0,
@@ -141,6 +145,7 @@ export default function Sales({
                         items: lines.map((l) => ({
                           variant: l.variant,
                           quantity: l.quantity,
+                          unit_price: l.unit_price,
                         })),
                         delivery: "pickup",
                         payment: f.get("payment"),
@@ -230,7 +235,14 @@ export default function Sales({
                             setLines((old) =>
                               old.map((x) =>
                                 x.key === l.key
-                                  ? { ...x, variant: e.target.value }
+                                  ? {
+                                      ...x,
+                                      variant: e.target.value,
+                                      unit_price:
+                                        data.variants.find(
+                                          (v: Row) => v.id === e.target.value,
+                                        )?.price ?? "",
+                                    }
                                   : x,
                               ),
                             )
@@ -242,8 +254,10 @@ export default function Sales({
                             .map((v: Row) => (
                               <option key={v.id} value={v.id}>
                                 {v.sku} · {v.name} ·{" "}
-                                {money(v.price, v.currency)} · {v.available}{" "}
-                                disponibles
+                                {v.price == null
+                                  ? "Pendiente de precio"
+                                  : money(v.price, v.currency)}{" "}
+                                · {v.available} disponibles
                               </option>
                             ))}
                         </select>
@@ -267,6 +281,29 @@ export default function Sales({
                             )
                           }
                         />
+                      </label>
+                      <label>
+                        Precio realmente vendido · {currency}
+                        <DecimalInput
+                          type="number"
+                          min="0"
+                          step="any"
+                          required
+                          value={l.unit_price ?? ""}
+                          onChange={(e) =>
+                            setLines((old) =>
+                              old.map((x) =>
+                                x.key === l.key
+                                  ? { ...x, unit_price: e.target.value }
+                                  : x,
+                              ),
+                            )
+                          }
+                        />
+                        <small>
+                          Sugerido desde la lista base. Puedes editarlo para
+                          esta venta.
+                        </small>
                       </label>
                       {lines.length > 1 && (
                         <AppButton
@@ -324,8 +361,10 @@ export default function Sales({
                         (sum, l) =>
                           sum +
                           Number(
-                            data.variants.find((v: Row) => v.id === l.variant)
-                              ?.price || 0,
+                            l.unit_price ??
+                              data.variants.find((v: Row) => v.id === l.variant)
+                                ?.price ??
+                              0,
                           ) *
                             l.quantity,
                         0,
