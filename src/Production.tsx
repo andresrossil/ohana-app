@@ -156,6 +156,7 @@ function ProductionBatches({
               )}
             </>
             <form
+              data-dirty-managed
               onChange={() => setDirty(true)}
               onSubmit={(e) => {
                 e.preventDefault();

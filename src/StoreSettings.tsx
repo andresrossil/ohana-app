@@ -52,6 +52,7 @@ export default function StoreSettings({
       </p>
       {config && (
         <form
+          data-dirty-managed
           onChange={() => setDirty(true)}
           onSubmit={(e) => {
             e.preventDefault();

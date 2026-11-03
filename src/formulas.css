@@ -166,3 +166,14 @@
     min-height: 42px;
   }
 }
+.formula-dialog details[hidden] {
+  display: none !important;
+}
+.formula-line-frame {
+  border: 1px solid var(--admin-border);
+  border-radius: 8px;
+  padding: 8px;
+}
+.formula-line-frame > .formula-table-scroll {
+  border: 0;
+}

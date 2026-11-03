@@ -1,3 +1,4 @@
+import { operationStarted, operationFinished } from "./navigation-protection";
 import { supabase as db } from "./client";
 import { useEffect, useState } from "react";
 export type Row = Record<string, any>;
@@ -101,15 +102,19 @@ export function useOperation(company: string, module: string) {
   }, [company, module]);
   async function run(work: () => Promise<void>) {
     if (busy) return;
+    operationStarted();
+    let succeeded = false;
     setBusy(true);
     setError("");
     setNotice("");
     try {
       await work();
+      succeeded = true;
     } catch (e: any) {
       setError(e.message || "No se pudo completar la operación");
     } finally {
       setBusy(false);
+      operationFinished(succeeded);
     }
   }
   return { canWrite, error, setError, busy, notice, setNotice, run };

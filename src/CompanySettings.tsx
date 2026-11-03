@@ -222,7 +222,12 @@ function CompanyProfile({
   if (loading)
     return <p role="status">Cargando configuración de la empresa…</p>;
   return (
-    <form className="company-settings" onSubmit={save}>
+    <form
+      data-dirty-managed
+      aria-busy={busy}
+      className="company-settings"
+      onSubmit={save}
+    >
       <h2>{appearance ? "Apariencia de la empresa" : "Datos de empresa"}</h2>
       {!canManage && (
         <p className="sheet-notice">

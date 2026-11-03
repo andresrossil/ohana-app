@@ -43,16 +43,25 @@ export default function Sidebar({
   return (
     <aside className={`app-sidebar ${open ? "menu-open" : ""}`}>
       <div className="sidebar-top">
-        {companies.find((c) => c.id === company) ? (
-          <CompanyLogo company={companies.find((c) => c.id === company)!} />
-        ) : (
-          <div className="brand brand-sidebar">
-            <img
-              src={`${import.meta.env.BASE_URL}brand/ohana-logo.png`}
-              alt="OHANA"
-            />
-          </div>
-        )}
+        <button
+          className="brand-home"
+          type="button"
+          aria-label="Ir a Inicio"
+          onClick={() => {
+            if (onNavigate("dashboard")) setOpen(false);
+          }}
+        >
+          {companies.find((c) => c.id === company) ? (
+            <CompanyLogo company={companies.find((c) => c.id === company)!} />
+          ) : (
+            <div className="brand brand-sidebar">
+              <img
+                src={`${import.meta.env.BASE_URL}brand/ohana-logo.png`}
+                alt="OHANA"
+              />
+            </div>
+          )}
+        </button>
         <button
           className="menu-toggle secondary"
           aria-label={open ? "Cerrar menú" : "Abrir menú"}

@@ -1,3 +1,6 @@
+import AutoTextarea from "./AutoTextarea";
+import CatalogBadge from "./CatalogBadge";
+import { useNavigationProtection } from "./navigation-protection";
 import { AppButton, AppIcon } from "./AppIcon";
 import { IconProvider } from "./AppIcon";
 import React, { Suspense, lazy, useEffect, useRef, useState } from "react";
@@ -55,6 +58,10 @@ const money = (n: number, c = "GTQ") =>
     maximumFractionDigits: 4,
   }).format(n);
 function App() {
+  const protection = useNavigationProtection();
+  const [pendingNavigation, setPendingNavigation] = useState<Section | null>(
+    null,
+  );
   const [session, setSession] = useState<Session | null>(null),
     [ready, setReady] = useState(false),
     [companies, setCompanies] = useState<Row[]>([]),
@@ -92,6 +99,10 @@ function App() {
     [canCreate, setCanCreate] = useState(false),
     [pickerCorp, setPickerCorp] = useState(""),
     [settingsDirty, setSettingsDirty] = useState(false);
+  useEffect(() => {
+    protection.clear();
+    setPendingNavigation(null);
+  }, [company, session?.user.id]);
   const authIdentity = useRef<string | null>(null);
   const contextVersion = useRef(0);
   const activeCompany = companies.find((c) => c.id === company);
@@ -299,6 +310,12 @@ function App() {
   async function save(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!canWrite) return;
+    if (tab === "raw_materials" && edit?.id && sheetDirty) {
+      setError(
+        "Guarda o descarta primero los cambios de presentaciones y precios.",
+      );
+      return;
+    }
     setBusy(true);
     setError("");
     const f = new FormData(e.currentTarget);
@@ -409,16 +426,26 @@ function App() {
   ) => (
     <label>
       {title}
-      <input
-        name={key}
-        type={type}
-        required={required}
-        defaultValue={edit?.[key] ?? ""}
-        readOnly={locked}
-        min={type === "number" ? "0.00000001" : undefined}
-        step={type === "number" ? "any" : undefined}
-        maxLength={type === "text" ? 160 : undefined}
-      />
+      {tab === "raw_materials" && key === "name" ? (
+        <AutoTextarea
+          name={key}
+          required={required}
+          maxLength={160}
+          defaultValue={edit?.[key] ?? ""}
+          readOnly={locked}
+        />
+      ) : (
+        <input
+          name={key}
+          type={type}
+          required={required}
+          defaultValue={edit?.[key] ?? ""}
+          readOnly={locked}
+          min={type === "number" ? "0.00000001" : undefined}
+          step={type === "number" ? "any" : undefined}
+          maxLength={type === "text" ? 160 : undefined}
+        />
+      )}
     </label>
   );
   if (confirmation)
@@ -565,8 +592,18 @@ function App() {
             if (leaveSheet()) chooseCompany(value);
           }}
           onNavigate={(next) => {
-            if (next === section) return true;
-            if (!leaveSheet()) return false;
+            if (next === section && edit === undefined && !importOpen)
+              return true;
+            if (
+              sheetDirty ||
+              settingsDirty ||
+              protection.dirty() ||
+              protection.busy() ||
+              busy
+            ) {
+              setPendingNavigation(next);
+              return false;
+            }
             setSection(next);
             if (next === "settings" && !activeCompany?.manage)
               setConfigView("origins");
@@ -949,6 +986,37 @@ function App() {
                   </section>
                   {tab === "raw_materials" && (
                     <div className="sheet-view-switch">
+                      {canWrite && (
+                        <AppButton
+                          disabled={busy}
+                          onClick={async () => {
+                            if (
+                              !window.confirm(
+                                "¿Generar los SKU faltantes? Se conservarán los existentes. Solo se incluyen materiales y empaques con clasificación definida.",
+                              )
+                            )
+                              return;
+                            setBusy(true);
+                            try {
+                              const r = await db.rpc(
+                                "generate_missing_material_skus",
+                                { p_company: company },
+                              );
+                              if (r.error) throw r.error;
+                              setImportNotice(
+                                `SKU generados: ${r.data.generated}. Sin clasificación: ${r.data.unclassified}.`,
+                              );
+                              await load();
+                            } catch (e: any) {
+                              setError(e.message);
+                            } finally {
+                              setBusy(false);
+                            }
+                          }}
+                        >
+                          Generar SKU faltantes
+                        </AppButton>
+                      )}
                       <AppButton
                         className="secondary"
                         onClick={() => {
@@ -1059,9 +1127,13 @@ function App() {
                                           {r.classification || "Pendiente"}
                                         </td>
                                         <td>
-                                          {data.catalog_origins.find(
-                                            (o) => o.id === r.origin_id,
-                                          )?.name || "Pendiente"}
+                                          <CatalogBadge
+                                            origin={
+                                              data.catalog_origins.find(
+                                                (o) => o.id === r.origin_id,
+                                              )?.name || "Pendiente"
+                                            }
+                                          />
                                         </td>
                                         <td>{r.barcode || "—"}</td>
                                       </>
@@ -1140,7 +1212,7 @@ function App() {
                                             (!r.active ? "inactive" : "")
                                           }
                                         >
-                                          {r.active ? "Activo" : "Archivado"}
+                                          <CatalogBadge active={r.active} />
                                         </span>
                                       )}
                                     </td>
@@ -1221,13 +1293,64 @@ function App() {
             }}
           />
         )}
+        {pendingNavigation && (
+          <div className="overlay" style={{zIndex:10000}}>
+            <section
+              className="modal"
+              role="dialog"
+              aria-modal="true"
+              aria-label="Cambios sin guardar"
+            >
+              <h2>¿Salir de esta pantalla?</h2>
+              <p>
+                {protection.busy() || busy
+                  ? "Hay una operación en curso. Espera a que termine antes de salir."
+                  : "Hay cambios sin guardar o datos pendientes de confirmar."}
+              </p>
+              <div className="form-actions">
+                <AppButton
+                  type="button"
+                  onClick={() => setPendingNavigation(null)}
+                >
+                  Permanecer
+                </AppButton>
+                <AppButton
+                  type="button"
+                  className="secondary"
+                  onClick={() => {
+                    if (protection.busy() || busy) {
+                      setError("Espera a que termine la operación en curso.");
+                      return;
+                    }
+                    const next = pendingNavigation;
+                    protection.clear();
+                    setPendingNavigation(null);
+                    setEdit(undefined);
+                    setImportOpen(false);
+                    setHistory(null);
+                    setSheetDirty(false);
+                    setSettingsDirty(false);
+                    setSection(next);
+                    if (next === "materials") setTab("raw_materials");
+                  }}
+                >
+                  Salir sin guardar
+                </AppButton>
+              </div>
+            </section>
+          </div>
+        )}
         {edit !== undefined && (
           <div className="overlay">
             <section
               role="dialog"
               aria-modal="true"
               aria-label="Editar catálogo"
-              className="modal"
+              className={
+                tab === "raw_materials" && edit?.id
+                  ? "modal material-editor-modal"
+                  : "modal"
+              }
             >
               <AppButton
                 className="close"
@@ -1239,7 +1362,7 @@ function App() {
               </AppButton>
               <p className="eyebrow">{labels[tab]}</p>
               <h2>{edit ? "Editar registro" : "Un nuevo comienzo"}</h2>
-              <form onSubmit={save}>
+              <form onSubmit={save} aria-busy={busy}>
                 {input("name", "Nombre", "text", true)}
                 {tab === "raw_materials" && (
                   <>
@@ -1343,7 +1466,10 @@ function App() {
                 {(tab === "raw_materials" || tab === "suppliers") && (
                   <label>
                     Notas
-                    <textarea name="notes" defaultValue={edit?.notes || ""} />
+                    <AutoTextarea
+                      name="notes"
+                      defaultValue={edit?.notes || ""}
+                    />
                   </label>
                 )}
                 {edit && (
@@ -1365,6 +1491,18 @@ function App() {
                   {busy ? "Guardando…" : "Guardar"}
                 </AppButton>
               </form>
+              {tab === "raw_materials" && edit?.id && (
+                <MaterialSheet
+                  key={edit.id}
+                  materialId={edit.id}
+                  company={company}
+                  currency={activeCompany?.currency || "GTQ"}
+                  canWrite={canWrite}
+                  catalog={data}
+                  onSaved={load}
+                  onDirty={setSheetDirty}
+                />
+              )}
             </section>
           </div>
         )}

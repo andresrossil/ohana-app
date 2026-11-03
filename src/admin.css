@@ -478,3 +478,60 @@
   outline: 2px solid var(--admin-primary);
   outline-offset: 4px;
 }
+.catalog-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  white-space: normal;
+}
+.badge-active,
+.badge-purchased {
+  color: #146534;
+  background: #e8f5eb;
+}
+.badge-archived {
+  color: #791f29;
+  background: #fbecee;
+}
+.badge-manufactured {
+  color: #193f72;
+  background: #e9f0fb;
+}
+.badge-pending {
+  color: var(--admin-muted);
+  background: var(--admin-secondary);
+}
+.shell .brand-home {
+  display: block;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  max-width: 100%;
+  color: inherit;
+}
+.shell .brand-home:hover {
+  background: var(--admin-secondary);
+}
+.shell .material-editor-modal {
+  width: min(1160px, calc(100vw - 32px));
+  max-width: 1160px;
+}
+.shell .sheet-panel textarea {
+  width: 100%;
+  min-width: 160px;
+  min-height: 38px;
+  box-sizing: border-box;
+}
+.formula-gallery {
+  max-height: 55dvh;
+  overflow: auto;
+}
+.formula-gallery thead {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--admin-secondary);
+}

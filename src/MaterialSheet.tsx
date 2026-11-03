@@ -1,3 +1,4 @@
+import AutoTextarea from "./AutoTextarea";
 import { AppButton, AppIcon } from "./AppIcon";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ClipboardEvent, KeyboardEvent } from "react";
@@ -39,6 +40,7 @@ import { readSheet } from "./sheet-repository";
 import type { SheetSnapshot } from "./sheet-repository";
 type Props = {
   company: string;
+  materialId?: string;
   currency?: string;
   canWrite: boolean;
   catalog: {
@@ -70,10 +72,17 @@ const numeric = (value: number | null) =>
     : new Intl.NumberFormat("es-GT", { maximumFractionDigits: 6 }).format(
         value,
       );
-function VsIcon({ variation }: { variation: number | null }) {
-  const state = comparison(variation),
-    label =
-      state === "lower"
+function VsIcon({
+  variation,
+  noPrevious,
+}: {
+  variation: number | null;
+  noPrevious: boolean;
+}) {
+  const state = noPrevious ? "lower" : comparison(variation),
+    label = noPrevious
+      ? "Sin precio anterior registrado"
+      : state === "lower"
         ? "Precio menor al anterior"
         : state === "higher"
           ? "Precio mayor al anterior"
@@ -113,6 +122,7 @@ function VsIcon({ variation }: { variation: number | null }) {
 }
 export default function MaterialSheet({
   company,
+  materialId,
   currency = "GTQ",
   canWrite,
   catalog,
@@ -132,7 +142,24 @@ export default function MaterialSheet({
     return data;
   },
 }: Props) {
-  const blankRow = () => ({ ...coreBlankRow(), currency });
+  const blankRow = () => {
+    const row = { ...coreBlankRow(), currency };
+    if (materialId) {
+      const m = catalog.raw_materials.find((m) => m.id === materialId);
+      if (m) {
+        row.materialId = m.id;
+        row.cells[2] = m.name;
+        row.cells[5] =
+          catalog.units.find((u) => u.id === m.unit_id)?.symbol || "";
+        return hydrateIdentity(
+          row,
+          catalog.raw_materials,
+          catalog.catalog_origins || [],
+        );
+      }
+    }
+    return row;
+  };
   const importing = mode === "import";
   const [rows, setRows] = useState<SheetRow[]>([]),
     [history, setHistory] = useState<CatalogRow[]>([]),
@@ -196,7 +223,10 @@ export default function MaterialSheet({
       const { sheet, history: all } = await readSnapshot(company, !importing);
       setHistory(all);
       setRows(
-        (importing ? [] : sheet).map((r) =>
+        (importing
+          ? []
+          : sheet.filter((r) => !materialId || r.raw_material_id === materialId)
+        ).map((r) =>
           hydrateIdentity(
             {
               key: r.id,
@@ -242,7 +272,7 @@ export default function MaterialSheet({
   }
   useEffect(() => {
     void load();
-  }, [company, importing]);
+  }, [company, importing, materialId]);
   useEffect(() => {
     if (importing && !loading)
       table.current
@@ -275,9 +305,9 @@ export default function MaterialSheet({
   }, [preview]);
   const dirty = rows.filter((r) => r.dirty);
   useEffect(() => {
-    onDirty(dirty.length > 0);
+    onDirty(dirty.length > 0 || busy || preview);
     return () => onDirty(false);
-  }, [dirty.length, onDirty]);
+  }, [dirty.length, busy, preview, onDirty]);
   const materialIds = useMemo(
     () => new Map(materials.map((m) => [normalize(m.name), m.id])),
     [materials],
@@ -994,7 +1024,11 @@ export default function MaterialSheet({
         <>
           <div className="sheet-heading">
             <div>
-              <h2>Materiales · hoja de trabajo</h2>
+              <h2>
+                {materialId
+                  ? "Presentaciones, proveedores y precios del material"
+                  : "Materiales · hoja de trabajo"}
+              </h2>
               <p>
                 Una fila por presentación. Selecciona una celda y pega desde
                 Excel. Arrastra o usa Mayús + clic para seleccionar un rango.
@@ -1258,6 +1292,16 @@ export default function MaterialSheet({
                               >
                                 {selectOptions(visualOrder[ci], shown)}
                               </select>
+                            ) : [2, 6].includes(visualOrder[ci]) ? (
+                              <AutoTextarea
+                                data-row={ri}
+                                data-col={ci}
+                                aria-label={`Fila ${ri + 1} ${col}`}
+                                value={shown}
+                                disabled={busy}
+                                onFocus={() => select({ row: ri, col: ci })}
+                                onChange={(e) => change(ri, ci, e.target.value)}
+                              />
                             ) : (
                               <input
                                 data-row={ri}
@@ -1296,7 +1340,12 @@ export default function MaterialSheet({
                               }}
                             >
                               {visualOrder[ci] === 9 ? (
-                                <VsIcon variation={result(r).variation} />
+                                <VsIcon
+                                  variation={result(r).variation}
+                                  noPrevious={
+                                    result(r).previousDisplay === null
+                                  }
+                                />
                               ) : (
                                 shown || "—"
                               )}
@@ -1482,7 +1531,10 @@ export default function MaterialSheet({
                     ))}
                     <p>
                       Precio UN: {numeric(calc.current)} · VS:{" "}
-                      <VsIcon variation={calc.variation} />{" "}
+                      <VsIcon
+                        variation={calc.variation}
+                        noPrevious={calc.previousDisplay === null}
+                      />{" "}
                       {numeric(calc.variation)}
                       {calc.unknown
                         ? " · Antecedente sin unidad conocida, no comparable"

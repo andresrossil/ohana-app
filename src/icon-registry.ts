@@ -7,6 +7,17 @@ export type IconEntry = {
 };
 export const iconRegistry: IconEntry[] = [
   ...[
+    ["active", "Activo", "circle-check"],
+    ["archived", "Archivado", "archive"],
+    ["purchased", "Comprado", "shopping-cart"],
+    ["manufactured", "Fabricado", "factory"],
+  ].map(([key, label, icon]) => ({
+    key: "status." + key,
+    label,
+    icon,
+    category: "Estado y origen de catálogo",
+  })),
+  ...[
     ["dashboard", "Inicio", "house"],
     ["materials", "Materiales", "layers"],
     ["products", "Productos", "package"],

@@ -1,3 +1,4 @@
+import CatalogBadge from "./CatalogBadge";
 import { AppButton, AppIcon } from "./AppIcon";
 import { orderedProducts } from "./product-view";
 import ProductImage from "./ProductImage";
@@ -227,13 +228,17 @@ export default function ProductsCatalog({
                     <small>{p.notes}</small>
                   </td>
                   <td>
-                    {origins.find((o) => o.id === p.origin_id)?.name ||
-                      "Pendiente"}
+                    <CatalogBadge
+                      origin={
+                        origins.find((o) => o.id === p.origin_id)?.name ||
+                        "Pendiente"
+                      }
+                    />
                   </td>
                   <td>{p.barcode || "—"}</td>
                   <td>
                     <span className={`status ${p.active ? "" : "inactive"}`}>
-                      {p.active ? "Activo" : "Archivado"}
+                      <CatalogBadge active={p.active} />
                     </span>
                   </td>
                   <td>
@@ -299,7 +304,7 @@ export default function ProductsCatalog({
               ×
             </AppButton>
             <h2>{edit ? "Editar producto" : "Nuevo producto"}</h2>
-            <form onSubmit={save}>
+            <form onSubmit={save} aria-busy={busy}>
               <label>
                 Nombre
                 <input

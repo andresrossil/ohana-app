@@ -124,6 +124,8 @@ export default function AdminAppearance({
         </Suspense>
       ) : (
         <form
+          data-dirty-managed
+          aria-busy={busy}
           className="company-settings admin-appearance"
           onSubmit={(e) => {
             e.preventDefault();

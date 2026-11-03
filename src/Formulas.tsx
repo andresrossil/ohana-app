@@ -1,3 +1,5 @@
+// V2: compact dialog/mobile layout; reconsider separate capture group and visible informative loss.
+import DecimalInput from "./DecimalInput";
 import { useEffect, useRef, useState } from "react";
 import { AppButton, AppIcon } from "./AppIcon";
 import { request } from "./commerce";
@@ -37,7 +39,7 @@ const actionNames: Record<Mode, string> = {
 const number = (n: number | null) =>
   n == null
     ? "—"
-    : new Intl.NumberFormat("es-GT", { maximumFractionDigits: 8 }).format(n);
+    : new Intl.NumberFormat("es-GT", { maximumFractionDigits: 2 }).format(n);
 const blankLine = (
   kind: "ingredient" | "packaging" = "ingredient",
 ): RecipeLine => ({
@@ -59,6 +61,7 @@ const initial = (): Row => ({
   own_reference: "",
   estimated_units: "",
   estimate_unit_id: "",
+  estimate_variant_id: "",
   quantity_per_unit: "",
   loss_enabled: false,
   loss_percent: 5,
@@ -380,296 +383,313 @@ export default function Formulas({
         <h3>
           {kind === "ingredient" ? "Materias primas" : "Materiales de empaque"}
         </h3>
-        <div className="formula-table-scroll">
-          <table>
-            <thead>
-              <tr>
-                <th>{kind === "ingredient" ? "Materia prima" : "Empaque"}</th>
-                <th>Cantidad</th>
-                <th>Unidad</th>
-                <th>% costo MP</th>
-                {!readOnly &&
-                  kind === "ingredient" &&
-                  draft.capture_mode === "percentage" && <th>% composición</th>}
-                <th>Precio por presentación</th>
-                <th>Costo calculado</th>
-                {!readOnly && <th>Acciones</th>}
-              </tr>
-            </thead>
-            <tbody>
-              {lines.map((line, index) => {
-                if (line.line_kind !== kind) return null;
-                const computed = math.rows[index],
-                  material = catalog.materials.find(
-                    (m: Row) => m.id === line.material,
-                  ),
-                  base = catalog.units.find(
-                    (u: Row) => u.id === material?.unit_id,
-                  ),
-                  candidates = catalog.materials.filter(
-                    (m: Row) =>
-                      m.active &&
-                      (kind === "packaging"
-                        ? m.classification === "Material de empaque"
-                        : m.classification !== "Material de empaque"),
-                  );
-                return (
-                  <tr key={line.key}>
-                    <td>
-                      {readOnly ? (
-                        <span>
-                          {material?.name || "Material no disponible"}
-                        </span>
-                      ) : (
-                        <>
-                          <input
-                            disabled={state.busy}
-                            aria-label={`Material fila ${index + 1}`}
-                            list={`formula-material-${line.key}`}
-                            value={
-                              line.search ??
-                              (material ? materialLabel(material) : "")
-                            }
-                            placeholder="Escribe nombre o SKU…"
-                            required
-                            onChange={(e) => pickMaterial(line, e.target.value)}
-                          />
-                          <datalist id={`formula-material-${line.key}`}>
-                            {candidates.map((m: Row) => (
-                              <option key={m.id} value={materialLabel(m)} />
-                            ))}
-                          </datalist>
-                        </>
-                      )}
-                    </td>
-                    <td>
-                      {readOnly ? (
-                        number(
-                          computed.quantity === null
-                            ? null
-                            : computed.quantity * Number(scale),
-                        )
-                      ) : (
-                        <input
-                          disabled={state.busy}
-                          aria-label={`Cantidad fila ${index + 1}`}
-                          type="number"
-                          min="0.00000001"
-                          max="999999999999"
-                          step="any"
-                          required
-                          readOnly={
-                            kind === "ingredient" &&
-                            draft.capture_mode === "percentage"
-                          }
-                          value={
-                            kind === "ingredient" &&
-                            draft.capture_mode === "percentage"
-                              ? (computed.quantity ?? "")
-                              : line.quantity
-                          }
-                          onChange={(e) =>
-                            changeLine(line.key, { quantity: e.target.value })
-                          }
-                        />
-                      )}
-                    </td>
-                    <td>
-                      {readOnly ? (
-                        computed.unit?.symbol
-                      ) : (
-                        <select
-                          disabled={state.busy}
-                          aria-label={`Unidad fila ${index + 1}`}
-                          value={line.unit}
-                          required
-                          onChange={(e) => {
-                            const oldUnit = catalog.units.find(
-                                (u: Row) => u.id === line.unit,
-                              ),
-                              next = catalog.units.find(
-                                (u: Row) => u.id === e.target.value,
-                              );
-                            changeLine(line.key, {
-                              unit: e.target.value,
-                              quantity:
-                                oldUnit && next && line.quantity !== ""
-                                  ? roundQuantity(
-                                      (Number(line.quantity) *
-                                        Number(oldUnit.base_factor)) /
-                                        Number(next.base_factor),
-                                    )
-                                  : line.quantity,
-                            });
-                          }}
-                        >
-                          <option value="">Seleccionar</option>
-                          {catalog.units
-                            .filter(
-                              (u: Row) =>
-                                u.active && u.dimension === base?.dimension,
-                            )
-                            .map((u: Row) => (
-                              <option value={u.id} key={u.id}>
-                                {u.symbol}
-                              </option>
-                            ))}
-                        </select>
-                      )}
-                      {kind === "ingredient" &&
-                        computed.unit?.dimension === "volume" && (
-                          <label className="formula-density">
-                            Densidad (g/ml)
+        <div className="formula-line-frame">
+          <div className="formula-table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>{kind === "ingredient" ? "Materia prima" : "Empaque"}</th>
+                  <th>Cantidad</th>
+                  <th>Unidad</th>
+                  <th>% costo MP</th>
+                  {!readOnly &&
+                    kind === "ingredient" &&
+                    draft.capture_mode === "percentage" && (
+                      <th>% composición</th>
+                    )}
+                  <th>Precio por presentación</th>
+                  <th>Costo calculado</th>
+                  {!readOnly && <th>Acciones</th>}
+                </tr>
+              </thead>
+              <tbody>
+                {lines.map((line, index) => {
+                  if (line.line_kind !== kind) return null;
+                  const computed = math.rows[index],
+                    material = catalog.materials.find(
+                      (m: Row) => m.id === line.material,
+                    ),
+                    base = catalog.units.find(
+                      (u: Row) => u.id === material?.unit_id,
+                    ),
+                    candidates = catalog.materials.filter(
+                      (m: Row) =>
+                        m.active &&
+                        (kind === "packaging"
+                          ? m.classification === "Material de empaque"
+                          : m.classification !== "Material de empaque"),
+                    );
+                  return (
+                    <tr key={line.key}>
+                      <td>
+                        {readOnly ? (
+                          <span>
+                            {material?.name || "Material no disponible"}
+                          </span>
+                        ) : (
+                          <>
                             <input
-                              aria-label={`Densidad fila ${index + 1}`}
+                              disabled={state.busy}
+                              aria-label={`Material fila ${index + 1}`}
+                              list={`formula-material-${line.key}`}
+                              value={
+                                line.search ??
+                                (material ? materialLabel(material) : "")
+                              }
+                              placeholder="Escribe nombre o SKU…"
+                              required
+                              onChange={(e) =>
+                                pickMaterial(line, e.target.value)
+                              }
+                            />
+                            <datalist id={`formula-material-${line.key}`}>
+                              {candidates.map((m: Row) => (
+                                <option key={m.id} value={materialLabel(m)} />
+                              ))}
+                            </datalist>
+                          </>
+                        )}
+                      </td>
+                      <td>
+                        {readOnly ? (
+                          number(
+                            computed.quantity === null
+                              ? null
+                              : computed.quantity * Number(scale),
+                          )
+                        ) : (
+                          <DecimalInput
+                            disabled={state.busy}
+                            aria-label={`Cantidad fila ${index + 1}`}
+                            type="number"
+                            min="0.00000001"
+                            max="999999999999"
+                            step="any"
+                            required
+                            readOnly={
+                              kind === "ingredient" &&
+                              draft.capture_mode === "percentage"
+                            }
+                            value={
+                              kind === "ingredient" &&
+                              draft.capture_mode === "percentage"
+                                ? (computed.quantity ?? "")
+                                : line.quantity
+                            }
+                            onChange={(e) =>
+                              changeLine(line.key, { quantity: e.target.value })
+                            }
+                          />
+                        )}
+                      </td>
+                      <td>
+                        {readOnly ? (
+                          computed.unit?.symbol
+                        ) : (
+                          <select
+                            disabled={state.busy}
+                            aria-label={`Unidad fila ${index + 1}`}
+                            value={line.unit}
+                            required
+                            onChange={(e) => {
+                              const oldUnit = catalog.units.find(
+                                  (u: Row) => u.id === line.unit,
+                                ),
+                                next = catalog.units.find(
+                                  (u: Row) => u.id === e.target.value,
+                                );
+                              changeLine(line.key, {
+                                unit: e.target.value,
+                                quantity:
+                                  oldUnit && next && line.quantity !== ""
+                                    ? roundQuantity(
+                                        (Number(line.quantity) *
+                                          Number(oldUnit.base_factor)) /
+                                          Number(next.base_factor),
+                                      )
+                                    : line.quantity,
+                              });
+                            }}
+                          >
+                            <option value="">Seleccionar</option>
+                            {catalog.units
+                              .filter(
+                                (u: Row) =>
+                                  u.active && u.dimension === base?.dimension,
+                              )
+                              .map((u: Row) => (
+                                <option value={u.id} key={u.id}>
+                                  {u.symbol}
+                                </option>
+                              ))}
+                          </select>
+                        )}
+                        {kind === "ingredient" &&
+                          computed.unit?.dimension === "volume" && (
+                            <label className="formula-density">
+                              Densidad (g/ml)
+                              <DecimalInput
+                                aria-label={`Densidad fila ${index + 1}`}
+                                type="number"
+                                min="0.00000001"
+                                max="999999.99999999"
+                                step="any"
+                                placeholder="Opcional"
+                                readOnly={readOnly}
+                                disabled={state.busy}
+                                value={line.density_g_ml ?? ""}
+                                onChange={(e) =>
+                                  changeLine(line.key, {
+                                    density_g_ml: e.target.value,
+                                  })
+                                }
+                              />
+                            </label>
+                          )}
+                      </td>
+                      <td>
+                        {computed.costPercentage == null
+                          ? "—"
+                          : new Intl.NumberFormat("es-GT", {
+                              maximumFractionDigits: 2,
+                            }).format(computed.costPercentage) + " %"}
+                      </td>
+                      {!readOnly &&
+                        kind === "ingredient" &&
+                        draft.capture_mode === "percentage" && (
+                          <td>
+                            {" "}
+                            <DecimalInput
+                              disabled={state.busy}
+                              aria-label={`Porcentaje fila ${index + 1}`}
                               type="number"
                               min="0.00000001"
-                              max="999999.99999999"
+                              max="100"
                               step="any"
-                              placeholder="Opcional"
-                              readOnly={readOnly}
-                              disabled={state.busy}
-                              value={line.density_g_ml ?? ""}
+                              required
+                              value={line.percentage}
                               onChange={(e) =>
                                 changeLine(line.key, {
-                                  density_g_ml: e.target.value,
+                                  percentage: e.target.value,
                                 })
                               }
                             />
-                          </label>
+                          </td>
                         )}
-                    </td>
-                    <td>
-                      {computed.costPercentage == null
-                        ? "—"
-                        : new Intl.NumberFormat("es-GT", {
-                            maximumFractionDigits: 2,
-                          }).format(computed.costPercentage) + " %"}
-                    </td>
-                    {!readOnly &&
-                      kind === "ingredient" &&
-                      draft.capture_mode === "percentage" && (
+                      <td>
+                        {material?.presentation_price != null ? (
+                          <>
+                            <strong>
+                              {money(
+                                material.presentation_price,
+                                catalog.currency,
+                              )}
+                            </strong>
+                            <small>
+                              {number(Number(material.presentation_quantity))}{" "}
+                              {material.presentation_unit} ·{" "}
+                              {material.presentation_name}
+                            </small>
+                            <small>
+                              {material.price_basis === "undated"
+                                ? "Referencia sin fecha"
+                                : material.effective_on}
+                            </small>
+                          </>
+                        ) : (
+                          <span className="muted">Sin precio utilizable</span>
+                        )}
+                      </td>
+                      <td>
+                        {computed.cost == null ? (
+                          <span className="muted">Sin precio utilizable</span>
+                        ) : (
+                          money(computed.cost, catalog.currency)
+                        )}
+                      </td>
+                      {!readOnly && (
                         <td>
-                          {" "}
-                          <input
+                          <AppButton
+                            type="button"
+                            className="secondary"
                             disabled={state.busy}
-                            aria-label={`Porcentaje fila ${index + 1}`}
-                            type="number"
-                            min="0.00000001"
-                            max="100"
-                            step="any"
-                            required
-                            value={line.percentage}
-                            onChange={(e) =>
-                              changeLine(line.key, {
-                                percentage: e.target.value,
-                              })
-                            }
-                          />
+                            iconKey="action.delete"
+                            aria-label={`Eliminar material fila ${index + 1}`}
+                            onClick={() => {
+                              setLines((old) =>
+                                old.filter((r) => r.key !== line.key),
+                              );
+                              changed();
+                            }}
+                          >
+                            Eliminar
+                          </AppButton>
                         </td>
                       )}
-                    <td>
-                      {material?.presentation_price != null ? (
-                        <>
-                          <strong>
-                            {money(
-                              material.presentation_price,
-                              catalog.currency,
-                            )}
-                          </strong>
-                          <small>
-                            {number(Number(material.presentation_quantity))}{" "}
-                            {material.presentation_unit} ·{" "}
-                            {material.presentation_name}
-                          </small>
-                          <small>
-                            {material.price_basis === "undated"
-                              ? "Referencia sin fecha"
-                              : material.effective_on}
-                          </small>
-                        </>
-                      ) : (
-                        <span className="muted">Sin precio utilizable</span>
-                      )}
-                    </td>
-                    <td>
-                      {computed.cost == null ? (
-                        <span className="muted">Sin precio utilizable</span>
-                      ) : (
-                        money(computed.cost, catalog.currency)
-                      )}
-                    </td>
-                    {!readOnly && (
-                      <td>
-                        <AppButton
-                          type="button"
-                          className="secondary"
-                          disabled={state.busy}
-                          iconKey="action.delete"
-                          aria-label={`Eliminar material fila ${index + 1}`}
-                          onClick={() => {
-                            setLines((old) =>
-                              old.filter((r) => r.key !== line.key),
-                            );
-                            changed();
-                          }}
-                        >
-                          Eliminar
-                        </AppButton>
-                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td
+                    colSpan={
+                      readOnly ||
+                      kind !== "ingredient" ||
+                      draft.capture_mode !== "percentage"
+                        ? 5
+                        : 6
+                    }
+                  >
+                    {kind === "ingredient"
+                      ? "Subtotal de materias primas"
+                      : "Subtotal de empaque"}
+                  </td>
+                  <td>
+                    {money(
+                      kind === "ingredient"
+                        ? math.ingredientCost
+                        : math.packagingCost,
+                      catalog.currency,
                     )}
-                  </tr>
-                );
-              })}
-            </tbody>
-            <tfoot>
-              <tr>
-                <td
-                  colSpan={
-                    readOnly ||
-                    kind !== "ingredient" ||
-                    draft.capture_mode !== "percentage"
-                      ? 5
-                      : 6
-                  }
-                >
-                  {kind === "ingredient"
-                    ? "Subtotal de materias primas"
-                    : "Subtotal de empaque"}
-                </td>
-                <td>
-                  {money(
-                    kind === "ingredient"
-                      ? math.ingredientCost
-                      : math.packagingCost,
-                    catalog.currency,
-                  )}
-                </td>
-                {!readOnly && <td />}
-              </tr>
-            </tfoot>
-          </table>
+                  </td>
+                  {!readOnly && <td />}
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+          {!lines.some((l) => l.line_kind === kind) && (
+            <p className="muted">
+              {kind === "ingredient"
+                ? "Añade una materia prima."
+                : "Sin empaque asociado."}
+            </p>
+          )}
+          {!readOnly && (
+            <AppButton
+              type="button"
+              className="secondary"
+              disabled={state.busy || lines.length >= 100}
+              onClick={() => {
+                setLines((old) => [
+                  ...old,
+                  {
+                    ...blankLine(kind),
+                    quantity:
+                      kind === "packaging" && Number(draft.estimated_units) > 0
+                        ? Number(draft.estimated_units)
+                        : "",
+                  },
+                ]);
+                changed();
+              }}
+            >
+              {kind === "ingredient"
+                ? "Agregar ingrediente"
+                : "Agregar empaque"}
+            </AppButton>
+          )}
         </div>
-        {!lines.some((l) => l.line_kind === kind) && (
-          <p className="muted">
-            {kind === "ingredient"
-              ? "Añade una materia prima."
-              : "Sin empaque asociado."}
-          </p>
-        )}
-        {!readOnly && (
-          <AppButton
-            type="button"
-            className="secondary"
-            disabled={state.busy || lines.length >= 100}
-            onClick={() => {
-              setLines((old) => [...old, blankLine(kind)]);
-              changed();
-            }}
-          >
-            {kind === "ingredient" ? "Agregar ingrediente" : "Agregar empaque"}
-          </AppButton>
-        )}
       </section>
     );
   }
@@ -730,7 +750,7 @@ export default function Formulas({
             onChange={(e) => setQuery(e.target.value)}
           />
         </div>
-        <div className="formula-table-scroll">
+        <div className="formula-table-scroll formula-gallery">
           <table>
             <thead>
               <tr>
@@ -859,6 +879,7 @@ export default function Formulas({
               </p>
             )}
             <form
+              data-dirty-managed
               onSubmit={(e) => {
                 e.preventDefault();
                 if (!readOnly || mode === "notes") save(false);
@@ -923,8 +944,11 @@ export default function Formulas({
                         e.target.value,
                       );
                       field("product", selected?.id || "");
-                      if (selected?.id !== draft.product)
+                      if (selected?.id !== draft.product) {
                         field("estimate_unit_id", "");
+                        field("estimate_variant_id", "");
+                        field("quantity_per_unit", "");
+                      }
                     }}
                   />
                   <datalist id="formula-products">
@@ -944,12 +968,75 @@ export default function Formulas({
                     onChange={(e) => field("name", e.target.value)}
                   />
                 </label>
+                <label>
+                  Modalidad de captura
+                  <select
+                    value={draft.capture_mode}
+                    onChange={(e) =>
+                      switchCapture(e.target.value as "quantity" | "percentage")
+                    }
+                  >
+                    <option value="quantity">Por cantidades</option>
+                    <option value="percentage">Por porcentajes</option>
+                  </select>
+                </label>
+                <label>
+                  Estado
+                  <select
+                    value={draft.state}
+                    onChange={(e) => field("state", e.target.value)}
+                  >
+                    {Object.entries(labels).map(([key, label]) => (
+                      <option key={key} value={key}>
+                        {label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                {draft.capture_mode === "percentage" && (
+                  <>
+                    <label>
+                      {readOnly
+                        ? "Cantidad total base"
+                        : "Cantidad total a preparar"}
+                      <DecimalInput
+                        type="number"
+                        min="0.00000001"
+                        max="999999999999"
+                        step="any"
+                        value={draft.total_quantity}
+                        required
+                        onChange={(e) =>
+                          field("total_quantity", e.target.value)
+                        }
+                      />
+                    </label>
+                    <label>
+                      Unidad del total
+                      <select
+                        required
+                        value={draft.total_unit}
+                        onChange={(e) => field("total_unit", e.target.value)}
+                      >
+                        {catalog.units
+                          .filter(
+                            (u: Row) => u.active || u.id === draft.total_unit,
+                          )
+                          .map((u: Row) => (
+                            <option key={u.id} value={u.id}>
+                              {u.symbol}
+                            </option>
+                          ))}
+                      </select>
+                    </label>
+                  </>
+                )}
               </fieldset>
               <fieldset disabled={readOnly || state.busy}>
                 <legend>Producción estimada · opcional</legend>
                 <label>
                   Unidades estimadas
-                  <input
+                  <DecimalInput
                     type="number"
                     min="1"
                     max="999999999999"
@@ -963,10 +1050,74 @@ export default function Formulas({
                   />
                 </label>
                 <label>
-                  Presentación
+                  Presentación comercial
+                  <select
+                    value={draft.estimate_variant_id || ""}
+                    onChange={(e) => {
+                      field("estimate_variant_id", e.target.value);
+                      const v = (catalog.presentations || []).find(
+                        (v: Row) => v.id === e.target.value,
+                      );
+                      if (
+                        v?.weight_min != null &&
+                        Number(v.weight_min) === Number(v.weight_max)
+                      ) {
+                        const unit = catalog.units.find(
+                          (u: Row) =>
+                            u.active &&
+                            u.dimension === "mass" &&
+                            Number(u.base_factor) === 1,
+                        );
+                        if (unit) {
+                          field("estimate_unit_id", unit.id);
+                          field("quantity_per_unit", Number(v.weight_min));
+                        }
+                      }
+                    }}
+                  >
+                    <option value="">Sin definir</option>
+                    {(catalog.presentations || [])
+                      .filter(
+                        (v: Row) =>
+                          v.product_id === draft.product &&
+                          (v.active || v.id === draft.estimate_variant_id),
+                      )
+                      .map((v: Row) => (
+                        <option key={v.id} value={v.id}>
+                          {v.name}
+                        </option>
+                      ))}
+                  </select>
+                  <small>
+                    {(catalog.presentations || []).some(
+                      (v: Row) => v.product_id === draft.product && v.active,
+                    )
+                      ? "Selecciona el formato comercial del producto. Su contenido exacto se completa cuando está definido."
+                      : "Este producto aún no tiene presentaciones comerciales. Configúralas en Productos → Variantes y existencias."}
+                  </small>
+                </label>
+                <label>
+                  Unidad del contenido
                   <select
                     value={draft.estimate_unit_id || ""}
-                    onChange={(e) => field("estimate_unit_id", e.target.value)}
+                    onChange={(e) => {
+                      field("estimate_unit_id", e.target.value);
+                      const v = (catalog.presentations || []).find(
+                          (v: Row) => v.id === draft.estimate_variant_id,
+                        ),
+                        u = catalog.units.find(
+                          (u: Row) => u.id === e.target.value,
+                        );
+                      if (
+                        v?.weight_min != null &&
+                        Number(v.weight_min) === Number(v.weight_max) &&
+                        u?.dimension === "mass"
+                      )
+                        field(
+                          "quantity_per_unit",
+                          Number(v.weight_min) / Number(u.base_factor),
+                        );
+                    }}
                   >
                     <option value="">Sin definir</option>
                     {catalog.units
@@ -980,8 +1131,10 @@ export default function Formulas({
                         return (
                           u.id === draft.estimate_unit_id ||
                           (u.active &&
-                            base &&
-                            u.dimension === base.dimension &&
+                            (base || draft.estimate_variant_id) &&
+                            (u.dimension === base?.dimension ||
+                              (draft.estimate_variant_id &&
+                                u.dimension === "mass")) &&
                             ["g", "kg", "ml", "l"].includes(
                               u.symbol.toLowerCase(),
                             ))
@@ -998,12 +1151,18 @@ export default function Formulas({
                   </small>
                 </label>
                 <label>
-                  Cantidad por unidad
-                  <input
+                  Contenido por unidad
+                  <DecimalInput
                     type="number"
                     min="0.00000001"
                     max="999999999999"
                     step="any"
+                    readOnly={(catalog.presentations || []).some(
+                      (v: Row) =>
+                        v.id === draft.estimate_variant_id &&
+                        v.weight_min != null &&
+                        Number(v.weight_min) === Number(v.weight_max),
+                    )}
                     value={draft.quantity_per_unit ?? ""}
                     onChange={(e) => field("quantity_per_unit", e.target.value)}
                   />
@@ -1024,80 +1183,7 @@ export default function Formulas({
                   </small>
                 </label>
               </fieldset>
-              <details className="formula-disclosure">
-                <summary>
-                  Modalidad de captura y estado · {labels[draft.state]}
-                </summary>
-                <fieldset disabled={readOnly || state.busy}>
-                  {" "}
-                  <label>
-                    Estado
-                    <select
-                      value={draft.state}
-                      onChange={(e) => field("state", e.target.value)}
-                    >
-                      {Object.entries(labels).map(([key, label]) => (
-                        <option key={key} value={key}>
-                          {label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label>
-                    Modalidad de captura
-                    <select
-                      value={draft.capture_mode}
-                      onChange={(e) =>
-                        switchCapture(
-                          e.target.value as "quantity" | "percentage",
-                        )
-                      }
-                    >
-                      <option value="quantity">Por cantidades</option>
-                      <option value="percentage">Por porcentajes</option>
-                    </select>
-                  </label>
-                  {draft.capture_mode === "percentage" && (
-                    <>
-                      <label>
-                        {readOnly
-                          ? "Cantidad total base"
-                          : "Cantidad total a preparar"}
-                        <input
-                          type="number"
-                          min="0.00000001"
-                          max="999999999999"
-                          step="any"
-                          value={draft.total_quantity}
-                          required
-                          onChange={(e) =>
-                            field("total_quantity", e.target.value)
-                          }
-                        />
-                      </label>
-                      <label>
-                        Unidad del total
-                        <select
-                          required
-                          value={draft.total_unit}
-                          onChange={(e) => field("total_unit", e.target.value)}
-                        >
-                          {catalog.units
-                            .filter(
-                              (u: Row) => u.active || u.id === draft.total_unit,
-                            )
-                            .map((u: Row) => (
-                              <option key={u.id} value={u.id}>
-                                {u.symbol}
-                              </option>
-                            ))}
-                        </select>
-                      </label>
-                    </>
-                  )}
-                </fieldset>
-              </details>
-              <details className="formula-disclosure">
+              <details className="formula-disclosure" hidden>
                 <summary>
                   Merma informativa
                   {draft.loss_enabled
@@ -1117,7 +1203,7 @@ export default function Formulas({
                   {draft.loss_enabled && (
                     <label>
                       Porcentaje de merma
-                      <input
+                      <DecimalInput
                         type="number"
                         min="0"
                         max="100"
@@ -1156,7 +1242,7 @@ export default function Formulas({
               {mode === "view" && (
                 <label className="formula-scale">
                   Factor de escala para esta vista
-                  <input
+                  <DecimalInput
                     type="number"
                     min="0.00000001"
                     max="1000000"
@@ -1175,7 +1261,10 @@ export default function Formulas({
                   )}
                 </label>
               )}
-              {rowsTable("ingredient")}
+              <details className="formula-disclosure" open>
+                <summary>Materias primas</summary>
+                {rowsTable("ingredient")}
+              </details>
               <details className="formula-disclosure">
                 <summary>
                   Materiales de empaque ·{" "}

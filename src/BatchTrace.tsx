@@ -10,14 +10,14 @@ const money = (v: any, c = "GTQ") =>
         style: "currency",
         currency: c,
         minimumFractionDigits: 2,
-        maximumFractionDigits: 8,
+        maximumFractionDigits: 2,
       }).format(Number(v));
 export const lotCode = (n: number | string | undefined) =>
   n == null ? "Lote sin número" : `LOT-${String(n).padStart(4, "0")}`;
 const num = (n: any) =>
   n == null
     ? "—"
-    : new Intl.NumberFormat("es-GT", { maximumFractionDigits: 8 }).format(
+    : new Intl.NumberFormat("es-GT", { maximumFractionDigits: 2 }).format(
         Number(n),
       );
 export default function BatchTrace({
