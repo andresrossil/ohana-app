@@ -1,4 +1,6 @@
 import MaterialRequirements from "./MaterialRequirements";
+import VariantWeightCapture, { type WeighedUnit } from "./VariantWeightCapture";
+import { weightMatches } from "./variant-weights";
 import { IconDetails } from "./PoolControls";
 import AdditionalCostsPanel from "./AdditionalCostsPanel";
 import { additionalCosts } from "./additional-costs";
@@ -75,7 +77,10 @@ function ProductionBatches({
     [draftScale, setDraftScale] = useState("1"),
     [consumed, setConsumed] = useState<Record<string, string>>({}),
     [draftUnits, setDraftUnits] = useState("1"),
-    [outputUnits, setOutputUnits] = useState<Record<string, string>>({});
+    [outputUnits, setOutputUnits] = useState<Record<string, string>>({}),
+    [outputWeights, setOutputWeights] = useState<Record<string, string>>({}),
+    [weighedUnits, setWeighedUnits] = useState<WeighedUnit[]>([]),
+    [pendingUnitWeight, setPendingUnitWeight] = useState(false);
   async function load() {
     const [c, f, b, costs] = await Promise.all([
       operation(company, "production_catalog"),
@@ -263,6 +268,36 @@ function ProductionBatches({
                     formula: draftFormula,
                   };
                 } else if (mode === "finish") {
+                  if (pendingUnitWeight) {
+                    state.setError(
+                      "Registra la unidad pesada o borra el peso pendiente antes de confirmar.",
+                    );
+                    return;
+                  }
+                  const manualMismatch = catalog.variants.some((v: Row) => {
+                    const weight = f.get("weight_" + v.id);
+                    if (
+                      v.product_id !== selected!.product_id ||
+                      Number(f.get("output_" + v.id)) !== 1 ||
+                      weight == null ||
+                      weight === ""
+                    )
+                      return false;
+                    const matches = weightMatches(
+                      catalog.variants.filter(
+                        (r: Row) => r.product_id === selected!.product_id,
+                      ),
+                      v.attributes || {},
+                      weight,
+                    );
+                    return matches.length !== 1 || matches[0].id !== v.id;
+                  });
+                  if (manualMismatch) {
+                    state.setError(
+                      "Un peso individual no corresponde a la variante seleccionada o no tiene un rango válido. Usa Registrar por peso unitario.",
+                    );
+                    return;
+                  }
                   action = "batch_finish";
                   payload = {
                     batch: selected!.id,
@@ -284,6 +319,13 @@ function ProductionBatches({
                         variant: v.id,
                         quantity: f.get("output_" + v.id),
                         weight: f.get("weight_" + v.id),
+                        ...(weighedUnits.some((u) => u.variant === v.id)
+                          ? {
+                              unit_weights: weighedUnits
+                                .filter((u) => u.variant === v.id)
+                                .map((u) => u.weight),
+                            }
+                          : {}),
                       })),
                   };
                 } else {
@@ -458,6 +500,78 @@ function ProductionBatches({
                     inventario una sola vez y se conservará la receta histórica.
                   </label>
                   <h3>Variantes obtenidas</h3>
+                  <VariantWeightCapture
+                    variants={catalog.variants.filter(
+                      (v: Row) => v.product_id === selected!.product_id,
+                    )}
+                    units={weighedUnits}
+                    busy={state.busy}
+                    onPending={setPendingUnitWeight}
+                    onAdd={(variant, weight) => {
+                      if (
+                        !weighedUnits.some((u) => u.variant === variant.id) &&
+                        (Number(outputUnits[variant.id]) > 0 ||
+                          Number(outputWeights[variant.id]) > 0)
+                      ) {
+                        state.setError(
+                          "Esta variante ya tiene captura manual. Limpia su cantidad y peso para registrar por unidad.",
+                        );
+                        return false;
+                      }
+                      const units = [
+                        ...weighedUnits,
+                        {
+                          key: crypto.randomUUID(),
+                          variant: variant.id,
+                          weight,
+                        },
+                      ];
+                      setWeighedUnits(units);
+                      const rows = units.filter(
+                        (u) => u.variant === variant.id,
+                      );
+                      setOutputUnits((old) => ({
+                        ...old,
+                        [variant.id]: String(rows.length),
+                      }));
+                      setOutputWeights((old) => ({
+                        ...old,
+                        [variant.id]: String(
+                          Math.round(
+                            rows.reduce((sum, u) => sum + u.weight, 0) * 10000,
+                          ) / 10000,
+                        ),
+                      }));
+                      setDirty(true);
+                      state.setError("");
+                      return true;
+                    }}
+                    onRemove={(key) => {
+                      const removed = weighedUnits.find((u) => u.key === key);
+                      if (!removed) return;
+                      const units = weighedUnits.filter((u) => u.key !== key),
+                        rows = units.filter(
+                          (u) => u.variant === removed.variant,
+                        );
+                      setWeighedUnits(units);
+                      setOutputUnits((old) => ({
+                        ...old,
+                        [removed.variant]: String(rows.length),
+                      }));
+                      setOutputWeights((old) => ({
+                        ...old,
+                        [removed.variant]: rows.length
+                          ? String(
+                              Math.round(
+                                rows.reduce((sum, u) => sum + u.weight, 0) *
+                                  10000,
+                              ) / 10000,
+                            )
+                          : "",
+                      }));
+                      setDirty(true);
+                    }}
+                  />
                   <p>
                     Deja en cero las variantes que no produjo este lote. El peso
                     total de cada variante es opcional.
@@ -479,7 +593,10 @@ function ProductionBatches({
                             type="number"
                             min="0"
                             step="1"
-                            defaultValue="0"
+                            value={outputUnits[v.id] || "0"}
+                            readOnly={weighedUnits.some(
+                              (u) => u.variant === v.id,
+                            )}
                           />
                         </label>
                         <label>
@@ -489,6 +606,16 @@ function ProductionBatches({
                             type="number"
                             step="any"
                             min="0.0001"
+                            value={outputWeights[v.id] || ""}
+                            onChange={(e) =>
+                              setOutputWeights((old) => ({
+                                ...old,
+                                [v.id]: e.target.value,
+                              }))
+                            }
+                            readOnly={weighedUnits.some(
+                              (u) => u.variant === v.id,
+                            )}
                           />
                         </label>
                       </div>
@@ -713,6 +840,9 @@ function ProductionBatches({
                           setSelected(b);
                           setConsumed({});
                           setOutputUnits({});
+                          setOutputWeights({});
+                          setWeighedUnits([]);
+                          setPendingUnitWeight(false);
                           setDirty(false);
                           setMode("finish");
                         }}

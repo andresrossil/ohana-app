@@ -1,6 +1,7 @@
 import ResponsiveTable from "./ResponsiveTable";
 import { confirmAction } from "./ConfirmDialog";
 import CatalogBadge from "./CatalogBadge";
+import { weightRangeError, weightRangeLabel } from "./variant-weights";
 import { AppButton, AppIcon } from "./AppIcon";
 import { useEffect, useState, lazy, Suspense } from "react";
 import { operation, mutate, useOperation, money, type Row } from "./operations";
@@ -57,8 +58,8 @@ export default function VariantManager({
           </AppButton>
         </header>
         <p>
-          Un producto, varias opciones de venta. Los rangos de peso son
-          inclusivos y no pueden solaparse para los mismos atributos.
+          El peso mínimo está incluido y el máximo no. Ejemplo: 80–90 g
+          corresponde a pesos desde 80 g hasta menos de 90 g.
         </p>
         {state.error && (
           <p className="error" role="alert">
@@ -91,6 +92,19 @@ export default function VariantManager({
                 active: data.active === "on",
                 allow_preorder: data.allow_preorder === "on",
               };
+              const rangeError = weightRangeError(
+                rows.map((r) => ({ ...r, id: r.id })),
+                {
+                  ...payload,
+                  id: edit?.id || "",
+                  weight_min: String(data.weight_min || ""),
+                  weight_max: String(data.weight_max || ""),
+                },
+              );
+              if (rangeError) {
+                state.setError(rangeError);
+                return;
+              }
               state.run(async () => {
                 await mutate(company, "variant_save", payload);
                 setEdit(undefined);
@@ -237,11 +251,7 @@ export default function VariantManager({
                     {r.sku}
                     <small>{r.barcode || "Sin código de barras"}</small>
                   </td>
-                  <td>
-                    {r.weight_min
-                      ? `${r.weight_min}–${r.weight_max} g`
-                      : "Sin rango"}
-                  </td>
+                  <td>{weightRangeLabel({ ...r, id: r.id })}</td>
                   <td>
                     {r.price == null
                       ? "Pendiente de precio"
