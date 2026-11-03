@@ -1,3 +1,4 @@
+import { confirmAction } from "./ConfirmDialog";
 import { AppButton, AppIcon } from "./AppIcon";
 import { lazy, Suspense } from "react";
 const IconSettings = lazy(() => import("./IconSettings"));
@@ -86,10 +87,12 @@ export default function AdminAppearance({
         <AppButton
           type="button"
           className={view === "theme" ? "selected" : "secondary"}
-          onClick={() => {
+          onClick={async () => {
             if (
               iconDirty.current &&
-              !confirm("Hay cambios de íconos sin guardar. ¿Descartarlos?")
+              !(await confirmAction(
+                "Hay cambios de íconos sin guardar. ¿Descartarlos?",
+              ))
             )
               return;
             if (view !== "theme") setView("theme");
@@ -100,10 +103,12 @@ export default function AdminAppearance({
         <AppButton
           type="button"
           className={view === "icons" ? "selected" : "secondary"}
-          onClick={() => {
+          onClick={async () => {
             if (
               dirty &&
-              !confirm("Hay cambios de tema sin guardar. ¿Descartarlos?")
+              !(await confirmAction(
+                "Hay cambios de tema sin guardar. ¿Descartarlos?",
+              ))
             )
               return;
             setTheme(savedTheme.current);

@@ -1,3 +1,4 @@
+import { confirmAction } from "./ConfirmDialog";
 import { IconDetails, SearchField } from "./PoolControls";
 // V2: compact dialog/mobile layout; reconsider separate capture group and visible informative loss.
 import DecimalInput from "./DecimalInput";
@@ -210,9 +211,13 @@ export default function Formulas({
     setComparison(null);
     state.setError("");
   }
-  function close() {
+  async function close() {
     if (state.busy) return;
-    if (dirty && !confirm("Hay cambios sin guardar. ¿Descartarlos?")) return;
+    if (
+      dirty &&
+      !(await confirmAction("Hay cambios sin guardar. ¿Descartarlos?"))
+    )
+      return;
     setMode(null);
     setDirty(false);
     setDuplicates([]);
@@ -362,9 +367,9 @@ export default function Formulas({
   }
   async function changeState(f: Row, next: string) {
     if (
-      !confirm(
+      !(await confirmAction(
         `¿Marcar ${f.code} · v${f.version} como ${labels[next].toLowerCase()}?${next === "current" ? " La otra versión vigente de esta fórmula quedará inactiva." : " Los lotes anteriores conservarán su referencia."}`,
-      )
+      ))
     )
       return;
     await state.run(async () => {

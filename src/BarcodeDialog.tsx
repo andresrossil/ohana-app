@@ -100,9 +100,20 @@ export default function BarcodeDialog({
     }
     // Only fixed markup is written. All catalog content is added as text or generated SVG.
     win.document.write(
-      '<!doctype html><html lang="es"><head><title>Etiquetas Ohana</title><style>@page{margin:10mm}body{margin:0;font:12px sans-serif}.labels{display:flex;flex-wrap:wrap;gap:5mm}.label{break-inside:avoid;page-break-inside:avoid;max-width:100%;padding:3mm;border:1px dashed #aaa;text-align:center}.label svg{display:block;max-width:100%;height:auto}.label p{margin:0 0 2mm;overflow-wrap:anywhere}@media print{.label{border:0}button{display:none}}</style></head><body><AppButton onclick="window.print()">Imprimir etiquetas</AppButton><div class="labels"></div></body></html>',
+      '<!doctype html><html lang="es"><head><title>Etiquetas Ohana</title><style>@page{margin:10mm}body{margin:0;font:12px sans-serif}.labels{display:flex;flex-wrap:wrap;gap:5mm}.label{break-inside:avoid;page-break-inside:avoid;max-width:100%;padding:3mm;border:1px dashed #aaa;text-align:center}.label svg{display:block;max-width:100%;height:auto}.label p{margin:0 0 2mm;overflow-wrap:anywhere}@media print{.label{border:0}button{display:none}}</style></head><body><button onclick="window.print()">Imprimir etiquetas</button><div class="labels"></div></body></html>',
     );
     win.document.close();
+    const printIcon = document.querySelector(
+      "[data-print-labels] .app-icon svg",
+    );
+    if (printIcon) {
+      const icon = win.document.importNode(printIcon, true);
+      (icon as SVGElement).setAttribute(
+        "style",
+        "width:16px;height:16px;vertical-align:middle;margin-right:6px",
+      );
+      win.document.querySelector("button")?.prepend(icon);
+    }
     const target = win.document.querySelector(".labels")!;
     for (let i = 0; i < copies; i++) {
       const label = win.document.createElement("section");
@@ -181,7 +192,12 @@ export default function BarcodeDialog({
         <AppButton disabled={!ready || busy} onClick={() => void download()}>
           {busy ? "Preparando…" : "Descargar PNG"}
         </AppButton>
-        <AppButton className="secondary" disabled={!ready} onClick={print}>
+        <AppButton
+          data-print-labels
+          className="secondary"
+          disabled={!ready}
+          onClick={print}
+        >
           Imprimir etiquetas
         </AppButton>
         <AppButton className="secondary" onClick={onClose}>

@@ -1,3 +1,4 @@
+import { confirmAction } from "./ConfirmDialog";
 import CatalogBadge from "./CatalogBadge";
 import { AppButton, AppIcon } from "./AppIcon";
 import { useEffect, useState, lazy, Suspense } from "react";
@@ -40,10 +41,12 @@ export default function VariantManager({
           <AppButton
             disabled={state.busy}
             className="secondary"
-            onClick={() => {
+            onClick={async () => {
               if (
                 edit !== undefined &&
-                !confirm("¿Descartar los cambios de esta variante?")
+                !(await confirmAction(
+                  "¿Descartar los cambios de esta variante?",
+                ))
               )
                 return;
               onClose();

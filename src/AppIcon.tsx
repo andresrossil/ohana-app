@@ -221,7 +221,13 @@ export function AppButton({
             ? "status.active"
             : action
               ? "action." + action
-              : "");
+              : /configuraci[oó]n|colores|tipograf[ií]a|[ií]conos|administrar corporaciones/i.test(
+                    label,
+                  )
+                ? "module.settings"
+                : label.trim()
+                  ? "action.expand"
+                  : "");
   const addIcon = !!key && !containsIcon(children);
   const content = Children.map(children, (n) =>
     typeof n === "string" && addIcon
@@ -233,6 +239,18 @@ export function AppButton({
   return (
     <button
       {...props}
+      className={
+        [
+          props.className,
+          /eliminar|borrar|quitar|retirar|archivar|desactivar|cancelar pedido|salir sin guardar/i.test(
+            label,
+          )
+            ? "danger"
+            : "",
+        ]
+          .filter(Boolean)
+          .join(" ") || undefined
+      }
       aria-label={
         props["aria-label"] ||
         (addIcon && /^[\s×✕✖▥]+$/.test(textOf(children)) ? label : undefined)

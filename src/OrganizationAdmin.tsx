@@ -1,3 +1,4 @@
+import { confirmAction } from "./ConfirmDialog";
 import { IconDetails, SearchField } from "./PoolControls";
 import { AppButton, AppIcon } from "./AppIcon";
 import { useEffect, useState, lazy, Suspense } from "react";
@@ -269,9 +270,13 @@ export default function OrganizationAdmin({
     setDirty(false);
     setDialog(value);
   }
-  function close() {
+  async function close() {
     if (busy) return;
-    if (dirty && !confirm("Hay cambios sin guardar. ¿Descartarlos?")) return;
+    if (
+      dirty &&
+      !(await confirmAction("Hay cambios sin guardar. ¿Descartarlos?"))
+    )
+      return;
     setDialog(null);
   }
   function toggle(id: string) {

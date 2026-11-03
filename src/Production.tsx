@@ -1,3 +1,4 @@
+import { confirmAction } from "./ConfirmDialog";
 import { AppButton, AppIcon } from "./AppIcon";
 import Formulas from "./Formulas";
 import { request } from "./commerce";
@@ -81,9 +82,13 @@ function ProductionBatches({
     window.addEventListener("beforeunload", leave);
     return () => window.removeEventListener("beforeunload", leave);
   }, [dirty]);
-  function close() {
+  async function close() {
     if (state.busy) return;
-    if (dirty && !confirm("Hay cambios sin guardar. ¿Descartarlos?")) return;
+    if (
+      dirty &&
+      !(await confirmAction("Hay cambios sin guardar. ¿Descartarlos?"))
+    )
+      return;
     setMode(null);
     setDirty(false);
   }

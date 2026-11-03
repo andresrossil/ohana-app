@@ -1,3 +1,4 @@
+import { confirmAction } from "./ConfirmDialog";
 import { AppButton } from "./AppIcon";
 import { SearchField } from "./PoolControls";
 import { useEffect, useState } from "react";
@@ -142,9 +143,9 @@ export default function IconSettings({
         <AppButton
           className="secondary"
           disabled={!editable}
-          onClick={() => {
+          onClick={async () => {
             if (
-              confirm(
+              await confirmAction(
                 "¿Restaurar todos los pools predeterminados? Los cambios se aplicarán al guardar.",
               )
             ) {

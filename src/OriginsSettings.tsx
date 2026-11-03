@@ -1,3 +1,4 @@
+import { confirmAction } from "./ConfirmDialog";
 import CatalogBadge from "./CatalogBadge";
 import { AppButton, AppIcon } from "./AppIcon";
 import { useState } from "react";
@@ -54,9 +55,9 @@ export default function OriginsSettings({
   }
   async function remove(row: CatalogRow) {
     if (
-      !window.confirm(
+      !(await confirmAction(
         `¿Eliminar el origen “${row.name}”? Solo se elimina si no está en uso.`,
-      )
+      ))
     )
       return;
     setBusy(true);

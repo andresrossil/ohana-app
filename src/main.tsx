@@ -1,3 +1,4 @@
+import { confirmAction, ConfirmHost, ConfirmDialog } from "./ConfirmDialog";
 import { SearchField } from "./PoolControls";
 import AutoTextarea from "./AutoTextarea";
 import CatalogBadge from "./CatalogBadge";
@@ -123,9 +124,29 @@ function App() {
           originMatches(r.origin_id, origin))),
   );
   const sectionTitle = sections.find((s) => s[0] === section)?.[1] || "";
-  const leaveSheet = () =>
-    !(sheetDirty || settingsDirty) ||
-    window.confirm("Hay cambios sin guardar. ¿Quieres descartarlos?");
+  const leaveSheet = async () => {
+    if (
+      !(
+        sheetDirty ||
+        settingsDirty ||
+        protection.dirty() ||
+        protection.busy() ||
+        busy
+      )
+    )
+      return true;
+    return confirmAction(
+      "Hay cambios sin guardar o una operación pendiente. ¿Quieres salir sin guardar?",
+      {
+        title: "Cambios sin guardar",
+        cancelText: "Cancelar",
+        confirmText: "Salir sin guardar",
+        danger: true,
+        iconKey: "status.warning",
+        busyCheck: () => protection.busy() || busy,
+      },
+    );
+  };
   const canWrite = role !== "viewer" && !!activeCompany?.write;
   const currentCompany = useRef(company);
   currentCompany.current = company;
@@ -578,8 +599,8 @@ function App() {
             ...(activeCompany?.manage || canCreate ? ["settings"] : []),
           ]}
           corporations={corporations}
-          onCorporation={(id) => {
-            if (!leaveSheet()) return;
+          onCorporation={async (id) => {
+            if (!(await leaveSheet())) return;
             setPickerCorp(id);
             const list = companies.filter(
               (c) => c.corporation_id === id && c.active !== false,
@@ -588,9 +609,9 @@ function App() {
             setSection("dashboard");
           }}
           email={session.user.email}
-          onCompany={(value) => {
+          onCompany={async (value) => {
             if (value === company) return;
-            if (leaveSheet()) chooseCompany(value);
+            if (await leaveSheet()) chooseCompany(value);
           }}
           onNavigate={(next, fromLogo = false) => {
             if (
@@ -638,8 +659,8 @@ function App() {
             setSheetDirty(false);
             return true;
           }}
-          onLogout={() => {
-            if (!leaveSheet()) return;
+          onLogout={async () => {
+            if (!(await leaveSheet())) return;
             void db.auth.signOut().then(({ error }) => {
               if (error) setError(error.message);
             });
@@ -666,8 +687,8 @@ function App() {
           )}
           {!company && section === "settings" && configView === "structure" ? (
             <OrganizationAdmin
-              onConfigure={(id) => {
-                if (!leaveSheet()) return;
+              onConfigure={async (id) => {
+                if (!(await leaveSheet())) return;
                 if (id !== company) chooseCompany(id);
                 setSection("settings");
                 setConfigView("profile");
@@ -733,9 +754,9 @@ function App() {
                         <AppButton
                           key={key}
                           className={configView === key ? "selected" : ""}
-                          onClick={() => {
+                          onClick={async () => {
                             if (key === configView) return;
-                            if (!leaveSheet()) return;
+                            if (!(await leaveSheet())) return;
                             setConfigView(key);
                             if (
                               ![
@@ -759,8 +780,8 @@ function App() {
                     <AppButton
                       className="secondary company-back"
                       iconKey="action.back"
-                      onClick={() => {
-                        if (leaveSheet()) setConfigView("structure");
+                      onClick={async () => {
+                        if (await leaveSheet()) setConfigView("structure");
                       }}
                     >
                       Volver a la corporación
@@ -787,8 +808,8 @@ function App() {
                   )}
                   {configView === "structure" && (
                     <OrganizationAdmin
-                      onConfigure={(id) => {
-                        if (!leaveSheet()) return;
+                      onConfigure={async (id) => {
+                        if (!(await leaveSheet())) return;
                         if (id !== company) chooseCompany(id);
                         setSection("settings");
                         setConfigView("profile");
@@ -945,8 +966,8 @@ function App() {
                       <div className="catalog-entry-actions">
                         <AppButton
                           disabled={loading}
-                          onClick={() => {
-                            if (!leaveSheet()) return;
+                          onClick={async () => {
+                            if (!(await leaveSheet())) return;
                             if (tab === "raw_materials") setSheetView(false);
                             setEdit(null);
                           }}
@@ -963,8 +984,8 @@ function App() {
                           <AppButton
                             className="secondary"
                             disabled={loading}
-                            onClick={() => {
-                              if (!leaveSheet()) return;
+                            onClick={async () => {
+                              if (!(await leaveSheet())) return;
                               setSheetView(false);
                               setEdit(undefined);
                               setImportNotice("");
@@ -1013,9 +1034,9 @@ function App() {
                           disabled={busy}
                           onClick={async () => {
                             if (
-                              !window.confirm(
+                              !(await confirmAction(
                                 "¿Generar los SKU faltantes? Se conservarán los existentes. Solo se incluyen materiales y empaques con clasificación definida.",
-                              )
+                              ))
                             )
                               return;
                             setBusy(true);
@@ -1041,8 +1062,8 @@ function App() {
                       )}
                       <AppButton
                         className="secondary"
-                        onClick={() => {
-                          if (leaveSheet()) setSheetView(!sheetView);
+                        onClick={async () => {
+                          if (await leaveSheet()) setSheetView(!sheetView);
                         }}
                       >
                         {sheetView
@@ -1317,52 +1338,33 @@ function App() {
           />
         )}
         {pendingNavigation && (
-          <div className="overlay" style={{ zIndex: 10000 }}>
-            <section
-              className="modal"
-              role="dialog"
-              aria-modal="true"
-              aria-label="Cambios sin guardar"
-            >
-              <h2>¿Salir de esta pantalla?</h2>
-              <p>
-                {protection.busy() || busy
-                  ? "Hay una operación en curso. Espera a que termine antes de salir."
-                  : "Hay cambios sin guardar o datos pendientes de confirmar."}
-              </p>
-              <div className="form-actions">
-                <AppButton
-                  type="button"
-                  onClick={() => setPendingNavigation(null)}
-                >
-                  Permanecer
-                </AppButton>
-                <AppButton
-                  type="button"
-                  className="secondary"
-                  onClick={() => {
-                    if (protection.busy() || busy) {
-                      setError("Espera a que termine la operación en curso.");
-                      return;
-                    }
-                    const next = pendingNavigation;
-                    protection.clear();
-                    setPendingNavigation(null);
-                    setEdit(undefined);
-                    setImportOpen(false);
-                    setHistory(null);
-                    setBarcode(null);
-                    setSheetDirty(false);
-                    setSettingsDirty(false);
-                    setSection(next);
-                    if (next === "materials") setTab("raw_materials");
-                  }}
-                >
-                  Salir sin guardar
-                </AppButton>
-              </div>
-            </section>
-          </div>
+          <ConfirmDialog
+            title="Cambios sin guardar"
+            message="Hay cambios sin guardar o datos pendientes de confirmar. ¿Quieres salir?"
+            iconKey="status.warning"
+            danger
+            confirmText="Salir sin guardar"
+            cancelText="Cancelar"
+            busyCheck={() => protection.busy() || busy}
+            onCancel={() => setPendingNavigation(null)}
+            onConfirm={() => {
+              if (protection.busy() || busy) {
+                setError("Espera a que termine la operación en curso.");
+                return;
+              }
+              const next = pendingNavigation;
+              protection.clear();
+              setPendingNavigation(null);
+              setEdit(undefined);
+              setImportOpen(false);
+              setHistory(null);
+              setBarcode(null);
+              setSheetDirty(false);
+              setSettingsDirty(false);
+              setSection(next);
+              if (next === "materials") setTab("raw_materials");
+            }}
+          />
         )}
         {edit !== undefined && (
           <div className="overlay">
@@ -1625,6 +1627,7 @@ function App() {
             </section>
           </div>
         )}
+        <ConfirmHost key={company} />
       </div>
     </IconProvider>
   );

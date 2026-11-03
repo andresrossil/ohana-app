@@ -1,3 +1,4 @@
+import { confirmAction } from "./ConfirmDialog";
 import { SearchField } from "./PoolControls";
 import AutoTextarea from "./AutoTextarea";
 import { AppButton, AppIcon } from "./AppIcon";
@@ -897,11 +898,13 @@ export default function MaterialSheet({
     setEnd({ row: index, col: 0 });
     setTimeout(() => focus({ row: index, col: 0 }), 0);
   }
-  function cancelImport() {
+  async function cancelImport() {
     if (busy) return;
     if (
       dirty.length &&
-      !window.confirm("¿Cancelar esta carga y descartar los datos sin guardar?")
+      !(await confirmAction(
+        "¿Cancelar esta carga y descartar los datos sin guardar?",
+      ))
     )
       return;
     onCancel?.();
@@ -1053,11 +1056,11 @@ export default function MaterialSheet({
                 <AppButton
                   className="secondary"
                   disabled={!dirty.length || busy}
-                  onClick={() => {
+                  onClick={async () => {
                     if (
-                      !window.confirm(
+                      !(await confirmAction(
                         "¿Descartar todos los cambios sin guardar de la hoja?",
-                      )
+                      ))
                     )
                       return;
                     setPreview(false);

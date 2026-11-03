@@ -124,10 +124,10 @@ export function actionIcon(text: string) {
     [/cerrar sesi[oó]n|salir|anterior/, "back"],
     [/restaurar|reiniciar/, "refresh"],
     [/permanecer|^\s*[×✕✖]\s*$/, "cancel"],
-    [/guardar/, "save"],
+    [/guardar|guardando/, "save"],
     [/confirmar|liberar|finalizar|entregar/, "confirm"],
     [/cancelar|cerrar|descartar/, "cancel"],
-    [/editar/, "edit"],
+    [/editar|renombrar/, "edit"],
     [/eliminar|quitar|retirar/, "delete"],
     [/duplicar|copiar/, "duplicate"],
     [/buscar/, "search"],
@@ -141,10 +141,13 @@ export function actionIcon(text: string) {
     [/actualizar/, "refresh"],
     [/accesos/, "access"],
     [/volver/, "back"],
-    [/agregar|añadir|crear|nueva|nuevo|iniciar/, "add"],
+    [/agregar|añadir|crear|nueva|nuevo|iniciar|registrar/, "add"],
     [/seleccionar|elegir|aplicar|aceptar/, "confirm"],
-    [/mostrar|\bver\b|detalle|abrir|siguiente|continuar/, "expand"],
-    [/preparar|generar|producir|f[oó]rmula/, "calculate"],
+    [
+      /mostrar|consultar|\bver\b|detalle|abrir|siguiente|continuar|variantes y existencias/,
+      "expand",
+    ],
+    [/preparar|generar|producir|ajustar|f[oó]rmula/, "calculate"],
   ];
   return rules.find(([r]) => r.test(s))?.[1];
 }

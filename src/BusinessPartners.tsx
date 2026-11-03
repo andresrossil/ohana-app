@@ -1,3 +1,4 @@
+import { confirmAction } from "./ConfirmDialog";
 import CatalogBadge from "./CatalogBadge";
 import { SearchField } from "./PoolControls";
 import { useEffect, useRef, useState } from "react";
@@ -111,9 +112,13 @@ export default function BusinessPartners({
     setDraft((old) => ({ ...old, [key]: value }));
     setDirty(true);
   }
-  function close() {
+  async function close() {
     if (busy) return;
-    if (dirty && !confirm("Hay cambios sin guardar. ¿Descartarlos?")) return;
+    if (
+      dirty &&
+      !(await confirmAction("Hay cambios sin guardar. ¿Descartarlos?"))
+    )
+      return;
     setMode(null);
     setDirty(false);
     setError("");
@@ -183,9 +188,9 @@ export default function BusinessPartners({
   }
   async function toggle(row: Row) {
     if (
-      !confirm(
+      !(await confirmAction(
         `${row.active ? "Desactivar" : "Activar"} a ${row.name}? ${row.active ? "Conservará su historial y dejará de estar disponible en nuevas operaciones." : "Volverá a estar disponible."}`,
-      )
+      ))
     )
       return;
     setBusy(true);
