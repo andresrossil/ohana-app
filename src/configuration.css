@@ -387,3 +387,123 @@
     grid-template-columns: repeat(auto-fill, minmax(76px, 1fr));
   }
 }
+.icon-pool-category h4 {
+  margin: 18px 0 8px;
+  color: var(--admin-heading);
+}
+.icon-pool-list {
+  display: grid;
+  gap: 8px;
+}
+.icon-pool-row {
+  display: grid;
+  grid-template-columns: minmax(150px, 1fr) auto auto;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid var(--admin-border);
+  border-radius: 8px;
+  padding: 10px;
+  background: var(--admin-surface);
+}
+.icon-pool-label small {
+  display: block;
+  color: var(--admin-muted);
+  font-size: 10px;
+  overflow-wrap: anywhere;
+}
+.icon-pool-options {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.icon-pool-option {
+  display: grid;
+  gap: 3px;
+  justify-items: center;
+}
+.shell .icon-pool-choice {
+  width: 52px;
+  min-height: 42px;
+  justify-content: center;
+  padding: 8px;
+}
+.shell .icon-pool-choice.is-active {
+  outline: 2px solid var(--admin-primary);
+  outline-offset: 1px;
+  background: var(--admin-primary);
+  color: var(--admin-button-text);
+}
+.icon-pool-tools {
+  display: flex;
+  gap: 3px;
+}
+.shell .icon-pool-tools button {
+  min-height: 24px;
+  padding: 3px 5px;
+}
+.icon-pool-tools .app-icon {
+  width: 12px;
+  height: 12px;
+}
+.icon-pool-tools svg {
+  width: 12px;
+  height: 12px;
+}
+.icon-pool-controls {
+  display: grid;
+  gap: 6px;
+}
+.shell .icon-pool-controls button {
+  font-size: 11px;
+  min-height: 32px;
+  padding: 6px 8px;
+}
+.icon-pool-save {
+  position: sticky;
+  bottom: 0;
+  background: var(--admin-surface);
+  padding: 12px 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-top: 1px solid var(--admin-border);
+  z-index: 2;
+}
+@media (max-width: 760px) {
+  .icon-pool-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .icon-pool-options {
+    grid-row: 2;
+    grid-column: 1/-1;
+    gap: 10px;
+  }
+  .icon-pool-controls {
+    grid-column: 2;
+    grid-row: 1;
+    display: flex;
+  }
+  .shell .icon-pool-tools button {
+    min-height: 30px;
+    padding: 5px;
+  }
+}
+.shell .icon-pool-choice.is-active {
+  background: var(--admin-secondary);
+  color: var(--admin-text);
+}
+.pool-status-active .icon-pool-choice .app-icon,
+.pool-status-purchased .icon-pool-choice .app-icon,
+.pool-status-success .icon-pool-choice .app-icon {
+  color: #146534;
+}
+.pool-status-archived .icon-pool-choice .app-icon,
+.pool-status-error .icon-pool-choice .app-icon {
+  color: #791f29;
+}
+.pool-status-manufactured .icon-pool-choice .app-icon {
+  color: #193f72;
+}
+.pool-status-warning .icon-pool-choice .app-icon {
+  color: #9a5b00;
+}

@@ -1,3 +1,4 @@
+import { AppIcon } from "./AppIcon";
 import { classifications } from "./sheet-model";
 import type { CatalogRow } from "./sheet-model";
 export function classificationMatches(
@@ -29,7 +30,7 @@ export default function CatalogFilters({
     <div className="catalog-filters">
       {onClassification && (
         <label>
-          Clasificación
+          <AppIcon name="control.filter" /> Clasificación
           <select
             value={classification}
             onChange={(e) => onClassification(e.target.value)}

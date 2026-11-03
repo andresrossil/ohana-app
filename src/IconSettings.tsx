@@ -1,9 +1,9 @@
-import { useEffect, useState, lazy, Suspense } from "react";
+import { useEffect, useState } from "react";
 import { request } from "./commerce";
 import { AppIcon } from "./AppIcon";
 import { iconRegistry } from "./icon-registry";
 import { availableIconNames } from "./icon-names";
-const Dynamic = lazy(() => import("./LucideDynamic"));
+import { defaultIconPools, type IconPools, type IconPool } from "./icon-pools";
 export default function IconSettings({
   company,
   canManage,
@@ -13,23 +13,31 @@ export default function IconSettings({
   canManage: boolean;
   onDirty: (dirty: boolean) => void;
 }) {
-  const [icons, setIcons] = useState<Record<string, string>>({}),
+  const [pools, setPools] = useState<IconPools>({}),
     [loading, setLoading] = useState(true),
     [ready, setReady] = useState(false),
     [dirty, setDirty] = useState(false),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
-    [notice, setNotice] = useState(""),
-    [entry, setEntry] = useState<string | null>(null),
-    [query, setQuery] = useState(""),
+    [notice, setNotice] = useState("");
+  const [search, setSearch] = useState(""),
     [category, setCategory] = useState("Todos"),
-    [count, setCount] = useState(80);
+    [picker, setPicker] = useState<{ key: string; index?: number } | null>(
+      null,
+    ),
+    [query, setQuery] = useState(""),
+    [count, setCount] = useState(40);
   useEffect(() => {
     let live = true;
-    request("company_icons", { p_company: company })
+    setLoading(true);
+    setReady(false);
+    setDirty(false);
+    setError("");
+    setPicker(null);
+    request("company_icon_pools", { p_company: company })
       .then((r) => {
         if (live) {
-          setIcons(r || {});
+          setPools(r || {});
           setReady(true);
         }
       })
@@ -44,9 +52,9 @@ export default function IconSettings({
     };
   }, [company]);
   useEffect(() => {
-    onDirty(dirty);
+    onDirty(dirty || busy);
     const guard = (e: BeforeUnloadEvent) => {
-      if (dirty) {
+      if (dirty || busy) {
         e.preventDefault();
         e.returnValue = "";
       }
@@ -56,192 +64,303 @@ export default function IconSettings({
       onDirty(false);
       window.removeEventListener("beforeunload", guard);
     };
-  }, [dirty, onDirty]);
-  const groups: Record<string, RegExp> = {
-    Navegación: /arrow|chevron|menu|compass|navigation|house/,
-    Personas: /user|person|contact|hand/,
-    Comercio: /cart|store|shop|package|box|barcode|wallet|credit|bank/,
-    Archivos: /file|folder|save|download|upload|printer/,
-    Estados: /alert|circle|check|info|clock|bell/,
-    Naturaleza: /flower|leaf|tree|sun|moon|cloud|sprout|heart/,
-  };
+  }, [dirty, busy, onDirty]);
+  const editable = canManage && ready && !busy;
+  function update(key: string, pool: IconPool) {
+    setPools((old) => ({ ...old, [key]: pool }));
+    setDirty(true);
+    setNotice("");
+    setError("");
+  }
+  function choose(name: string) {
+    if (!picker) return;
+    const pool = pools[picker.key] || defaultIconPools[picker.key],
+      options = [...pool.options];
+    if (options.some((n, i) => n === name && i !== picker.index)) {
+      setError("Ese icono ya está en el pool.");
+      return;
+    }
+    let active = pool.active;
+    if (picker.index === undefined) {
+      if (options.length >= 5) return;
+      options.push(name);
+    } else {
+      if (active === options[picker.index]) active = name;
+      options[picker.index] = name;
+    }
+    update(picker.key, { options, active });
+    setPicker(null);
+  }
+  const norm = (s: string) =>
+    s
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "");
+  const filtered = iconRegistry.filter(
+    (e) =>
+      (category === "Todos" || e.category === category) &&
+      norm(
+        [e.label, e.key, e.category, ...(pools[e.key]?.options || [])].join(
+          " ",
+        ),
+      ).includes(norm(search)),
+  );
+  const categories = [...new Set(iconRegistry.map((e) => e.category))];
   const aliases: Record<string, string> = {
-    flor: "flower",
     guardar: "save",
-    cancelar: "x",
-    editar: "pencil",
-    eliminar: "trash",
-    agregar: "plus",
     buscar: "search",
-    usuario: "user",
-    empresa: "building",
     casa: "house",
-    caja: "package",
-    inventario: "warehouse",
-    produccion: "factory",
+    empresa: "building",
+    editar: "pen",
+    eliminar: "trash",
+    comprar: "shopping",
+    fabricar: "factory",
+    archivo: "archive",
     flecha: "arrow",
-    impresora: "printer",
-    historial: "history",
-    calculadora: "calculator",
-    hoja: "leaf",
-    corazon: "heart",
+    activo: "check",
   };
-  const term = query
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .trim()
-    .replaceAll(" ", "-");
+  const term = norm(query).trim().replaceAll(" ", "-"),
+    pool = picker ? pools[picker.key] || defaultIconPools[picker.key] : null;
   const found = availableIconNames.filter(
     (n) =>
       n.includes(aliases[term] || term) &&
-      (category === "Todos" || groups[category]?.test(n)),
+      !pool?.options.some((old, i) => old === n && i !== picker?.index),
   );
-  function update(next: Record<string, string>) {
-    setIcons(next);
-    setDirty(true);
-    setNotice("");
-  }
-  const editable = canManage && ready;
-  if (loading) return <p role="status">Cargando íconos de la empresa…</p>;
+  if (loading) return <p role="status">Cargando pools de iconos…</p>;
   return (
-    <section className="icon-settings">
+    <section className="icon-settings" aria-busy={busy}>
       <div className="hierarchy-toolbar">
         <div>
-          <h3>Íconos de la empresa</h3>
+          <h3>Pools de iconos por empresa</h3>
           <p className="muted">
-            Personaliza módulos y acciones. Los textos y las confirmaciones se
-            conservan.
+            Hasta cinco opciones por función. El resaltado es el icono activo;
+            los colores de estado se conservan.
           </p>
         </div>
         <button
           className="secondary"
-          disabled={!editable || busy}
+          disabled={!editable}
           onClick={() => {
             if (
               confirm(
-                "¿Restaurar todos los íconos predeterminados? Tendrás que guardar los cambios.",
+                "¿Restaurar todos los pools predeterminados? Los cambios se aplicarán al guardar.",
               )
-            )
-              update({});
+            ) {
+              setPools(structuredClone(defaultIconPools));
+              setDirty(true);
+              setNotice("");
+            }
           }}
         >
           Restaurar todos
         </button>
       </div>
       {error && (
-        <p role="alert" className="error">
+        <p className="error" role="alert">
           <AppIcon name="status.error" />
           {error}
         </p>
       )}
       {notice && <p role="status">{notice}</p>}
-      <div className="icon-assignments">
-        {iconRegistry.map((e) => (
-          <div className="icon-assignment" key={e.key}>
-            <AppIcon name={e.key} override={icons[e.key] || e.icon} />
-            <div>
-              <strong>{e.label}</strong>
-              <small>
-                {e.key} · {icons[e.key] || e.icon}
-              </small>
-            </div>
-            <button
-              className="secondary"
-              disabled={!editable || e.locked}
-              onClick={() => {
-                setEntry(e.key);
-                setQuery("");
-                setCategory("Todos");
-                setCount(80);
-              }}
-            >
-              {e.locked ? "Señal fija" : "Cambiar"}
-            </button>
-            <button
-              className="secondary"
-              disabled={!editable || !icons[e.key] || e.locked}
-              onClick={() => {
-                const next = { ...icons };
-                delete next[e.key];
-                update(next);
-              }}
-            >
-              Restaurar
-            </button>
-          </div>
-        ))}
+      <div className="settings-grid">
+        <label>
+          Buscar función o icono
+          <input
+            type="search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Activo, compras, guardar…"
+          />
+        </label>
+        <label>
+          Categoría
+          <select
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+          >
+            {["Todos", ...categories].map((c) => (
+              <option key={c}>{c}</option>
+            ))}
+          </select>
+        </label>
       </div>
-      {dirty && <p role="status">Tienes cambios de íconos sin guardar.</p>}
-      <button
-        disabled={!editable || !dirty || busy}
-        onClick={async () => {
-          setBusy(true);
-          setError("");
-          try {
-            await request("save_company_icons", {
-              p_company: company,
-              p_icons: icons,
-            });
-            setDirty(false);
-            setNotice("Íconos guardados para esta empresa.");
-            window.dispatchEvent(new Event("ohana-icons-saved"));
-          } catch (e: any) {
-            setError(e.message);
-          } finally {
-            setBusy(false);
-          }
-        }}
-      >
-        Guardar íconos
-      </button>
-      {entry && (
-        <div className="overlay">
+      {categories.map((c) => {
+        const entries = filtered.filter((e) => e.category === c);
+        return (
+          entries.length > 0 && (
+            <section className="icon-pool-category" key={c}>
+              <h4>{c}</h4>
+              <div className="icon-pool-list">
+                {entries.map((e) => {
+                  const p = pools[e.key] || defaultIconPools[e.key];
+                  return (
+                    <div
+                      className={
+                        "icon-pool-row pool-" + e.key.replaceAll(".", "-")
+                      }
+                      key={e.key}
+                    >
+                      <div className="icon-pool-label">
+                        <strong>{e.label}</strong>
+                        <small>{e.key}</small>
+                      </div>
+                      <div className="icon-pool-options">
+                        {p.options.map((name, i) => (
+                          <div className="icon-pool-option" key={name}>
+                            <button
+                              type="button"
+                              className={
+                                "secondary icon-pool-choice " +
+                                (p.active === name ? "is-active" : "")
+                              }
+                              title={
+                                name + (p.active === name ? " · Activo" : "")
+                              }
+                              aria-label={
+                                "Activar " + name + " para " + e.label
+                              }
+                              aria-pressed={p.active === name}
+                              disabled={!editable}
+                              onClick={() => {
+                                if (p.active !== name)
+                                  update(e.key, { ...p, active: name });
+                              }}
+                            >
+                              <AppIcon name={e.key} override={name} />
+                            </button>
+                            <div className="icon-pool-tools">
+                              <button
+                                type="button"
+                                className="secondary"
+                                disabled={!editable}
+                                title="Reemplazar opción"
+                                aria-label={
+                                  "Reemplazar " + name + " de " + e.label
+                                }
+                                onClick={() => {
+                                  setPicker({ key: e.key, index: i });
+                                  setQuery("");
+                                  setCount(40);
+                                }}
+                              >
+                                <AppIcon name="action.edit" />
+                              </button>
+                              <button
+                                type="button"
+                                className="secondary"
+                                disabled={!editable || p.options.length === 1}
+                                title="Quitar opción"
+                                aria-label={"Quitar " + name + " de " + e.label}
+                                onClick={() => {
+                                  const options = p.options.filter(
+                                    (_, index) => index !== i,
+                                  );
+                                  update(e.key, {
+                                    options,
+                                    active:
+                                      p.active === name ? options[0] : p.active,
+                                  });
+                                }}
+                              >
+                                <AppIcon name="action.delete" />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="icon-pool-controls">
+                        <button
+                          className="secondary"
+                          disabled={!editable || p.options.length >= 5}
+                          onClick={() => {
+                            setPicker({ key: e.key });
+                            setQuery("");
+                            setCount(40);
+                          }}
+                        >
+                          Agregar
+                        </button>
+                        <button
+                          className="secondary"
+                          disabled={!editable}
+                          onClick={() =>
+                            update(
+                              e.key,
+                              structuredClone(defaultIconPools[e.key]),
+                            )
+                          }
+                        >
+                          Restaurar
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+          )
+        );
+      })}
+      {!filtered.length && (
+        <p>No hay funciones que coincidan con la búsqueda.</p>
+      )}
+      <div className="icon-pool-save">
+        <button
+          disabled={!editable || !dirty}
+          onClick={async () => {
+            setBusy(true);
+            setError("");
+            try {
+              await request("save_company_icons", {
+                p_company: company,
+                p_icons: pools,
+              });
+              setDirty(false);
+              setNotice("Pools e iconos activos guardados para esta empresa.");
+              window.dispatchEvent(new Event("ohana-icons-saved"));
+            } catch (e: any) {
+              setError(e.message);
+            } finally {
+              setBusy(false);
+            }
+          }}
+        >
+          Guardar iconos
+        </button>
+        {dirty && <span role="status">Cambios sin guardar</span>}
+      </div>
+      {picker && (
+        <div className="overlay" style={{ zIndex: 10001 }}>
           <section
             className="modal operations-dialog icon-selector"
             role="dialog"
             aria-modal="true"
-            aria-label="Seleccionar ícono"
+            aria-label="Elegir opción del pool"
           >
             <div className="hierarchy-toolbar">
               <h3>
-                Ícono para {iconRegistry.find((e) => e.key === entry)?.label}
+                {picker.index === undefined ? "Agregar" : "Reemplazar"} icono ·{" "}
+                {iconRegistry.find((e) => e.key === picker.key)?.label}
               </h3>
-              <button className="secondary" onClick={() => setEntry(null)}>
+              <button className="secondary" onClick={() => setPicker(null)}>
                 Cerrar
               </button>
             </div>
-            <div className="settings-grid">
-              <label>
-                Buscar por nombre de Lucide
-                <input
-                  type="search"
-                  value={query}
-                  onChange={(e) => {
-                    setQuery(e.target.value);
-                    setCount(80);
-                  }}
-                  placeholder="search, flower, package…"
-                />
-              </label>
-              <label>
-                Categoría
-                <select
-                  value={category}
-                  onChange={(e) => {
-                    setCategory(e.target.value);
-                    setCount(80);
-                  }}
-                >
-                  {["Todos", ...Object.keys(groups)].map((c) => (
-                    <option key={c}>{c}</option>
-                  ))}
-                </select>
-              </label>
-            </div>
+            <label>
+              Buscar icono Lucide
+              <input
+                type="search"
+                value={query}
+                onChange={(e) => {
+                  setQuery(e.target.value);
+                  setCount(40);
+                }}
+                placeholder="search, package, check…"
+              />
+            </label>
             <p>
-              {found.length} íconos disponibles. Selecciona uno para ver el
-              cambio en la lista.
+              {found.length} opciones válidas. Se excluyen los iconos ya
+              incluidos en este pool.
             </p>
             <div className="icon-gallery">
               {found.slice(0, count).map((name) => (
@@ -250,15 +369,9 @@ export default function IconSettings({
                   className="secondary"
                   key={name}
                   title={name}
-                  aria-label={"Seleccionar " + name}
-                  onClick={() => {
-                    update({ ...icons, [entry]: name });
-                    setEntry(null);
-                  }}
+                  onClick={() => choose(name)}
                 >
-                  <Suspense fallback={<span className="icon-placeholder" />}>
-                    <Dynamic name={name} />
-                  </Suspense>
+                  <AppIcon name={picker.key} override={name} />
                   <small>{name}</small>
                 </button>
               ))}
@@ -266,14 +379,14 @@ export default function IconSettings({
             {found.length > count && (
               <button
                 className="secondary"
-                onClick={() => setCount(count + 80)}
+                onClick={() => setCount(count + 40)}
               >
                 Mostrar más
               </button>
             )}
             <small>
-              Lucide · licencia ISC. Los archivos de íconos se distribuyen con
-              la aplicación, no se guardan en Supabase.
+              Lucide · licencia ISC. Se descargan únicamente los iconos
+              mostrados.
             </small>
           </section>
         </div>

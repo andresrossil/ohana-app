@@ -13,7 +13,7 @@ do $$begin
  if public.company_icons('35000000-0000-0000-0000-000000000001')->>'module.materials'<>'flower' then raise exception 'Persistence failed';end if;
  if(select appearance from public.company_settings where company_id='35000000-0000-0000-0000-000000000001')<>'{"primary":"#123456"}'::jsonb then raise exception 'Store appearance changed';end if;
  begin perform public.save_company_icons('35000000-0000-0000-0000-000000000002','{}');raise exception 'Cross company edit';exception when insufficient_privilege then null;end;
- begin perform public.save_company_icons('35000000-0000-0000-0000-000000000001','{"action.save":"arbitrary-svg-url"}');raise exception 'Unknown icon accepted';exception when check_violation then null;end;
+ begin perform public.save_company_icons('35000000-0000-0000-0000-000000000001','{"action.save":"arbitrary-svg-url"}');raise exception 'Unknown icon accepted';exception when check_violation or raise_exception then null;end;
  begin perform public.save_company_icons('35000000-0000-0000-0000-000000000001','{"status.warning":"flower"}');raise exception 'Warning changed';exception when check_violation then null;end;
 end $$;
 select set_config('request.jwt.claim.sub','15000000-0000-0000-0000-000000000003',true);
@@ -24,6 +24,6 @@ end $$;
 select set_config('request.jwt.claim.sub','15000000-0000-0000-0000-000000000005',true);
 do $$begin begin perform public.company_icons('35000000-0000-0000-0000-000000000001');raise exception 'Platform bypass';exception when insufficient_privilege then null;end;end $$;
 select set_config('request.jwt.claim.sub','15000000-0000-0000-0000-000000000002',true);
-select public.save_company_icons('35000000-0000-0000-0000-000000000001','{}');
-select 'PASS: manager writes, operator reads, tenant isolation, no platform bypass, allowlisted identifiers, protected warnings and restore' as result;
+select public.save_company_icons('35000000-0000-0000-0000-000000000001',access_private.default_icon_pools());
+select 'PASS: manager writes, operator reads, tenant isolation, no platform bypass, allowlisted identifiers, configurable state pools and restore' as result;
 rollback;

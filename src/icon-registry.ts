@@ -6,6 +6,31 @@ export type IconEntry = {
   locked?: boolean;
 };
 export const iconRegistry: IconEntry[] = [
+  {
+    key: "navigation.menu",
+    label: "Abrir menú",
+    category: "Navegación",
+    icon: "menu",
+  },
+  {
+    key: "navigation.close",
+    label: "Cerrar menú",
+    category: "Navegación",
+    icon: "panel-left-close",
+  },
+  {
+    key: "control.sort",
+    label: "Ordenar columnas",
+    category: "Controles",
+    icon: "arrow-up-down",
+  },
+  {
+    key: "control.filter",
+    label: "Filtrar catálogo",
+    category: "Controles",
+    icon: "list-filter",
+  },
+
   ...[
     ["active", "Activo", "circle-check"],
     ["archived", "Archivado", "archive"],
@@ -82,17 +107,15 @@ export const iconRegistry: IconEntry[] = [
   },
   {
     key: "status.warning",
-    label: "Advertencia (fijo)",
+    label: "Advertencia",
     category: "Estados",
     icon: "triangle-alert",
-    locked: true,
   },
   {
     key: "status.error",
-    label: "Error (fijo)",
+    label: "Error",
     category: "Estados",
     icon: "circle-alert",
-    locked: true,
   },
 ];
 export function actionIcon(text: string) {

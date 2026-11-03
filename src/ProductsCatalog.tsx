@@ -80,6 +80,7 @@ export default function ProductsCatalog({
             }))
           }
         >
+          <AppIcon name="control.sort" />
           {label}{" "}
           {sort.column === column
             ? sort.direction === "asc"

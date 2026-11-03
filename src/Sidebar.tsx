@@ -1,3 +1,4 @@
+import { AppIcon } from "./AppIcon";
 import NavIcon from "./NavIcon";
 import { useState } from "react";
 import type { CatalogRow } from "./sheet-model";
@@ -69,7 +70,7 @@ export default function Sidebar({
           aria-controls="ohana-navigation"
           onClick={() => setOpen(!open)}
         >
-          {open ? "×" : "☰"}
+          <AppIcon name={open ? "navigation.close" : "navigation.menu"} />
         </button>
       </div>
       <div id="ohana-navigation" className="sidebar-content">

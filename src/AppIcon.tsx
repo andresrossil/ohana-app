@@ -133,9 +133,7 @@ export function AppIcon({
   const saved = useContext(Context),
     entry = iconRegistry.find((e) => e.key === name);
   if (!entry) return null;
-  const selected = entry.locked
-    ? entry.icon
-    : override || saved[name] || entry.icon;
+  const selected = override || saved[name] || entry.icon;
   const Icon = defaults[selected];
   return (
     <span className="app-icon" aria-hidden="true">
