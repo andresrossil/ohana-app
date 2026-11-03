@@ -1677,3 +1677,5 @@ import "./admin-forms.css";
 import "./configuration.css";
 
 import "./mobile.css";
+
+import "./layout-polish.css";

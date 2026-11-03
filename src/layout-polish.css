@@ -1,0 +1,320 @@
+/* Shared layout corrections; colors and business behavior remain owned by existing components. */
+.shell main,
+.shell main > *,
+.shell fieldset,
+.shell legend,
+.shell .settings-grid,
+.shell .toolbar > *,
+.shell .hierarchy-toolbar > * {
+  min-width: 0;
+}
+.shell .overlay {
+  z-index: 1000;
+}
+.shell .overlay.confirm-overlay {
+  z-index: 20000;
+}
+body:has(.overlay) {
+  overflow: hidden;
+}
+.shell .modal {
+  max-width: calc(100vw - 32px);
+  min-width: 0;
+  overscroll-behavior: contain;
+}
+.shell button > span:not(.app-icon) {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.shell .app-icon {
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+.shell
+  :is(
+    .form-actions,
+    .tree-actions,
+    .hierarchy-toolbar,
+    .settings-tabs,
+    .sheet-controls,
+    .catalog-entry-actions
+  ) {
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.shell :is(.intro, .toolbar, .hierarchy-toolbar) {
+  gap: 16px;
+}
+.shell :is(h1, h2, h3, h4, legend, summary, small) {
+  overflow-wrap: anywhere;
+}
+.shell :is(.table-wrap, .formula-table-scroll, .partner-table-scroll) {
+  min-width: 0;
+  max-width: 100%;
+  overscroll-behavior-x: contain;
+}
+.shell .settings-panel .table-wrap {
+  margin: 0;
+  width: 100%;
+}
+.shell .pool-details > summary {
+  line-height: 1.45;
+}
+.shell .pool-details > summary > .app-icon {
+  flex: 0 0 16px;
+}
+.shell .formula-dialog .formula-line-notes textarea {
+  min-height: 72px;
+}
+.shell .formula-dialog .formula-line-notes {
+  max-width: 100%;
+}
+.shell .additional-cost-settings td.actions {
+  display: table-cell;
+}
+@media (min-width: 1001px) {
+  .shell {
+    grid-template-columns: 240px minmax(0, 1fr);
+  }
+}
+@media (min-width: 761px) {
+  .shell .modal .hierarchy-toolbar {
+    align-items: center;
+  }
+  .shell .modal .hierarchy-toolbar h2 {
+    flex: 1 1 260px;
+    margin: 0;
+  }
+  .shell .formula-dialog .formula-lines td:first-child {
+    min-width: 260px;
+  }
+}
+@media (max-width: 760px) {
+  .shell .modal {
+    scrollbar-gutter: stable;
+  }
+  .shell .modal .hierarchy-toolbar {
+    gap: 8px;
+  }
+  .shell .modal .hierarchy-toolbar > h2 {
+    flex: 1 1 160px;
+  }
+  .shell .modal .hierarchy-toolbar > button {
+    flex: 0 1 auto;
+    padding-inline: 10px;
+  }
+  .shell form .form-actions button {
+    padding: 10px;
+    font-size: 14px;
+  }
+  .shell .catalog .actions button {
+    white-space: normal;
+    margin: 0;
+    min-height: 44px;
+  }
+  .shell
+    .responsive-table
+    > tbody
+    > tr
+    > td:has(select[aria-label^="Base de cantidad"]) {
+    grid-column: 1/-1;
+  }
+  .shell .formula-dialog .formula-lines td > select + input {
+    margin-top: 8px;
+  }
+  .shell .responsive-table > tbody > tr > .mobile-cell-wide {
+    grid-column: 1/-1;
+  }
+  .shell .additional-cost-settings .responsive-table > tbody > tr > td.actions {
+    display: flex;
+    gap: 8px;
+  }
+  .shell .formula-dialog .formula-line-notes summary {
+    min-height: 40px;
+  }
+  .shell .formula-dialog .formula-summary {
+    padding: 12px;
+    gap: 14px;
+  }
+  .shell .formula-dialog .formula-summary strong {
+    overflow-wrap: anywhere;
+  }
+  .shell .modal form > .form-actions {
+    border-top: 1px solid var(--admin-border);
+  }
+  .shell .modal .responsive-table input {
+    min-height: 44px;
+  }
+}
+@media (max-width: 360px) {
+  .shell .responsive-table > tbody > tr {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .shell .modal .hierarchy-toolbar > h2 {
+    font-size: 18px;
+  }
+  .shell .modal .hierarchy-toolbar > button {
+    font-size: 14px;
+  }
+}
+html:has(.overlay) {
+  overflow: hidden;
+}
+.shell button > span:not(.app-icon) {
+  overflow-wrap: normal;
+  word-break: normal;
+}
+.shell td button:not(.sheet-sort) {
+  width: max-content;
+  max-width: 100%;
+  height: auto;
+}
+.shell .formula-dialog .formula-lines td button {
+  min-width: 100px;
+}
+@media (max-width: 760px) {
+  .shell .modal {
+    scroll-padding-bottom: 180px;
+  }
+  .shell .responsive-table > tbody > tr > td button {
+    max-width: 100%;
+  }
+}
+@media (max-height: 600px) {
+  .shell .modal form > .form-actions {
+    position: static;
+  }
+}
+@media (min-width: 761px) {
+  .shell .sidebar-top > .menu-toggle {
+    display: none;
+  }
+  .shell .app-sidebar {
+    overflow-x: hidden;
+  }
+}
+@media (max-width: 760px) {
+  .shell .theme-options {
+    grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
+  }
+  .shell form .settings-grid:has(.color-control) {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+  .shell form .settings-grid:has(.color-control) > label {
+    grid-column: auto !important;
+  }
+  .shell .color-control {
+    gap: 6px;
+  }
+  .shell .color-control code {
+    font-size: 11px;
+  }
+}
+.shell input[type="checkbox"],
+.shell input[type="radio"] {
+  flex-shrink: 0;
+}
+@media (max-width: 760px) {
+  .shell input[type="checkbox"],
+  .shell input[type="radio"] {
+    flex: 0 0 22px;
+  }
+  .shell form > label:has(.formula-line-notes) {
+    grid-column: 1/-1 !important;
+  }
+  .shell .modal form > .form-actions {
+    align-items: stretch;
+  }
+}
+@media (max-width: 480px) {
+  .shell .operations-dialog form > .form-actions > button:first-child {
+    flex-basis: 100%;
+  }
+}
+.shell td > .app-icon {
+  margin-inline-end: 6px;
+}
+.shell form fieldset {
+  border-color: var(--admin-border);
+  border-radius: 8px;
+}
+@media (min-width: 380px) and (max-width: 760px) {
+  .shell form label:has(> select[name="unit"]),
+  .shell form label:has(> input[name="currency"]) {
+    grid-column: auto !important;
+  }
+}
+html:has(dialog[open]),
+body:has(dialog[open]) {
+  overflow: hidden;
+}
+.shell .bulk-import-dialog .import-heading h2 {
+  font-family: var(--admin-font), sans-serif;
+  color: var(--admin-heading);
+  font-size: 24px;
+}
+.shell .bulk-import-dialog .import-heading > div {
+  min-width: 0;
+  max-width: 100%;
+}
+.shell .bulk-import-dialog .import-heading p {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.shell .bulk-import-dialog .import-actions {
+  align-items: center;
+  flex: 0 0 auto;
+}
+.shell .bulk-import-dialog .import-actions button {
+  height: 44px;
+  min-height: 44px;
+  flex-grow: 1;
+}
+@media (max-width: 760px) {
+  .shell .bulk-import-dialog {
+    inset: 0;
+    margin: auto;
+    width: calc(100vw - 20px);
+    height: calc(var(--ohana-vh, 100dvh) - 20px);
+    max-height: calc(var(--ohana-vh, 100dvh) - 20px);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  .shell .bulk-import-dialog .sheet-panel {
+    height: 100%;
+    min-height: 0;
+    min-width: 0;
+    width: 100%;
+  }
+  .shell .bulk-import-dialog .import-heading {
+    position: static;
+    flex: 0 0 auto;
+    gap: 10px;
+    padding: 12px;
+  }
+  .shell .bulk-import-dialog .sheet-scroll {
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 100px;
+    max-height: none;
+  }
+  .shell .bulk-import-dialog .sheet-footnote {
+    flex: 0 0 auto;
+    padding: 10px 12px;
+  }
+  .shell .responsive-table > thead:has(button) th {
+    flex: 0 0 auto;
+    min-width: max-content;
+    max-width: none;
+  }
+}
+.shell .modal > form {
+  clear: both;
+  width: 100%;
+}
+@media (max-width: 760px) {
+  .shell .bulk-import-dialog .import-actions {
+    height: 44px;
+    max-height: 44px;
+  }
+}
