@@ -226,7 +226,6 @@ export function validateRow(
   const material = row.materialId
     ? materials.find((m) => m.id === row.materialId)
     : materials.find((m) => normalize(m.name) === normalize(c[2]));
-  if (material && !material.active) errors.push("Material archivado");
   const base = units.find((u) => u.id === material?.unit_id);
   if (base && unit && base.dimension !== unit.dimension)
     errors.push("La unidad no es compatible con el material");

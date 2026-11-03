@@ -793,6 +793,19 @@ export default function MaterialSheet({
     (r) => duplicate(r) && !r.duplicateChoice,
   );
   async function save() {
+    if (busy) return;
+    const archived = new Map<string, string>();
+    for (const row of dirty) {
+      const material = row.materialId
+        ? materials.find((m) => m.id === row.materialId)
+        : materials.find((m) => normalize(m.name) === normalize(row.cells[2]));
+      if (material && !material.active)
+        archived.set(material.id, `${material.sku || row.cells[13]?.trim() || "Sin SKU"} · ${material.name}`);
+    }
+    if (archived.size && !(await confirmAction(
+      `Vas a modificar materiales archivados o inactivos:\n\n${[...archived.values()].join("\n")}\n\nPuedes guardar los cambios. Los materiales conservarán su estado archivado o inactivo.`,
+      { title: "Advertencia: materiales archivados", confirmText: "Continuar y guardar", cancelText: "Cancelar", iconKey: "status.warning" },
+    ))) return;
     setBusy(true);
     setError("");
     try {
