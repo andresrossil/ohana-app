@@ -11,7 +11,7 @@ export function prefixFor(
 ) {
   return kind === "product"
     ? "P"
-    : classification === "Materia prima"
+    : classification === "Materia prima" || classification === "Insumos"
       ? "M"
       : classification === "Material de empaque"
         ? "E"

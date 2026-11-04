@@ -22,7 +22,11 @@ export const visualOrder = [
   13, 14, 15, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 16,
 ];
 export const manualColumns = [0, 1, 2, 3, 4, 5, 6, 7, 12, 13, 14, 15, 16];
-export const classifications = ["Materia prima", "Material de empaque"];
+export const classifications = [
+  "Materia prima",
+  "Material de empaque",
+  "Insumos",
+];
 export type SheetRow = {
   key: string;
   cells: string[];
@@ -237,7 +241,9 @@ export function validateRow(
   )
     errors.push("PRECIO ANTERIOR inválido");
   if (c[14] && !classifications.includes(c[14]))
-    errors.push("CLASIFICACIÓN: elige Materia prima o Material de empaque");
+    errors.push(
+      "CLASIFICACIÓN: elige Materia prima, Material de empaque o Insumos",
+    );
   if ((c[13] || "").length > 80) errors.push("SKU: máximo 80 caracteres");
   if (c[16] && (!/^[\x20-\x7E]+$/.test(c[16]) || c[16].length > 80))
     errors.push(
