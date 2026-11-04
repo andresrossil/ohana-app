@@ -63,6 +63,7 @@ const blankLine = (
 });
 const initial = (): Row => ({
   product: "",
+  production_mode: "fixed",
   name: "",
   code: "",
   capture_mode: "quantity",
@@ -411,6 +412,13 @@ export default function Formulas({
     await state.run(async () => {
       const payload = {
         ...draft,
+        ...(draft.production_mode === "variable_weight"
+          ? {
+              estimate_variant_id: "",
+              estimate_unit_id: "",
+              quantity_per_unit: "",
+            }
+          : {}),
         labor_level_id: "",
         advertising_level_id: "",
         kind: mode,
@@ -1009,19 +1017,25 @@ export default function Formulas({
                     </td>
                     <td className="formula-amount">
                       {price == null
-                        ? "Pendiente"
+                        ? f.production_mode === "variable_weight"
+                          ? "Según variante"
+                          : "Pendiente"
                         : money(price, catalog.currency)}
                       {price == null && (
                         <small>
                           {presentation
                             ? "Sin precio base vigente"
-                            : "Sin presentación vinculada"}
+                            : f.production_mode === "variable_weight"
+                              ? "Precio según variante y peso"
+                              : "Sin presentación vinculada"}
                         </small>
                       )}
                     </td>
                     <td className="formula-amount">
                       {estimate.cost == null
-                        ? "Pendiente"
+                        ? f.production_mode === "variable_weight"
+                          ? "Según peso real"
+                          : "Pendiente"
                         : money(estimate.cost, catalog.currency)}
                       {estimate.reason && <small>{estimate.reason}</small>}
                     </td>
@@ -1036,7 +1050,9 @@ export default function Formulas({
                       }
                     >
                       {margin == null
-                        ? "Pendiente"
+                        ? f.production_mode === "variable_weight"
+                          ? "Según peso real"
+                          : "Pendiente"
                         : money(margin, catalog.currency)}
                     </td>
                     <td className="actions formula-actions">
@@ -1287,6 +1303,23 @@ export default function Formulas({
               <fieldset disabled={readOnly || state.busy}>
                 <legend>Producción estimada · opcional</legend>
                 <label>
+                  Modalidad de producción
+                  <select
+                    value={draft.production_mode || "fixed"}
+                    onChange={(e) => field("production_mode", e.target.value)}
+                  >
+                    <option value="fixed">Producción fija</option>
+                    <option value="variable_weight">
+                      Producción variable por peso
+                    </option>
+                  </select>
+                  <small>
+                    {draft.production_mode === "variable_weight"
+                      ? "Una misma fórmula produce distintas variantes. Los pesos reales se registran al terminar el lote."
+                      : "Presentación definida y costo según las unidades obtenidas."}
+                  </small>
+                </label>
+                <label>
                   Unidades estimadas
                   <DecimalInput
                     type="number"
@@ -1301,124 +1334,132 @@ export default function Formulas({
                     onChange={(e) => field("estimated_units", e.target.value)}
                   />
                 </label>
-                <label>
-                  Presentación comercial
-                  <select
-                    value={draft.estimate_variant_id || ""}
-                    onChange={(e) => {
-                      field("estimate_variant_id", e.target.value);
-                      const v = (catalog.presentations || []).find(
-                        (v: Row) => v.id === e.target.value,
-                      );
-                      if (
-                        v?.weight_min != null &&
-                        Number(v.weight_min) === Number(v.weight_max)
-                      ) {
-                        const unit = catalog.units.find(
-                          (u: Row) =>
-                            u.active &&
-                            u.dimension === "mass" &&
-                            Number(u.base_factor) === 1,
-                        );
-                        if (unit) {
-                          field("estimate_unit_id", unit.id);
-                          field("quantity_per_unit", Number(v.weight_min));
-                        }
-                      }
-                    }}
-                  >
-                    <option value="">Sin definir</option>
-                    {(catalog.presentations || [])
-                      .filter(
-                        (v: Row) =>
-                          v.product_id === draft.product &&
-                          (v.active || v.id === draft.estimate_variant_id),
-                      )
-                      .map((v: Row) => (
-                        <option key={v.id} value={v.id}>
-                          {v.name}
-                        </option>
-                      ))}
-                  </select>
-                  <small>
-                    {(catalog.presentations || []).some(
-                      (v: Row) => v.product_id === draft.product && v.active,
-                    )
-                      ? "Selecciona el formato comercial del producto. Su contenido exacto se completa cuando está definido."
-                      : "Este producto aún no tiene presentaciones comerciales. Configúralas en Productos → Variantes y existencias."}
-                  </small>
-                </label>
-                <label>
-                  Unidad del contenido
-                  <select
-                    value={draft.estimate_unit_id || ""}
-                    onChange={(e) => {
-                      field("estimate_unit_id", e.target.value);
-                      const v = (catalog.presentations || []).find(
-                          (v: Row) => v.id === draft.estimate_variant_id,
-                        ),
-                        u = catalog.units.find(
-                          (u: Row) => u.id === e.target.value,
-                        );
-                      if (
-                        v?.weight_min != null &&
-                        Number(v.weight_min) === Number(v.weight_max) &&
-                        u?.dimension === "mass"
-                      )
-                        field(
-                          "quantity_per_unit",
-                          Number(v.weight_min) / Number(u.base_factor),
-                        );
-                    }}
-                  >
-                    <option value="">Sin definir</option>
-                    {catalog.units
-                      .filter((u: Row) => {
-                        const product = catalog.products.find(
-                            (p: Row) => p.id === draft.product,
-                          ),
-                          base = catalog.units.find(
-                            (b: Row) => b.id === product?.unit_id,
+                {draft.production_mode !== "variable_weight" && (
+                  <>
+                    <label>
+                      Presentación comercial
+                      <select
+                        value={draft.estimate_variant_id || ""}
+                        onChange={(e) => {
+                          field("estimate_variant_id", e.target.value);
+                          const v = (catalog.presentations || []).find(
+                            (v: Row) => v.id === e.target.value,
                           );
-                        return (
-                          u.id === draft.estimate_unit_id ||
-                          (u.active &&
-                            (base || draft.estimate_variant_id) &&
-                            (u.dimension === base?.dimension ||
-                              (draft.estimate_variant_id &&
-                                u.dimension === "mass")) &&
-                            ["g", "kg", "ml", "l"].includes(
-                              u.symbol.toLowerCase(),
-                            ))
-                        );
-                      })
-                      .map((u: Row) => (
-                        <option key={u.id} value={u.id}>
-                          {u.symbol}
-                        </option>
-                      ))}
-                  </select>
-                  <small>
-                    Usa la unidad configurada en el producto o una equivalente.
-                  </small>
-                </label>
-                <label>
-                  Contenido por unidad
-                  <DecimalInput
-                    type="number"
-                    min="0.00000001"
-                    max="999999999999"
-                    step="any"
-                    readOnly={(catalog.presentations || []).some(
-                      (v: Row) =>
-                        v.id === draft.estimate_variant_id &&
-                        v.weight_min != null &&
-                        Number(v.weight_min) === Number(v.weight_max),
-                    )}
-                    value={draft.quantity_per_unit ?? ""}
-                    onChange={(e) => field("quantity_per_unit", e.target.value)}
-                  />
-                </label>
+                          if (
+                            v?.weight_min != null &&
+                            Number(v.weight_min) === Number(v.weight_max)
+                          ) {
+                            const unit = catalog.units.find(
+                              (u: Row) =>
+                                u.active &&
+                                u.dimension === "mass" &&
+                                Number(u.base_factor) === 1,
+                            );
+                            if (unit) {
+                              field("estimate_unit_id", unit.id);
+                              field("quantity_per_unit", Number(v.weight_min));
+                            }
+                          }
+                        }}
+                      >
+                        <option value="">Sin definir</option>
+                        {(catalog.presentations || [])
+                          .filter(
+                            (v: Row) =>
+                              v.product_id === draft.product &&
+                              (v.active || v.id === draft.estimate_variant_id),
+                          )
+                          .map((v: Row) => (
+                            <option key={v.id} value={v.id}>
+                              {v.name}
+                            </option>
+                          ))}
+                      </select>
+                      <small>
+                        {(catalog.presentations || []).some(
+                          (v: Row) =>
+                            v.product_id === draft.product && v.active,
+                        )
+                          ? "Selecciona el formato comercial del producto. Su contenido exacto se completa cuando está definido."
+                          : "Este producto aún no tiene presentaciones comerciales. Configúralas en Productos → Variantes y existencias."}
+                      </small>
+                    </label>
+                    <label>
+                      Unidad del contenido
+                      <select
+                        value={draft.estimate_unit_id || ""}
+                        onChange={(e) => {
+                          field("estimate_unit_id", e.target.value);
+                          const v = (catalog.presentations || []).find(
+                              (v: Row) => v.id === draft.estimate_variant_id,
+                            ),
+                            u = catalog.units.find(
+                              (u: Row) => u.id === e.target.value,
+                            );
+                          if (
+                            v?.weight_min != null &&
+                            Number(v.weight_min) === Number(v.weight_max) &&
+                            u?.dimension === "mass"
+                          )
+                            field(
+                              "quantity_per_unit",
+                              Number(v.weight_min) / Number(u.base_factor),
+                            );
+                        }}
+                      >
+                        <option value="">Sin definir</option>
+                        {catalog.units
+                          .filter((u: Row) => {
+                            const product = catalog.products.find(
+                                (p: Row) => p.id === draft.product,
+                              ),
+                              base = catalog.units.find(
+                                (b: Row) => b.id === product?.unit_id,
+                              );
+                            return (
+                              u.id === draft.estimate_unit_id ||
+                              (u.active &&
+                                (base || draft.estimate_variant_id) &&
+                                (u.dimension === base?.dimension ||
+                                  (draft.estimate_variant_id &&
+                                    u.dimension === "mass")) &&
+                                ["g", "kg", "ml", "l"].includes(
+                                  u.symbol.toLowerCase(),
+                                ))
+                            );
+                          })
+                          .map((u: Row) => (
+                            <option key={u.id} value={u.id}>
+                              {u.symbol}
+                            </option>
+                          ))}
+                      </select>
+                      <small>
+                        Usa la unidad configurada en el producto o una
+                        equivalente.
+                      </small>
+                    </label>
+                    <label>
+                      Contenido por unidad
+                      <DecimalInput
+                        type="number"
+                        min="0.00000001"
+                        max="999999999999"
+                        step="any"
+                        readOnly={(catalog.presentations || []).some(
+                          (v: Row) =>
+                            v.id === draft.estimate_variant_id &&
+                            v.weight_min != null &&
+                            Number(v.weight_min) === Number(v.weight_max),
+                        )}
+                        value={draft.quantity_per_unit ?? ""}
+                        onChange={(e) =>
+                          field("quantity_per_unit", e.target.value)
+                        }
+                      />
+                    </label>
+                  </>
+                )}
                 <label>
                   Peso teórico de ingredientes
                   <input

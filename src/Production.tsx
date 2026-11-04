@@ -107,6 +107,9 @@ function ProductionBatches({
     return () => onDirty(false);
   }, [dirty, onDirty]);
   useEffect(() => {
+    if (pendingUnitWeight) setDirty(true);
+  }, [pendingUnitWeight]);
+  useEffect(() => {
     const leave = (e: BeforeUnloadEvent) => {
       if (dirty) {
         e.preventDefault();
@@ -138,6 +141,13 @@ function ProductionBatches({
     (sum, n) => sum + Number(n || 0),
     0,
   );
+  const variableWeight = estimating?.production_mode === "variable_weight";
+  const perUnitMaterials = (estimating?.ingredients || []).filter(
+    (i: Row) =>
+      i.line_kind === "packaging" ||
+      (i.line_kind === "auxiliary" && i.quantity_basis === "unit"),
+  );
+  const realWeight = weighedUnits.reduce((sum, u) => sum + u.weight, 0);
   const neededUnits =
     mode === "start"
       ? Number(draftUnits)
@@ -175,16 +185,39 @@ function ProductionBatches({
   const extraQuote = additionalCosts(
     costCatalog.additional_costs,
     costCatalog.currency,
-    Number(estimating?.estimated_units) > 0
-      ? Number(estimating!.estimated_units) * factor
-      : null,
-    costCatalog.presentations.find(
-      (v: Row) => v.id === estimating?.estimate_variant_id,
-    ),
+    neededUnits > 0 ? neededUnits : null,
+    variableWeight
+      ? undefined
+      : costCatalog.presentations.find(
+          (v: Row) => v.id === estimating?.estimate_variant_id,
+        ),
     estimating?.labor_level_id,
     estimating?.advertising_level_id,
     estimating?.overhead_lines || [],
   );
+  const fixedPreview = additionalCosts(
+    costCatalog.additional_costs,
+    costCatalog.currency,
+    neededUnits > 0 ? neededUnits : null,
+    undefined,
+    "",
+    "",
+    (estimating?.overhead_lines || []).filter(
+      (line: Row) =>
+        costCatalog.additional_costs.find((c: Row) => c.id === line.cost_id)
+          ?.kind === "overhead",
+    ),
+  );
+  const perUnitPreview =
+    baseMath?.rows
+      .filter((r) =>
+        perUnitMaterials.some((m: Row) => m.material_id === r.material?.id),
+      )
+      .reduce((sum, r) => sum + (r.cost ?? 0), 0) ?? 0;
+  const commonPreview =
+    baseMath?.totalCost != null && fixedPreview.additional_total != null
+      ? baseMath.totalCost - perUnitPreview + fixedPreview.additional_total
+      : null;
   return (
     <>
       <section className="intro">
@@ -309,7 +342,7 @@ function ProductionBatches({
                     batch: selected!.id,
                     expected_revision: formula!.edit_revision,
                     scrap: f.get("scrap"),
-                    weight: f.get("weight"),
+                    weight: variableWeight ? realWeight : f.get("weight"),
                     consumptions: formula!.ingredients.map((r: Row) => ({
                       material: r.material_id,
                       unit: r.unit_id,
@@ -330,6 +363,9 @@ function ProductionBatches({
                               unit_weights: weighedUnits
                                 .filter((u) => u.variant === v.id)
                                 .map((u) => u.weight),
+                              unit_materials: weighedUnits
+                                .filter((u) => u.variant === v.id)
+                                .map((u) => u.materialQuantities || {}),
                             }
                           : {}),
                       })),
@@ -513,71 +549,170 @@ function ProductionBatches({
                     units={weighedUnits}
                     busy={state.busy}
                     onPending={setPendingUnitWeight}
-                    onAdd={(variant, weight) => {
-                      if (
-                        !weighedUnits.some((u) => u.variant === variant.id) &&
-                        (Number(outputUnits[variant.id]) > 0 ||
-                          Number(outputWeights[variant.id]) > 0)
-                      ) {
-                        state.setError(
-                          "Esta variante ya tiene captura manual. Limpia su cantidad y peso para registrar por unidad.",
-                        );
-                        return false;
-                      }
-                      const units = [
-                        ...weighedUnits,
-                        {
-                          key: crypto.randomUUID(),
-                          variant: variant.id,
-                          weight,
-                        },
-                      ];
+                    currency={costCatalog.currency}
+                    unitMaterials={
+                      variableWeight
+                        ? perUnitMaterials.map((m: Row) => ({
+                            id: m.material_id,
+                            name: m.name,
+                            unit: m.unit,
+                            quantity: consumed[m.material_id] ?? suggested(m),
+                          }))
+                        : []
+                    }
+                    onReplace={(units) => {
                       setWeighedUnits(units);
-                      const rows = units.filter(
-                        (u) => u.variant === variant.id,
-                      );
-                      setOutputUnits((old) => ({
-                        ...old,
-                        [variant.id]: String(rows.length),
-                      }));
-                      setOutputWeights((old) => ({
-                        ...old,
-                        [variant.id]: String(
-                          Math.round(
-                            rows.reduce((sum, u) => sum + u.weight, 0) * 10000,
-                          ) / 10000,
-                        ),
-                      }));
+                      const amounts: Record<string, string> = {},
+                        weights: Record<string, string> = {};
+                      catalog.variants
+                        .filter(
+                          (v: Row) => v.product_id === selected!.product_id,
+                        )
+                        .forEach((v: Row) => {
+                          const group = units.filter((u) => u.variant === v.id);
+                          amounts[v.id] = String(group.length);
+                          weights[v.id] = group.length
+                            ? String(
+                                Math.round(
+                                  group.reduce((s, u) => s + u.weight, 0) *
+                                    10000,
+                                ) / 10000,
+                              )
+                            : "";
+                        });
+                      if (!variableWeight) catalog.variants.forEach((v:Row)=>{
+                        if (v.weight_min==null && !weighedUnits.some(u=>u.variant===v.id) && !units.some(u=>u.variant===v.id)) { delete amounts[v.id]; delete weights[v.id]; }
+                      });
+                      setOutputUnits(old=>({...old,...amounts}));
+                      setOutputWeights(old=>({...old,...weights}));
                       setDirty(true);
-                      state.setError("");
-                      return true;
                     }}
-                    onRemove={(key) => {
-                      const removed = weighedUnits.find((u) => u.key === key);
-                      if (!removed) return;
-                      const units = weighedUnits.filter((u) => u.key !== key),
-                        rows = units.filter(
-                          (u) => u.variant === removed.variant,
-                        );
-                      setWeighedUnits(units);
-                      setOutputUnits((old) => ({
-                        ...old,
-                        [removed.variant]: String(rows.length),
-                      }));
-                      setOutputWeights((old) => ({
-                        ...old,
-                        [removed.variant]: rows.length
-                          ? String(
-                              Math.round(
-                                rows.reduce((sum, u) => sum + u.weight, 0) *
-                                  10000,
-                              ) / 10000,
-                            )
-                          : "",
-                      }));
-                      setDirty(true);
+                    costFor={(v, w, n, totalWeight, quantities) => {
+                      const perUnitCost =
+                        baseMath?.rows
+                          .filter((r) =>
+                            perUnitMaterials.some(
+                              (m: Row) => m.material_id === r.material?.id,
+                            ),
+                          )
+                          .reduce((s, r) => s + (r.cost ?? 0), 0) ?? 0;
+                      const fixed = additionalCosts(
+                        costCatalog.additional_costs,
+                        costCatalog.currency,
+                        n,
+                        undefined,
+                        "",
+                        "",
+                        (estimating?.overhead_lines || []).filter(
+                          (line: Row) =>
+                            costCatalog.additional_costs.find(
+                              (c: Row) => c.id === line.cost_id,
+                            )?.kind === "overhead",
+                        ),
+                      );
+                      const assigned = perUnitMaterials.reduce(
+                        (sum: number, m: Row) => {
+                          const totalQuantity = Number(
+                            consumed[m.material_id] ?? suggested(m),
+                          );
+                          const quantity =
+                            quantities[m.material_id] !== undefined &&
+                            quantities[m.material_id] !== ""
+                              ? Number(quantities[m.material_id])
+                              : totalQuantity / n;
+                          const cost = baseMath?.rows.find(
+                            (r) => r.material?.id === m.material_id,
+                          )?.cost;
+                          return (
+                            sum +
+                            (totalQuantity > 0 && cost != null
+                              ? (cost * quantity) / totalQuantity
+                              : 0)
+                          );
+                        },
+                        0,
+                      );
+                      const manufacturing =
+                        baseMath?.totalCost != null &&
+                        fixed.additional_total != null &&
+                        totalWeight > 0
+                          ? ((baseMath.totalCost -
+                              perUnitCost +
+                              fixed.additional_total) *
+                              w) /
+                              totalWeight +
+                            assigned
+                          : null;
+                      const ref = costCatalog.presentations.find(
+                        (p: Row) => p.id === v.id,
+                      );
+                      const commercial = additionalCosts(
+                        costCatalog.additional_costs,
+                        costCatalog.currency,
+                        1,
+                        ref,
+                        "",
+                        "",
+                        (estimating?.overhead_lines || []).filter(
+                          (line: Row) =>
+                            costCatalog.additional_costs.find(
+                              (c: Row) => c.id === line.cost_id,
+                            )?.kind !== "overhead",
+                        ),
+                      );
+                      const total =
+                        manufacturing != null &&
+                        commercial.additional_total != null
+                          ? manufacturing + commercial.additional_total
+                          : null;
+                      return {
+                        manufacturing_cost: manufacturing,
+                        commercial_cost: commercial.additional_total,
+                        total_cost: total,
+                        sale_price: ref?.price ?? null,
+                        margin:
+                          ref?.price != null && total != null
+                            ? Number(ref.price) - total
+                            : null,
+                      };
                     }}
                   />
+                  {variableWeight && (
+                    <section className="formula-summary">
+                      <div>
+                        <span>Unidades / peso real</span>
+                        <strong>
+                          {weighedUnits.length} ·{" "}
+                          {realWeight.toLocaleString("es-GT", {
+                            maximumFractionDigits: 4,
+                          })}{" "}
+                          g
+                        </strong>
+                      </div>
+                      <div>
+                        <span>Fabricación común por gramo · estimación</span>
+                        <strong>
+                          {commonPreview != null && realWeight > 0
+                            ? money(
+                                commonPreview / realWeight,
+                                costCatalog.currency,
+                              )
+                            : "Pendiente"}
+                        </strong>
+                      </div>
+                      <div>
+                        <span>Fabricación total · estimación</span>
+                        <strong>
+                          {commonPreview != null
+                            ? money(
+                                commonPreview + perUnitPreview,
+                                costCatalog.currency,
+                              )
+                            : "Pendiente"}
+                        </strong>
+                      </div>
+                    </section>
+                  )}
                   <p>
                     Las variantes con rango de peso se registran unidad por
                     unidad arriba. Para las demás puedes capturar la cantidad y,
@@ -603,6 +738,7 @@ function ProductionBatches({
                             value={outputUnits[v.id] || "0"}
                             readOnly={
                               v.weight_min != null ||
+                              variableWeight ||
                               weighedUnits.some((u) => u.variant === v.id)
                             }
                           />
@@ -623,6 +759,7 @@ function ProductionBatches({
                             }
                             readOnly={
                               v.weight_min != null ||
+                              variableWeight ||
                               weighedUnits.some((u) => u.variant === v.id)
                             }
                           />
@@ -652,6 +789,8 @@ function ProductionBatches({
                       Peso total real del lote (g, opcional)
                       <input
                         name="weight"
+                        readOnly={variableWeight}
+                        value={variableWeight ? realWeight || "" : undefined}
                         type="number"
                         min="0.0001"
                         step="any"
@@ -659,9 +798,9 @@ function ProductionBatches({
                     </label>
                   </div>
                   <p>
-                    El costo se reparte por peso real o por el punto medio del
-                    rango. Si faltan pesos o costos de materiales, quedará
-                    pendiente.
+                    {variableWeight
+                      ? "La fabricación común se reparte por el peso real. Empaque e insumos por unidad usan el consumo registrado. Mano de obra y publicidad se calculan con el precio base de cada variante. Los valores previos a confirmar son estimaciones."
+                      : "El costo se reparte según el rendimiento obtenido. Si faltan pesos o costos de materiales, quedará pendiente."}
                   </p>
                 </>
               ) : (
@@ -696,7 +835,7 @@ function ProductionBatches({
                   units={Number(draftUnits)}
                 />
               )}
-              {estimating && mode !== "release" && (
+              {estimating && mode !== "release" && !variableWeight && (
                 <AdditionalCostsPanel
                   quote={extraQuote}
                   baseCost={baseMath?.totalCost ?? null}
@@ -775,7 +914,36 @@ function ProductionBatches({
                   </td>
                   <td>{b.available_on}</td>
                   <td>
-                    {money(b.total_cost, b.currency)}
+                    {money(
+                      b.recipe_snapshot?.weight_costs?.manufacturing_total ??
+                        b.total_cost,
+                      b.currency,
+                    )}
+                    {b.recipe_snapshot?.weight_costs && (
+                      <>
+                        <small>
+                          Comerciales:{" "}
+                          {money(
+                            b.recipe_snapshot.weight_costs.commercial_total,
+                            b.currency,
+                          )}
+                        </small>
+                        <small>
+                          Total con comerciales:{" "}
+                          {money(
+                            b.recipe_snapshot.weight_costs.total_cost,
+                            b.currency,
+                          )}
+                        </small>
+                        <small>
+                          Fabricación común / g:{" "}
+                          {money(
+                            b.recipe_snapshot.weight_costs.cost_per_gram,
+                            b.currency,
+                          )}
+                        </small>
+                      </>
+                    )}
                     {b.recipe_snapshot?.additional_costs && (
                       <small>
                         Total estimado con adicionales:{" "}

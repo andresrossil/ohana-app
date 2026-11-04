@@ -2,6 +2,7 @@ import { AppIcon } from "./AppIcon";
 import { IconDetails } from "./PoolControls";
 import ResponsiveTable from "./ResponsiveTable";
 import type { Row } from "./operations";
+import { money } from "./operations";
 export const unitStatus: Record<string, string> = {
   curing: "En curación",
   available: "Disponible",
@@ -75,6 +76,8 @@ export default function PhysicalUnits({
               <th>Producto / variante original</th>
               <th>Lote</th>
               <th>Peso real</th>
+              <th>Costos históricos / unidad</th>
+              <th>Margen estimado al producir</th>
               <th>Estado</th>
             </tr>
           </thead>
@@ -112,6 +115,63 @@ export default function PhysicalUnits({
                     maximumFractionDigits: 4,
                   })}{" "}
                   g
+                </td>
+                <td>
+                  {u.cost_snapshot ? (
+                    <>
+                      <strong>
+                        {money(
+                          u.cost_snapshot.total_cost,
+                          u.cost_snapshot.currency,
+                        )}
+                      </strong>
+                      <small>
+                        Fabricación:{" "}
+                        {money(
+                          u.cost_snapshot.manufacturing_cost,
+                          u.cost_snapshot.currency,
+                        )}
+                      </small>
+                      <small>
+                        Comerciales:{" "}
+                        {money(
+                          u.cost_snapshot.commercial_cost,
+                          u.cost_snapshot.currency,
+                        )}
+                      </small>
+                      <small>
+                        {u.cost_snapshot.formula_code} · v
+                        {u.cost_snapshot.formula_version}
+                      </small>
+                    </>
+                  ) : (
+                    "Sin desglose histórico"
+                  )}
+                </td>
+                <td>
+                  {u.cost_snapshot ? (
+                    <>
+                      {money(u.cost_snapshot.margin, u.cost_snapshot.currency)}
+                      <small>
+                        Sobre venta:{" "}
+                        {u.cost_snapshot.margin_on_sale_percent == null
+                          ? "Pendiente"
+                          : Number(
+                              u.cost_snapshot.margin_on_sale_percent,
+                            ).toFixed(2) + " %"}
+                      </small>
+                      <small>
+                        Recargo sobre costo:{" "}
+                        {u.cost_snapshot.markup_on_cost_percent == null
+                          ? "Pendiente"
+                          : Number(
+                              u.cost_snapshot.markup_on_cost_percent,
+                            ).toFixed(2) + " %"}
+                      </small>
+                    </>
+                  ) : (
+                    "—"
+                  )}
                 </td>
                 <td>
                   <UnitState status={u.status} />

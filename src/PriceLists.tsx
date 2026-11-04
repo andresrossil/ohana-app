@@ -617,6 +617,23 @@ export default function PriceLists({
                         {margin == null
                           ? "Pendiente"
                           : money(margin, data.currency)}
+                        {margin != null && (
+                          <>
+                            <small>
+                              Margen / venta:{" "}
+                              {price != null && price > 0
+                                ? ((margin / price) * 100).toFixed(2) + " %"
+                                : "Pendiente"}
+                            </small>
+                            <small>
+                              Recargo / costo:{" "}
+                              {estimate.cost != null && estimate.cost > 0
+                                ? ((margin / estimate.cost) * 100).toFixed(2) +
+                                  " %"
+                                : "Pendiente"}
+                            </small>
+                          </>
+                        )}
                       </td>
                       <td>
                         {v ? (

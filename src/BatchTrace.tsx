@@ -53,6 +53,7 @@ export default function BatchTrace({
     };
   }, [company, id]);
   const snapshot = data?.snapshot;
+  const weightCosts = snapshot?.weight_costs;
   return (
     <div className="overlay">
       <section
@@ -170,11 +171,90 @@ export default function BatchTrace({
                 </div>
                 <p>
                   <strong>
-                    Costo histórico de producción:{" "}
+                    {weightCosts
+                      ? "Consumos históricos de materiales: "
+                      : "Costo histórico de producción: "}
                     {money(snapshot.total_cost, snapshot.currency)}
                   </strong>
                 </p>
-                {snapshot.additional_costs && (
+                {weightCosts && (
+                  <section className="formula-summary">
+                    <div>
+                      <span>Peso real confirmado</span>
+                      <strong>
+                        {num(weightCosts.total_weight)} g ·{" "}
+                        {weightCosts.unit_count} unidades
+                      </strong>
+                    </div>
+                    <div>
+                      <span>Fabricación común / gramo</span>
+                      <strong>
+                        {money(weightCosts.cost_per_gram, snapshot.currency)}
+                      </strong>
+                    </div>
+                    <div>
+                      <span>Fabricación histórica</span>
+                      <strong>
+                        {money(
+                          weightCosts.manufacturing_total,
+                          snapshot.currency,
+                        )}
+                      </strong>
+                    </div>
+                    <div>
+                      <span>Costos comerciales estimados</span>
+                      <strong>
+                        {money(weightCosts.commercial_total, snapshot.currency)}
+                      </strong>
+                    </div>
+                    <div>
+                      <span>Costo total histórico</span>
+                      <strong>
+                        {money(weightCosts.total_cost, snapshot.currency)}
+                      </strong>
+                    </div>
+                    <div className="table-wrap form-wide">
+                      <ResponsiveTable>
+                        <thead>
+                          <tr>
+                            <th>Variante</th>
+                            <th>Peso real</th>
+                            <th>Fabricación</th>
+                            <th>Comerciales</th>
+                            <th>Costo total</th>
+                            <th>Precio base aplicado</th>
+                            <th>Margen sobre venta</th>
+                            <th>Recargo sobre costo</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(weightCosts.units || []).map(
+                            (u: Row, i: number) => (
+                              <tr key={i}>
+                                <td>{u.variant_name || u.variant_id}</td>
+                                <td>{num(u.weight)} g</td>
+                                <td>
+                                  {money(u.manufacturing_cost, u.currency)}
+                                </td>
+                                <td>{money(u.commercial_cost, u.currency)}</td>
+                                <td>{money(u.total_cost, u.currency)}</td>
+                                <td>
+                                  {money(u.price_reference?.price, u.currency)}
+                                </td>
+                                <td>
+                                  {money(u.margin, u.currency)} ·{" "}
+                                  {num(u.margin_on_sale_percent)} %
+                                </td>
+                                <td>{num(u.markup_on_cost_percent)} %</td>
+                              </tr>
+                            ),
+                          )}
+                        </tbody>
+                      </ResponsiveTable>
+                    </div>
+                  </section>
+                )}
+                {snapshot.additional_costs && !weightCosts && (
                   <AdditionalCostsPanel
                     quote={snapshot.additional_costs}
                     baseCost={

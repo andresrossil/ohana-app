@@ -369,3 +369,5 @@
 @media (max-width: 760px) {
   .shell .formula-amount { min-width: 0; overflow-wrap: anywhere; }
 }
+.shell .weight-paste-panel { display: grid; gap: 6px; padding: 12px; margin: 12px 0; border: 1px solid var(--admin-border); border-left: 4px solid var(--admin-primary); border-radius: 12px; background: var(--admin-secondary); }
+.shell .weight-paste-panel textarea { width: 100%; min-width: 0; box-sizing: border-box; background: var(--admin-surface); }
