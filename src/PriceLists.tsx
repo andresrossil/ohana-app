@@ -1,3 +1,4 @@
+import { MarginBadge } from "./MarginBadge";
 import SearchSelect from "./SearchSelect";
 import { useEffect, useRef, useState } from "react";
 import { AppButton, AppIcon } from "./AppIcon";
@@ -641,7 +642,7 @@ export default function PriceLists({
                             <small>
                               Margen / venta:{" "}
                               {price != null && price > 0
-                                ? ((margin / price) * 100).toFixed(2) + " %"
+                                ? <MarginBadge value={margin / price * 100} />
                                 : "Pendiente"}
                             </small>
                             <small>

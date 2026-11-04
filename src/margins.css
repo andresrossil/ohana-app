@@ -1,0 +1,62 @@
+.margin-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  border: 1px solid;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: var(--admin-surface, #fff);
+  font-size: 13px;
+  line-height: 1.4;
+  font-weight: 600;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+.margin-badge svg {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+.shell .margin-settings fieldset {
+  border: 0;
+  padding: 0;
+  min-width: 0;
+}
+.shell .margin-settings td input:not([type="color"]) {
+  min-width: 90px;
+  width: 100%;
+}
+.shell .margin-settings td .search-select {
+  min-width: 150px;
+}
+.shell .margin-settings td input[type="color"] {
+  width: 54px;
+  height: 40px;
+  padding: 4px;
+}
+.shell .margin-settings .form-actions {
+  margin-top: 14px;
+}
+.shell .cost-summary-heading div strong,
+.shell .cost-summary-heading div span {
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.4;
+  color: var(--admin-heading);
+}
+.shell .formula-overheads tr.expense-group-start > td {
+  border-top: 3px solid var(--admin-border);
+}
+.shell .formula-overheads .expense-kind {
+  font-weight: 700;
+  display: block;
+  margin-bottom: 5px;
+  color: var(--admin-heading);
+}
+@media (max-width: 760px) {
+  .shell .margin-settings td input:not([type="color"]),
+  .shell .margin-settings td .search-select {
+    min-width: 0;
+  }
+}

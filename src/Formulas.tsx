@@ -1,3 +1,4 @@
+import { MarginBadge } from "./MarginBadge";
 import SearchSelect, { SortedDatalist } from "./SearchSelect";
 import ProductImage from "./ProductImage";
 import AutoTextarea from "./AutoTextarea";
@@ -1058,6 +1059,7 @@ export default function Formulas({
                           ? "Según peso real"
                           : "Pendiente"
                         : money(margin, catalog.currency)}
+                      {margin != null && price != null && price > 0 && <MarginBadge value={margin / price * 100} />}
                     </td>
                     <td className="actions formula-actions">
                       <AppButton

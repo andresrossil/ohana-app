@@ -54,9 +54,11 @@ export default function AdditionalCostsPanel({
           historical={historical}
         />
         <p className="muted">
-          Los gastos fijos se aplican una vez por lote. Mano de obra y
-          Publicidad se estiman sobre el precio de venta base. No generan
-          consumos de inventario.
+          {historical
+            ? "Se conservan las cantidades e importes registrados al confirmar. "
+            : "Otros gastos: cantidad = unidades del lote; importe = cantidad × precio unitario. "}
+          Mano de obra y Publicidad se estiman sobre el precio de venta base. No
+          generan consumos de inventario.
         </p>
         {!hideTotals && (
           <div className="formula-summary">

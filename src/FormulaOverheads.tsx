@@ -23,7 +23,17 @@ export default function FormulaOverheads({
       .filter((k) => quote[k]?.id)
       .map((k) => ({ ...quote[k], cost_id: quote[k].id, kind: k })),
   ];
-  const display = onChange ? lines : quote.cost_lines || legacy;
+  const original: Row[] = onChange ? lines : quote.cost_lines || legacy;
+  const kindOf = (line: Row) =>
+    items.find((x) => x.id === line.cost_id)?.kind || line.kind || "overhead";
+  const rank: Record<string, number> = {
+    overhead: 0,
+    labor: 1,
+    advertising: 2,
+  };
+  const display = original
+    .map((line, i) => ({ line, i }))
+    .sort((a, b) => (rank[kindOf(a.line)] ?? 3) - (rank[kindOf(b.line)] ?? 3));
   const change = (i: number, patch: Row) =>
     onChange?.(lines.map((l, n) => (n === i ? { ...l, ...patch } : l)));
   const amount = (v: unknown) =>
@@ -63,7 +73,7 @@ export default function FormulaOverheads({
             </tr>
           </thead>
           <tbody>
-            {display.map((line: Row, i: number) => {
+            {display.map(({ line, i }, position) => {
               const item = items.find((x) => x.id === line.cost_id),
                 row = onChange
                   ? quote.cost_lines?.find(
@@ -72,8 +82,19 @@ export default function FormulaOverheads({
                   : line,
                 fixed = (item?.kind || row?.kind || "overhead") === "overhead";
               return (
-                <tr key={line.cost_id || i}>
+                <tr
+                  key={line.cost_id || i}
+                  className={
+                    position > 0 &&
+                    kindOf(display[position - 1].line) !== kindOf(line)
+                      ? "expense-group-start"
+                      : ""
+                  }
+                >
                   <td>
+                    <span className="expense-kind">
+                      {costCatalogNames[kindOf(line)]}
+                    </span>
                     {onChange ? (
                       <SearchSelect
                         aria-label={`Costo fila ${i + 1}`}
@@ -85,7 +106,10 @@ export default function FormulaOverheads({
                           );
                           change(i, {
                             cost_id: e.target.value,
-                            quantity: Number(selected?.quantity) || 1,
+                            quantity:
+                              Number(
+                                quote.unit_basis_count ?? quote.estimated_units,
+                              ) || 1,
                             percent: null,
                           });
                         }}
@@ -125,7 +149,16 @@ export default function FormulaOverheads({
                     )}
                   </td>
                   <td>
-                    {onChange ? (
+                    {fixed ? (
+                      <>
+                        <span>{row?.quantity ?? "Unidades sin definir"}</span>
+                        <small>
+                          {historical
+                            ? "Cantidad histórica"
+                            : "Unidades del lote · automático"}
+                        </small>
+                      </>
+                    ) : onChange ? (
                       <>
                         <DecimalInput
                           aria-label={`Valor costo ${i + 1}`}
@@ -150,7 +183,7 @@ export default function FormulaOverheads({
                         />
                         <small>
                           {fixed
-                            ? "Una vez por lote"
+                            ? "Unidades del lote"
                             : "% del precio base × unidades"}
                         </small>
                         {!fixed && line.percent != null && (

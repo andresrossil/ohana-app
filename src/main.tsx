@@ -1,3 +1,5 @@
+import { MarginProvider } from "./MarginBadge";
+const MarginSettings = lazy(() => import("./MarginSettings"));
 import SearchSelect from "./SearchSelect";
 import MobileViewport from "./MobileViewport";
 import ResponsiveTable from "./ResponsiveTable";
@@ -577,7 +579,7 @@ function App() {
       </main>
     );
   return (
-    <IconProvider company={company}>
+    <IconProvider company={company}><MarginProvider company={company}>
       <div className="shell">
         <Sidebar
           section={section}
@@ -737,6 +739,7 @@ function App() {
                     {[
                       ["profile", "Datos de empresa"],
                       ["appearance", "Apariencia"],
+                      ["margin", "Margen esperado"],
                       ["structure", "Corporaciones y accesos"],
                       ["store", "Tienda y ventas"],
                       ["origins", "Orígenes"],
@@ -756,6 +759,7 @@ function App() {
                       .map(([key, label]) => (
                         <AppButton
                           key={key}
+                          iconKey={key === "margin" ? "action.calculate" : undefined}
                           className={configView === key ? "selected" : ""}
                           onClick={async () => {
                             if (key === configView) return;
@@ -797,6 +801,7 @@ function App() {
                         onDirty={setSettingsDirty}
                       />
                     )}
+                  {configView === "margin" && activeCompany?.manage && <MarginSettings key={company} company={company} onDirty={setSettingsDirty} />}
                   {configView === "store" && activeCompany?.manage && (
                     <StoreSettings
                       key={company}
@@ -1708,7 +1713,7 @@ function App() {
         )}
         <ConfirmHost key={company} />
       </div>
-    </IconProvider>
+    </MarginProvider></IconProvider>
   );
 }
 createRoot(document.getElementById("root")!).render(

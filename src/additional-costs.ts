@@ -20,7 +20,7 @@ export function additionalCosts(
   const price = variant?.currency === currency ? numeric(variant.price) : null;
   const lines = selected.map((line) => {
     const item = items.find((x) => x.id === line.cost_id),
-      quantity = numeric(line.quantity),
+      quantity = item?.kind === "overhead" ? n : numeric(line.quantity),
       percent = numeric(line.percent) ?? numeric(item?.percent);
     const fixed = item?.kind === "overhead";
     return {

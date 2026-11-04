@@ -1,3 +1,4 @@
+import { MarginBadge } from "./MarginBadge";
 import ResponsiveTable from "./ResponsiveTable";
 import { money, type Row } from "./operations";
 import { financialSummary } from "./financial-summary";
@@ -65,22 +66,26 @@ export default function CostSummary({
               <tr key={label} className={"summary-row-" + (kind || "normal")}>
                 <td>{label}</td>
                 <td data-sort-value={unit ?? ""}>
-                  {kind === "percent"
-                    ? unit == null
-                      ? "Pendiente"
-                      : unit.toLocaleString("es-GT", {
-                          maximumFractionDigits: 2,
-                        }) + " %"
-                    : amount(unit)}
+                  {kind === "percent" ? (
+                    unit == null ? (
+                      "Pendiente"
+                    ) : (
+                      <MarginBadge value={unit} />
+                    )
+                  ) : (
+                    amount(unit)
+                  )}
                 </td>
                 <td data-sort-value={batch ?? ""}>
-                  {kind === "percent"
-                    ? batch == null
-                      ? "Pendiente"
-                      : batch.toLocaleString("es-GT", {
-                          maximumFractionDigits: 2,
-                        }) + " %"
-                    : amount(batch)}
+                  {kind === "percent" ? (
+                    batch == null ? (
+                      "Pendiente"
+                    ) : (
+                      <MarginBadge value={batch} />
+                    )
+                  ) : (
+                    amount(batch)
+                  )}
                 </td>
               </tr>
             ))}
@@ -95,7 +100,8 @@ export default function CostSummary({
         {!historical && variable
           ? "Sin pesos y precios de las variantes obtenidas, las ventas y la utilidad permanecen pendientes. "
           : ""}
-        Los gastos fijos se aplican una vez por lote.
+        Otros gastos se calculan con las unidades del lote; el total no se
+        aplica dos veces.
       </p>
     </section>
   );
