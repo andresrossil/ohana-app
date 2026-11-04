@@ -3,7 +3,11 @@ import { AppButton } from "./AppIcon";
 import ResponsiveTable from "./ResponsiveTable";
 import DecimalInput from "./DecimalInput";
 import { money, type Row } from "./operations";
-import { costCatalogNames } from "./additional-costs";
+import {
+  costCatalogNames,
+  costAvailable,
+  costSelectionError,
+} from "./additional-costs";
 export default function FormulaOverheads({
   items,
   lines,
@@ -36,6 +40,7 @@ export default function FormulaOverheads({
     .sort((a, b) => (rank[kindOf(a.line)] ?? 3) - (rank[kindOf(b.line)] ?? 3));
   const change = (i: number, patch: Row) =>
     onChange?.(lines.map((l, n) => (n === i ? { ...l, ...patch } : l)));
+  const selectionError = onChange ? costSelectionError(lines, items) : "";
   const amount = (v: unknown) =>
     v == null ? "Pendiente" : money(v, quote.currency);
   return (
@@ -49,9 +54,7 @@ export default function FormulaOverheads({
             disabled={
               lines.length >= 100 ||
               lines.some((l) => !l.cost_id) ||
-              !items.some(
-                (x) => x.active && !lines.some((l) => l.cost_id === x.id),
-              )
+              !items.some((x) => x.active && costAvailable(x, lines, items))
             }
             onClick={() =>
               onChange([...lines, { cost_id: "", quantity: 1, percent: null }])
@@ -61,6 +64,11 @@ export default function FormulaOverheads({
           </AppButton>
         )}
       </div>
+      {selectionError && (
+        <p className="error" role="alert">
+          {selectionError}
+        </p>
+      )}
       <div className="table-wrap">
         <ResponsiveTable>
           <thead>
@@ -97,6 +105,7 @@ export default function FormulaOverheads({
                     </span>
                     {onChange ? (
                       <SearchSelect
+                        hideGroupLabels
                         aria-label={`Costo fila ${i + 1}`}
                         required
                         value={line.cost_id}
@@ -123,9 +132,7 @@ export default function FormulaOverheads({
                                   (x) =>
                                     x.kind === kind &&
                                     (x.active || x.id === line.cost_id) &&
-                                    !lines.some(
-                                      (l, n) => n !== i && l.cost_id === x.id,
-                                    ),
+                                    costAvailable(x, lines, items, i),
                                 )
                                 .map((x) => (
                                   <option
@@ -142,10 +149,7 @@ export default function FormulaOverheads({
                         )}
                       </SearchSelect>
                     ) : (
-                      <>
-                        {costCatalogNames[row?.kind || "overhead"]} ·{" "}
-                        {row?.name}
-                      </>
+                      <>{row?.name}</>
                     )}
                   </td>
                   <td>

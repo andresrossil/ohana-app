@@ -6,6 +6,37 @@ export const costCatalogNames: Record<string, string> = {
   labor: "Mano de obra",
   advertising: "Publicidad",
 };
+export function costAvailable(
+  item: Row,
+  selected: Row[],
+  items: Row[],
+  exclude = -1,
+) {
+  return !selected.some(
+    (line, index) =>
+      index !== exclude &&
+      (line.cost_id === item.id ||
+        (["labor", "advertising"].includes(item.kind) &&
+          items.find((x) => x.id === line.cost_id)?.kind === item.kind)),
+  );
+}
+export function costSelectionError(selected: Row[], items: Row[]) {
+  if (new Set(selected.map((line) => line.cost_id)).size !== selected.length)
+    return "No puedes repetir conceptos de costos adicionales.";
+  for (const kind of ["labor", "advertising"]) {
+    if (
+      selected.filter(
+        (line) => items.find((item) => item.id === line.cost_id)?.kind === kind,
+      ).length > 1
+    )
+      return (
+        "Solo puedes seleccionar un concepto de " +
+        costCatalogNames[kind] +
+        " por fórmula."
+      );
+  }
+  return "";
+}
 export function additionalCosts(
   items: Row[],
   currency: string,

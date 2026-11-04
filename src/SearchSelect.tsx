@@ -20,17 +20,23 @@ function label(node: React.ReactNode): string {
     )
     .join("");
 }
-function options(children: React.ReactNode): React.ReactElement<any>[] {
+function options(
+  children: React.ReactNode,
+  includeGroups = true,
+): React.ReactElement<any>[] {
   return Children.toArray(children).flatMap((child) => {
     if (!isValidElement<any>(child)) return [];
     if (child.type === "option") return [child];
     const props = child.props as any;
-    const nested = options(props.children);
+    const nested = options(props.children, includeGroups);
     return child.type === "optgroup"
       ? nested.map((option) =>
           React.cloneElement(option, {
             disabled: props.disabled || option.props.disabled,
-            children: props.label + " · " + label(option.props.children),
+            children: includeGroups
+              ? props.label + " · " + label(option.props.children)
+              : option.props.children,
+            "data-option-group": props.label,
           }),
         )
       : nested;
@@ -57,10 +63,13 @@ export function SortedDatalist({
 
 /** Searchable UI backed by the original select, retaining IDs, FormData and change handlers. */
 export default function SearchSelect(
-  props: React.SelectHTMLAttributes<HTMLSelectElement>,
+  props: React.SelectHTMLAttributes<HTMLSelectElement> & {
+    hideGroupLabels?: boolean;
+  },
 ) {
   const {
     children,
+    hideGroupLabels = false,
     value,
     defaultValue,
     onChange,
@@ -71,9 +80,10 @@ export default function SearchSelect(
     name: fieldName,
     ...rest
   } = props;
-  const entries = options(children).map((option) => ({
+  const entries = options(children, !hideGroupLabels).map((option) => ({
     value: String(option.props.value ?? label(option.props.children)),
     text: label(option.props.children),
+    group: option.props["data-option-group"],
     disabled: !!option.props.disabled,
   }));
   const initial = String(defaultValue ?? entries[0]?.value ?? "");
@@ -81,7 +91,12 @@ export default function SearchSelect(
     !a.value ? -1 : !b.value ? 1 : alphabet.compare(name(a.text), name(b.text)),
   );
   const [local, setLocal] = useState(initial);
-  const selected = String(value ?? (entries.some(entry => entry.value === local) ? local : entries.find(entry => !entry.disabled)?.value ?? ""));
+  const selected = String(
+    value ??
+      (entries.some((entry) => entry.value === local)
+        ? local
+        : (entries.find((entry) => !entry.disabled)?.value ?? "")),
+  );
   const current = entries.find((entry) => entry.value === selected);
   const [editing, setEditing] = useState<{
     value: string;
@@ -91,13 +106,15 @@ export default function SearchSelect(
   const id = useId();
   const display = (entry: (typeof entries)[number]) =>
     entries.filter((other) => other.text === entry.text).length > 1
-      ? `${entry.text} · ${entry.value}`
+      ? `${entry.text} · ${entry.group || entry.value}`
       : entry.text;
   const text =
     editing?.value === selected
       ? editing.text
       : current?.value
-        ? display(current)
+        ? hideGroupLabels
+          ? current.text
+          : display(current)
         : "";
   function choose(next: string) {
     setLocal(next);

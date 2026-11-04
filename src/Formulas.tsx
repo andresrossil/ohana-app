@@ -4,7 +4,7 @@ import ProductImage from "./ProductImage";
 import AutoTextarea from "./AutoTextarea";
 import AdditionalCostsPanel from "./AdditionalCostsPanel";
 import CostSummary from "./CostSummary";
-import { additionalCosts } from "./additional-costs";
+import { additionalCosts, costSelectionError } from "./additional-costs";
 import ResponsiveTable from "./ResponsiveTable";
 import { confirmAction } from "./ConfirmDialog";
 import { IconDetails, SearchField } from "./PoolControls";
@@ -388,6 +388,14 @@ export default function Formulas({
       return;
     }
     const expenses: Row[] = draft.overhead_lines || [];
+    const selectionError = costSelectionError(
+      expenses,
+      catalog.additional_costs || [],
+    );
+    if (selectionError) {
+      state.setError(selectionError);
+      return;
+    }
     if (
       expenses.some(
         (line) =>
@@ -1059,7 +1067,9 @@ export default function Formulas({
                           ? "Según peso real"
                           : "Pendiente"
                         : money(margin, catalog.currency)}
-                      {margin != null && price != null && price > 0 && <MarginBadge value={margin / price * 100} />}
+                      {margin != null && price != null && price > 0 && (
+                        <MarginBadge value={(margin / price) * 100} />
+                      )}
                     </td>
                     <td className="actions formula-actions">
                       <AppButton
