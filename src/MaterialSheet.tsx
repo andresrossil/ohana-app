@@ -81,7 +81,7 @@ function VsIcon({
   variation: number | null;
   noPrevious: boolean;
 }) {
-  const state = noPrevious ? "lower" : comparison(variation),
+  const state = noPrevious ? "neutral" : comparison(variation),
     label = noPrevious
       ? "Sin precio anterior registrado"
       : state === "lower"
@@ -98,17 +98,21 @@ function VsIcon({
       aria-label={label}
       title={`${label}${variation === null ? "" : ` · Diferencia por unidad: ${numeric(variation)}`}`}
     >
-      <AppIcon
-        name={
-          state === "lower"
-            ? "status.success"
-            : state === "higher"
-              ? "status.error"
-              : variation === null
-                ? "status.pending"
-                : "action.compare"
-        }
-      />
+      {state === "neutral" ? (
+        <span aria-hidden="true">—</span>
+      ) : (
+        <AppIcon
+          name={
+            state === "lower"
+              ? "status.success"
+              : state === "higher"
+                ? "status.error"
+                : variation === null
+                  ? "status.pending"
+                  : "action.compare"
+          }
+        />
+      )}
     </span>
   );
 }
@@ -646,7 +650,7 @@ export default function MaterialSheet({
       setNotice(
         importing
           ? `${matrix.length} filas pegadas. Puedes editar las celdas antes de guardar.`
-          : `${matrix.length} fila(s) pegadas. PRECIO UN y VS se recalculan; los valores copiados en esas columnas se ignoran. Revisa antes de guardar.`,
+          : `${matrix.length} fila(s) pegadas. PRECIO ACTUAL y VS se recalculan; los valores copiados en esas columnas se ignoran. Revisa antes de guardar.`,
       );
       requestAnimationFrame(() => {
         moving.current = true;
@@ -800,12 +804,24 @@ export default function MaterialSheet({
         ? materials.find((m) => m.id === row.materialId)
         : materials.find((m) => normalize(m.name) === normalize(row.cells[2]));
       if (material && !material.active)
-        archived.set(material.id, `${material.sku || row.cells[13]?.trim() || "Sin SKU"} · ${material.name}`);
+        archived.set(
+          material.id,
+          `${material.sku || row.cells[13]?.trim() || "Sin SKU"} · ${material.name}`,
+        );
     }
-    if (archived.size && !(await confirmAction(
-      `Vas a modificar materiales archivados o inactivos:\n\n${[...archived.values()].join("\n")}\n\nPuedes guardar los cambios. Los materiales conservarán su estado archivado o inactivo.`,
-      { title: "Advertencia: materiales archivados", confirmText: "Continuar y guardar", cancelText: "Cancelar", iconKey: "status.warning" },
-    ))) return;
+    if (
+      archived.size &&
+      !(await confirmAction(
+        `Vas a modificar materiales archivados o inactivos:\n\n${[...archived.values()].join("\n")}\n\nPuedes guardar los cambios. Los materiales conservarán su estado archivado o inactivo.`,
+        {
+          title: "Advertencia: materiales archivados",
+          confirmText: "Continuar y guardar",
+          cancelText: "Cancelar",
+          iconKey: "status.warning",
+        },
+      ))
+    )
+      return;
     setBusy(true);
     setError("");
     try {
@@ -1263,7 +1279,7 @@ export default function MaterialSheet({
                       return (
                         <td
                           key={col}
-                          className={`${chosen ? "cell-selected " : ""}${isEditable ? "" : "cell-auto"} ${visualOrder[ci] === 16 ? "barcode-cell" : ""}`}
+                          className={`${chosen ? "cell-selected " : ""}${isEditable ? "" : "cell-auto"} ${[0, 1, 2, 13, 14, 15].includes(visualOrder[ci]) ? "admin-name" : ""} ${visualOrder[ci] === 16 ? "barcode-cell" : ""}`}
                           title={
                             r.dirty && (rowErrors.length || rowWarnings.length)
                               ? [...rowErrors, ...rowWarnings].join(" · ")
@@ -1534,7 +1550,7 @@ export default function MaterialSheet({
                       </p>
                     ))}
                     <p>
-                      Precio UN: {numeric(calc.current)} · VS:{" "}
+                      Precio actual: {numeric(calc.current)} · VS:{" "}
                       <VsIcon
                         variation={calc.variation}
                         noPrevious={calc.previousDisplay === null}

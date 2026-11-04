@@ -56,7 +56,7 @@ export default function CompanyPicker({
         <>
           {corporations.length > 1 && (
             <AppButton className="secondary" onClick={() => setCorporation("")}>
-              ← Cambiar corporación
+              Cambiar corporación
             </AppButton>
           )}
           <div className="company-cards">

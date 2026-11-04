@@ -12,6 +12,7 @@ import { createRoot } from "react-dom/client";
 import type { Session } from "@supabase/supabase-js";
 import { supabase as db, confirmationRedirect } from "./client";
 import "./style.css";
+import "./consolidated.css";
 import MaterialSheet from "./MaterialSheet";
 import ImportMaterials from "./ImportMaterials";
 import Sidebar, { sections } from "./Sidebar";
@@ -1223,7 +1224,9 @@ function App() {
                                       </>
                                     )}
                                     <td>
-                                      <strong>{r.name}</strong>
+                                      <strong className="admin-name">
+                                        {r.name}
+                                      </strong>
                                       {tab === "presentations" && (
                                         <small>{r.alternative_name}</small>
                                       )}

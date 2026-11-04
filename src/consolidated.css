@@ -1,0 +1,90 @@
+.shell .admin-name,
+.shell input[name="name"],
+.shell input[name="sku"],
+.shell select[name="classification"] {
+  text-transform: uppercase;
+}
+.shell .vs-neutral {
+  color: #6b7280 !important;
+}
+.shell .vs-lower {
+  color: #16804a !important;
+}
+.shell .vs-higher {
+  color: #b91c1c !important;
+}
+.shell .admin-name input,
+.shell .admin-name textarea,
+.shell .admin-name select {
+  text-transform: uppercase;
+}
+.shell .base-price-heading {
+  max-width: 280px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.shell .price-lists .table-wrap {
+  max-width: 100%;
+  overflow-x: auto;
+}
+.shell .price-lists td {
+  vertical-align: middle;
+}
+.shell .price-lists td input {
+  min-width: 90px;
+  max-width: 150px;
+}
+.shell .price-pending-delete {
+  opacity: 0.6;
+}
+.shell .physical-units {
+  padding: 16px;
+  min-width: 0;
+}
+.shell .unit-id {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  font-size: 12px;
+}
+.shell .physical-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.shell .unit-available {
+  color: #16804a;
+}
+.shell .unit-reserved {
+  color: #9a6700;
+}
+.shell .unit-curing {
+  color: #285e97;
+}
+.shell .unit-sold {
+  color: #9b2c2c;
+}
+.shell .unit-retired,
+.shell .unit-released {
+  color: #6b7280;
+}
+.shell .physical-state .app-icon {
+  width: 16px;
+  height: 16px;
+}
+.shell .sale-line {
+  margin-bottom: 6px;
+  font-size: 13px;
+  min-width: 0;
+}
+.shell .sale-line details {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 760px) {
+  .shell .physical-units {
+    padding: 12px;
+  }
+  .shell .price-lists .form-actions {
+    flex-wrap: wrap;
+  }
+}

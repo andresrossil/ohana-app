@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AppButton, AppIcon } from "./AppIcon";
 import { confirmAction } from "./ConfirmDialog";
 import ResponsiveTable from "./ResponsiveTable";
@@ -6,6 +6,10 @@ import DecimalInput from "./DecimalInput";
 import { SearchField } from "./PoolControls";
 import { request } from "./commerce";
 import { money, useOperation, type Row } from "./operations";
+import { parseNumber } from "./sheet-model";
+import { weightRangeLabel } from "./variant-weights";
+import { pricesChanged } from "./price-events";
+import VariantManager from "./VariantManager";
 import "./additional-costs.css";
 export default function PriceLists({
   company,
@@ -24,9 +28,11 @@ export default function PriceLists({
     }),
     [selected, setSelected] = useState(""),
     [draft, setDraft] = useState<Row | null>(null),
-    [kind, setKind] = useState("list"),
-    [dirty, setDirty] = useState(false),
-    [query, setQuery] = useState("");
+    [changes, setChanges] = useState<Record<string, Row>>({}),
+    [query, setQuery] = useState(""),
+    [variantProduct, setVariantProduct] = useState<Row | null>(null);
+  const batch = useRef<{ payload: string; id: string } | null>(null),
+    dirty = !!draft || !!variantProduct || Object.keys(changes).length > 0;
   async function load() {
     const next = await request("price_list_command", {
       p_company: company,
@@ -48,127 +54,347 @@ export default function PriceLists({
   }, [dirty, onDirty]);
   const list = data.lists.find((l: Row) => l.id === selected),
     base = data.lists.find((l: Row) => l.is_base);
-  const entries = data.entries.filter(
-    (e: Row) =>
-      e.list_id === selected &&
-      [
-        data.variants.find((v: Row) => v.id === e.variant_id)?.name,
-        data.variants.find((v: Row) => v.id === e.variant_id)?.sku,
-        data.products.find(
-          (p: Row) =>
-            p.id ===
-            data.variants.find((v: Row) => v.id === e.variant_id)?.product_id,
-        )?.name,
-      ]
-        .join(" ")
-        .toLowerCase()
-        .includes(query.toLowerCase()),
-  );
-  const update = (key: string, value: unknown) => {
-    setDraft((old) => ({ ...old!, [key]: value }));
-    setDirty(true);
-  };
-  async function close() {
-    if (
-      state.busy ||
-      (dirty &&
-        !(await confirmAction("Hay cambios sin guardar. ¿Salir sin guardar?")))
-    )
-      return;
-    setDraft(null);
-    setDirty(false);
-  }
-  function editList(row?: Row) {
-    setKind("list");
-    setDraft(row ? { ...row } : { name: "", active: true, is_base: false });
-    setDirty(false);
-  }
-  function editEntry(row?: Row) {
-    const variant = data.variants.find((v: Row) => v.id === row?.variant_id);
-    setKind("entry");
-    setDraft(
-      row
-        ? { ...row, product_id: variant?.product_id }
-        : {
-            list_id: selected,
-            product_id: "",
-            variant_id: "",
-            price: "",
-            active: true,
-          },
+  const allRows: Row[] = data.products
+    .flatMap((p: Row) => {
+      const variants = data.variants
+        .filter((v: Row) => v.product_id === p.id)
+        .sort(
+          (a: Row, b: Row) =>
+            Number(a.weight_min ?? Infinity) -
+              Number(b.weight_min ?? Infinity) || a.name.localeCompare(b.name),
+        );
+      return variants.length
+        ? variants.map((v: Row) => {
+            const e = data.entries.find(
+              (e: Row) => e.list_id === selected && e.variant_id === v.id,
+            );
+            return {
+              product: p,
+              variant: v,
+              entry: e,
+              ...(changes[v.id] || {}),
+            };
+          })
+        : [{ product: p, variant: null }];
+    })
+    .sort(
+      (a: Row, b: Row) =>
+        a.product.name.localeCompare(b.product.name) ||
+        Number(a.variant?.weight_min ?? Infinity) -
+          Number(b.variant?.weight_min ?? Infinity),
     );
-    setDirty(false);
+  const rows = allRows.filter((r) =>
+    [
+      r.product.name,
+      r.product.sku,
+      r.variant?.name,
+      r.variant?.sku,
+      r.variant ? weightRangeLabel(r.variant) : "",
+      ...Object.entries(r.variant?.attributes || {}).flat(),
+    ]
+      .join(" ")
+      .toLowerCase()
+      .includes(query.toLowerCase()),
+  );
+  function current(r: Row): Row {
+    return (
+      changes[r.variant.id] || {
+        id: r.entry?.id || "",
+        revision: r.entry?.revision || 0,
+        variant_id: r.variant.id,
+        price: r.entry?.price ?? "",
+        active: r.entry?.active ?? false,
+      }
+    );
   }
-  async function save() {
+  function edit(r: Row, patch: Row) {
+    setChanges((old) => ({
+      ...old,
+      [r.variant.id]: { ...current(r), ...patch },
+    }));
+    state.setError("");
+  }
+  async function discard() {
+    if (
+      dirty &&
+      !(await confirmAction("Hay cambios sin guardar. ¿Salir sin guardar?"))
+    )
+      return false;
+    setDraft(null);
+    setChanges({});
+    batch.current = null;
+    return true;
+  }
+  async function select(id: string) {
+    if (id === selected) return;
+    if (await discard()) setSelected(id);
+  }
+  async function editList(row?: Row) {
+    if (!(await discard())) return;
+    setDraft(row ? { ...row } : { name: "", active: true, is_base: false });
+  }
+  async function saveList() {
     if (!draft) return;
     if (
-      kind === "list" &&
       draft.is_base &&
-      base?.id !== draft.id &&
       base &&
+      base.id !== draft.id &&
       !(await confirmAction(
-        `La lista «${draft.name}» reemplazará a «${base.name}» como lista de precios base. Fórmulas y nuevas ventas usarán sus precios. ¿Confirmar?`,
-        { title: "Cambiar lista de precios base" },
+        "La lista «" +
+          draft.name +
+          "» reemplazará a «" +
+          base.name +
+          "» como lista base. ¿Confirmar?",
+        { title: "Cambiar lista base" },
       ))
     )
       return;
     await state.run(async () => {
       const saved = await request("price_list_command", {
         p_company: company,
-        p_action: kind === "list" ? "save_list" : "save_entry",
+        p_action: "save_list",
         p_data: { ...draft, expected_base_id: base?.id || null },
       });
-      if (kind === "list") setSelected(saved.id);
       setDraft(null);
-      setDirty(false);
+      setSelected(saved.id);
       await load();
-      state.setNotice("Cambios guardados.");
+      pricesChanged(company);
+      state.setNotice("Lista guardada.");
     });
   }
+  async function deleteList() {
+    if (!list || !(await discard())) return;
+    if (
+      !(await confirmAction(
+        "¿Eliminar la lista «" +
+          list.name +
+          "» y sus precios sin historial? Si tiene referencias históricas, se conservará.",
+        { title: "Eliminar lista" },
+      ))
+    )
+      return;
+    await state.run(async () => {
+      await request("price_list_command", {
+        p_company: company,
+        p_action: "delete_list",
+        p_data: { id: list.id, revision: list.revision },
+      });
+      await load();
+      pricesChanged(company);
+      state.setNotice("Lista eliminada.");
+    });
+  }
+  async function deleteEntry(r: Row) {
+    const value = current(r);
+    if (value.delete) {
+      edit(r, { delete: false });
+      return;
+    }
+    if (!value.id) {
+      setChanges((old) => {
+        const next = { ...old };
+        delete next[r.variant.id];
+        return next;
+      });
+      return;
+    }
+    if (
+      await confirmAction(
+        "¿Eliminar el precio de " +
+          r.variant.name +
+          " de esta lista al guardar los cambios? Si tiene historial, deberás desactivarlo.",
+        { title: "Eliminar precio" },
+      )
+    )
+      edit(r, { delete: true });
+  }
+  async function saveGrid() {
+    const values = Object.values(changes).filter((v) => v.id || v.price !== "");
+    if (!values.length) {
+      setChanges({});
+      return;
+    }
+    if (values.length > 500) {
+      state.setError("Guarda como máximo 500 cambios a la vez.");
+      return;
+    }
+    if (
+      values.some(
+        (v) =>
+          !v.delete &&
+          (parseNumber(String(v.price)) === null ||
+            parseNumber(String(v.price))! < 0),
+      )
+    ) {
+      state.setError("Indica precios válidos, mayores o iguales a cero.");
+      return;
+    }
+    await state.run(async () => {
+      const payload = {
+        list_id: selected,
+        rows: values.map((v) => ({
+          ...v,
+          price: v.delete ? undefined : parseNumber(String(v.price)),
+        })),
+      };
+      const encoded = JSON.stringify(payload);
+      if (!batch.current || batch.current.payload !== encoded)
+        batch.current = { payload: encoded, id: crypto.randomUUID() };
+      await request("price_list_command", {
+        p_company: company,
+        p_action: "save_grid",
+        p_data: { ...payload, batch_id: batch.current.id },
+      });
+      setChanges({});
+      batch.current = null;
+      await load();
+      pricesChanged(company);
+      state.setNotice(values.length + " precio(s) guardados.");
+    });
+  }
+  function paste(e: React.ClipboardEvent<HTMLInputElement>, r: Row) {
+    const text = e.clipboardData
+      .getData("text/plain")
+      .replace(/\r/g, "")
+      .trimEnd();
+    if (!text.includes("\n")) return;
+    e.preventDefault();
+    const lines = text.split("\n");
+    if (lines.some((s) => s.includes("\t"))) {
+      state.setError(
+        "Copia solamente la columna de precios para pegarlos en orden.",
+      );
+      return;
+    }
+    const targets = rows.filter((x) => x.variant),
+      start = targets.findIndex((x) => x.variant.id === r.variant.id);
+    if (
+      start + lines.length > targets.length ||
+      lines.some((s) => parseNumber(s) === null || parseNumber(s)! < 0)
+    ) {
+      state.setError(
+        "El pegado contiene precios inválidos o supera las variantes visibles.",
+      );
+      return;
+    }
+    const edits: Record<string, Row> = {};
+    lines.forEach((s, i) => {
+      const row = targets[start + i];
+      edits[row.variant.id] = {
+        ...current(row),
+        price: parseNumber(s),
+        active: true,
+        delete: false,
+      };
+    });
+    setChanges((old) => ({ ...old, ...edits }));
+    state.setNotice(
+      lines.length + " precios pegados. Revisa y guarda los cambios.",
+    );
+  }
   return (
-    <section className="catalog additional-cost-settings">
+    <section className="catalog additional-cost-settings price-lists">
       <div className="hierarchy-toolbar">
         <h2>
           <AppIcon name="action.calculate" /> Listas de precios
         </h2>
         <div className="actions">
           <AppButton
-            disabled={state.busy || !!draft}
             iconKey="action.add"
+            disabled={state.busy}
             onClick={() => editList()}
           >
             Nueva lista
           </AppButton>
           <AppButton
-            disabled={state.busy || !!draft}
-            className="secondary"
             iconKey="action.refresh"
-            onClick={() => state.run(load)}
+            className="secondary"
+            disabled={state.busy}
+            onClick={async () => {
+              if (await discard()) state.run(load);
+            }}
           >
             Actualizar
           </AppButton>
         </div>
       </div>
       <p className="muted">
-        La lista base determina los precios sugeridos en Ventas y los costos
-        estimados en Fórmulas. Las ventas y lotes confirmados conservan sus
-        importes.
+        Precios de productos y variantes comerciales. La lista base se utiliza
+        en Fórmulas, Productos y Ventas. Los históricos conservan los importes
+        aplicados.
       </p>
       {state.error && (
-        <p className="error" role="alert">
+        <p role="alert" className="error">
           <AppIcon name="status.error" />
           {state.error}
         </p>
       )}
       {state.notice && <p role="status">{state.notice}</p>}
-      {!draft && (
+      {draft ? (
+        <form
+          data-dirty-managed
+          onSubmit={(e) => {
+            e.preventDefault();
+            saveList();
+          }}
+        >
+          <fieldset className="settings-grid" disabled={state.busy}>
+            <legend>{draft.id ? "Editar lista" : "Nueva lista"}</legend>
+            <label>
+              Nombre
+              <input
+                required
+                maxLength={120}
+                value={draft.name}
+                onChange={(e) => setDraft({ ...draft, name: e.target.value })}
+              />
+            </label>
+            <label>
+              Lista base
+              <select
+                value={String(draft.is_base)}
+                onChange={(e) =>
+                  setDraft({ ...draft, is_base: e.target.value === "true" })
+                }
+              >
+                <option value="false">No</option>
+                <option value="true">Sí</option>
+              </select>
+            </label>
+            <label>
+              Estado
+              <select
+                value={String(draft.active)}
+                onChange={(e) =>
+                  setDraft({ ...draft, active: e.target.value === "true" })
+                }
+              >
+                <option value="true">Activa</option>
+                <option value="false">Inactiva</option>
+              </select>
+            </label>
+            <div className="form-actions form-wide">
+              <AppButton iconKey="action.save">Guardar cambios</AppButton>
+              <AppButton
+                className="secondary"
+                type="button"
+                iconKey="action.cancel"
+                onClick={discard}
+              >
+                Cancelar
+              </AppButton>
+            </div>
+          </fieldset>
+        </form>
+      ) : (
         <>
           <div className="settings-grid">
             <label>
               Lista de precios
               <select
                 value={selected}
-                onChange={(e) => setSelected(e.target.value)}
+                disabled={state.busy}
+                onChange={(e) => select(e.target.value)}
               >
                 <option value="">Seleccionar lista</option>
                 {data.lists.map((l: Row) => (
@@ -182,211 +408,192 @@ export default function PriceLists({
             </label>
             <div className="form-actions">
               {list && (
-                <AppButton
-                  className="secondary"
-                  iconKey="action.edit"
-                  onClick={() => editList(list)}
-                >
-                  Editar lista
-                </AppButton>
-              )}
-              {list?.active && (
-                <AppButton iconKey="action.add" onClick={() => editEntry()}>
-                  Agregar precio
-                </AppButton>
+                <>
+                  <AppButton
+                    className="secondary"
+                    iconKey="action.edit"
+                    onClick={() => editList(list)}
+                  >
+                    Editar lista
+                  </AppButton>
+                  <AppButton
+                    className="secondary"
+                    iconKey="action.delete"
+                    disabled={state.busy || list.is_base}
+                    onClick={deleteList}
+                  >
+                    Eliminar lista
+                  </AppButton>
+                </>
               )}
             </div>
           </div>
-          <SearchField
-            aria-label="Buscar precio"
-            placeholder="Producto, presentación o SKU…"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
+          <div className="form-actions">
+            <SearchField
+              aria-label="Buscar precio"
+              placeholder="Producto, SKU, variante, peso o atributos…"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+            />
+            <AppButton
+              iconKey="action.save"
+              disabled={
+                state.busy || !list?.active || !Object.keys(changes).length
+              }
+              onClick={saveGrid}
+            >
+              Guardar cambios
+            </AppButton>
+            {Object.keys(changes).length > 0 && (
+              <AppButton
+                className="secondary"
+                iconKey="action.cancel"
+                disabled={state.busy}
+                onClick={discard}
+              >
+                Descartar cambios
+              </AppButton>
+            )}
+          </div>
           <div className="table-wrap">
             <ResponsiveTable>
               <thead>
                 <tr>
                   <th>Producto</th>
-                  <th>Presentación / variación</th>
-                  <th>Precio de venta</th>
+                  <th>SKU</th>
+                  <th>Variante</th>
+                  <th>Peso</th>
+                  <th>Atributos</th>
+                  <th>
+                    Precio {data.currency === "GTQ" ? "Q" : data.currency}
+                  </th>
                   <th>Estado</th>
                   <th>Acciones</th>
                 </tr>
               </thead>
               <tbody>
-                {entries.map((e: Row) => {
-                  const v = data.variants.find(
-                      (v: Row) => v.id === e.variant_id,
-                    ),
-                    p = data.products.find((p: Row) => p.id === v?.product_id);
+                {rows.map((r) => {
+                  const v = r.variant,
+                    value = v ? current(r) : null;
                   return (
-                    <tr key={e.id}>
-                      <td>{p?.name}</td>
-                      <td>
-                        {v?.name}
-                        <small>{v?.sku}</small>
+                    <tr
+                      key={v?.id || r.product.id}
+                      className={value?.delete ? "price-pending-delete" : ""}
+                    >
+                      <td className="admin-name">{r.product.name}</td>
+                      <td>{v?.sku || r.product.sku || "—"}</td>
+                      <td className="admin-name">
+                        {v?.name || "Sin variantes comerciales"}
                       </td>
-                      <td>{money(e.price, e.currency)}</td>
-                      <td>{e.active ? "Activo" : "Inactivo"}</td>
-                      <td className="actions">
-                        {list?.active && (
-                          <AppButton
-                            className="secondary"
-                            iconKey="action.edit"
-                            onClick={() => editEntry(e)}
+                      <td>{v ? weightRangeLabel(v) : "—"}</td>
+                      <td>
+                        {Object.entries(v?.attributes || {})
+                          .map(([k, v]) => k + ": " + v)
+                          .join(" · ") || "—"}
+                      </td>
+                      <td>
+                        {v ? (
+                          <DecimalInput
+                            aria-label={"Precio de " + v.name}
+                            type="number"
+                            min="0"
+                            step="any"
+                            placeholder="Pendiente"
+                            disabled={
+                              state.busy || !list?.active || value!.delete
+                            }
+                            value={value!.price}
+                            onPaste={(e) => paste(e, r)}
+                            onChange={(e) =>
+                              edit(r, {
+                                price: e.target.value,
+                                active: !value!.id ? true : value!.active,
+                              })
+                            }
+                          />
+                        ) : (
+                          <span>Pendiente</span>
+                        )}
+                      </td>
+                      <td>
+                        {v ? (
+                          <select
+                            aria-label={"Estado del precio de " + v.name}
+                            disabled={
+                              state.busy ||
+                              !list?.active ||
+                              value!.delete ||
+                              (!value!.id && value!.price === "")
+                            }
+                            value={value!.active ? "active" : "inactive"}
+                            onChange={(e) =>
+                              edit(r, { active: e.target.value === "active" })
+                            }
                           >
-                            Editar
+                            {!value!.id && value!.price === "" ? (
+                              <option value="inactive">Pendiente</option>
+                            ) : (
+                              <>
+                                <option value="active">Activo</option>
+                                <option value="inactive">Inactivo</option>
+                              </>
+                            )}
+                          </select>
+                        ) : (
+                          "—"
+                        )}
+                      </td>
+                      <td className="actions">
+                        {!v && r.product.active && (
+                          <AppButton
+                            type="button"
+                            className="secondary"
+                            iconKey="action.add"
+                            disabled={state.busy}
+                            onClick={() => setVariantProduct(r.product)}
+                          >
+                            Crear variante
+                          </AppButton>
+                        )}
+                        {v && (value!.id || changes[v.id]) && (
+                          <AppButton
+                            type="button"
+                            className="secondary"
+                            iconKey={
+                              value!.delete ? "action.back" : "action.delete"
+                            }
+                            disabled={state.busy || !list?.active}
+                            onClick={() => deleteEntry(r)}
+                          >
+                            {value!.delete ? "Conservar" : "Eliminar"}
                           </AppButton>
                         )}
                       </td>
                     </tr>
                   );
                 })}
-                {!entries.length && (
+                {!rows.length && (
                   <tr>
-                    <td colSpan={5}>Sin precios en esta lista.</td>
+                    <td colSpan={8}>No hay productos para esta búsqueda.</td>
                   </tr>
                 )}
               </tbody>
             </ResponsiveTable>
           </div>
+          <small>
+            Editar una celda no crea registros hasta guardar. Puedes pegar una
+            columna de precios desde Excel. Los precios con historial pueden
+            desactivarse, pero no eliminarse.
+          </small>
         </>
       )}
-      {draft && (
-        <form
-          data-dirty-managed
-          onSubmit={(e) => {
-            e.preventDefault();
-            save();
-          }}
-        >
-          <fieldset disabled={state.busy} className="settings-grid">
-            <legend>
-              {draft.id ? "Editar" : "Crear"}{" "}
-              {kind === "list" ? "lista" : "precio"}
-            </legend>
-            {kind === "list" ? (
-              <>
-                <label>
-                  Nombre
-                  <input
-                    required
-                    maxLength={120}
-                    value={draft.name}
-                    onChange={(e) => update("name", e.target.value)}
-                  />
-                </label>
-                <label>
-                  Lista de precios base
-                  <select
-                    value={String(draft.is_base)}
-                    onChange={(e) =>
-                      update("is_base", e.target.value === "true")
-                    }
-                  >
-                    <option value="false">No</option>
-                    <option value="true">Sí</option>
-                  </select>
-                  <small>Solo una lista base por empresa.</small>
-                </label>
-              </>
-            ) : (
-              <>
-                <label>
-                  Producto
-                  <select
-                    required
-                    value={draft.product_id || ""}
-                    onChange={(e) => {
-                      update("product_id", e.target.value);
-                      update("variant_id", "");
-                    }}
-                  >
-                    <option value="">Seleccionar producto</option>
-                    {data.products
-                      .filter((p: Row) => p.active || p.id === draft.product_id)
-                      .map((p: Row) => (
-                        <option key={p.id} value={p.id}>
-                          {p.sku} · {p.name}
-                        </option>
-                      ))}
-                  </select>
-                </label>
-                <label>
-                  Presentación o variación comercial
-                  <select
-                    required
-                    value={draft.variant_id || ""}
-                    onChange={(e) => update("variant_id", e.target.value)}
-                  >
-                    <option value="">Seleccionar presentación</option>
-                    {data.variants
-                      .filter(
-                        (v: Row) =>
-                          v.product_id === draft.product_id &&
-                          (v.active || v.id === draft.variant_id) &&
-                          !data.entries.some(
-                            (e: Row) =>
-                              e.list_id === selected &&
-                              e.variant_id === v.id &&
-                              e.id !== draft.id,
-                          ),
-                      )
-                      .map((v: Row) => (
-                        <option key={v.id} value={v.id}>
-                          {v.sku} · {v.name}
-                        </option>
-                      ))}
-                  </select>
-                  {draft.product_id &&
-                    !data.variants.some(
-                      (v: Row) => v.product_id === draft.product_id,
-                    ) && (
-                      <small>
-                        Configura una presentación en Productos antes de asignar
-                        un precio.
-                      </small>
-                    )}
-                </label>
-                <label>
-                  Precio de venta · {data.currency}
-                  <DecimalInput
-                    required
-                    type="number"
-                    min="0"
-                    step="any"
-                    value={draft.price}
-                    onChange={(e) => update("price", e.target.value)}
-                  />
-                </label>
-              </>
-            )}
-            <label>
-              Estado
-              <select
-                value={String(draft.active)}
-                onChange={(e) => update("active", e.target.value === "true")}
-              >
-                <option value="true">Activo</option>
-                <option value="false">Inactivo</option>
-              </select>
-            </label>
-            <div className="form-actions form-wide">
-              <AppButton disabled={state.busy} iconKey="action.save">
-                Guardar cambios
-              </AppButton>
-              <AppButton
-                type="button"
-                className="secondary"
-                iconKey="action.cancel"
-                onClick={close}
-              >
-                Cancelar
-              </AppButton>
-            </div>
-          </fieldset>
-        </form>
+      {variantProduct && (
+        <VariantManager
+          company={company}
+          product={variantProduct}
+          onClose={() => setVariantProduct(null)}
+          onChanged={load}
+        />
       )}
     </section>
   );

@@ -10,6 +10,7 @@ import DecimalInput from "./DecimalInput";
 import { useEffect, useRef, useState } from "react";
 import { AppButton, AppIcon } from "./AppIcon";
 import { request } from "./commerce";
+import { usePriceRefresh } from "./price-events";
 import { keyedRequest, money, useOperation, type Row } from "./operations";
 import {
   recipeMath,
@@ -121,6 +122,11 @@ export default function Formulas({
       generation.current++;
     };
   }, [company]);
+  usePriceRefresh(company, () => {
+    request("formula_catalog", { p_company: company })
+      .then(setCatalog)
+      .catch((e) => state.setError(e.message));
+  });
   useEffect(() => {
     onDirty(dirty);
     return () => onDirty(false);

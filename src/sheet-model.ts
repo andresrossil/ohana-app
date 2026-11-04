@@ -8,7 +8,7 @@ export const columns = [
   "UNIDAD MEDIDA",
   "COMENTARIO",
   "PRECIO PRESENTACION",
-  "PRECIO UN",
+  "PRECIO ACTUAL",
   "VS",
   "PRECIO ANTERIOR",
   "PROVEEDOR ANTERIOR",
@@ -143,6 +143,7 @@ export function pasteLayout(matrix: string[][], start = 0) {
   const aliases = new Map(columns.map((c, i) => [headerKey(c), i]));
   aliases.set("mp", 2);
   aliases.set("cantidad", 4);
+  aliases.set("precioun", 8);
   // Header-based mapping is independent of order. Unknown header columns fail clearly.
   if (
     keys.some((k) => k === "mp" || k === "material") &&

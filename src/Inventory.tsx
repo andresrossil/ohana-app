@@ -1,4 +1,9 @@
 import ResponsiveTable from "./ResponsiveTable";
+import PhysicalUnits, { MovementUnits } from "./PhysicalUnits";
+import { request } from "./commerce";
+import AutoTextarea from "./AutoTextarea";
+import { parseNumber } from "./sheet-model";
+import { weightMatches } from "./variant-weights";
 import { SearchField } from "./PoolControls";
 import { AppButton, AppIcon } from "./AppIcon";
 import { useEffect, useState } from "react";
@@ -28,18 +33,24 @@ export default function Inventory({
       suppliers: [],
       movements: [],
     }),
+    [physical, setPhysical] = useState<Row>({ units: [], history: [] }),
     [receipts, setReceipts] = useState<Row[]>([]),
     [form, setForm] = useState<"receive" | "adjust" | null>(null),
     [material, setMaterial] = useState(""),
     [kind, setKind] = useState("material"),
-    [query, setQuery] = useState("");
+    [query, setQuery] = useState(""),
+    [adjustItem, setAdjustItem] = useState(""),
+    [adjustQuantity, setAdjustQuantity] = useState(""),
+    [adjustWeights, setAdjustWeights] = useState("");
   async function load() {
-    const [d, r] = await Promise.all([
+    const [d, r, p] = await Promise.all([
       operation(company, "inventory"),
       operation(company, "receipts"),
+      request("physical_unit_catalog", { p_company: company }),
     ]);
     setData(d);
     setReceipts(r);
+    setPhysical(p);
   }
   useEffect(() => {
     state.run(load);
@@ -47,6 +58,32 @@ export default function Inventory({
   const baseUnit = data.units.find(
     (u: Row) =>
       u.id === data.materials.find((m: Row) => m.id === material)?.unit_id,
+  );
+  const selectedVariant =
+    kind === "variant"
+      ? data.variants.find((v: Row) => v.id === adjustItem)
+      : null;
+  const weightValues = adjustWeights.trim()
+    ? adjustWeights.trim().split(/[\n;]/).filter(Boolean).map(parseNumber)
+    : [];
+  const weightPreviews = weightValues.map((weight: number | null) => ({
+    weight,
+    matches: weightMatches(
+      data.variants.filter(
+        (v: Row) => v.product_id === selectedVariant?.product_id,
+      ),
+      selectedVariant?.attributes || {},
+      weight,
+    ),
+  }));
+  const unitById = new Map<string, Row>(
+    physical.units.map((u: Row) => [u.id, u]),
+  );
+  const movementNames = new Map<string, string>(
+    physical.history.map((h: Row) => [
+      h.movement_id,
+      unitById.get(h.unit_id)?.variant_snapshot?.name,
+    ]),
   );
   const balances = data.balances.filter((r: Row) =>
     [r.name, r.sku, r.barcode, r.classification]
@@ -79,7 +116,12 @@ export default function Inventory({
               </AppButton>
               <AppButton
                 className="secondary"
-                onClick={() => setForm("adjust")}
+                onClick={() => {
+                  setAdjustItem("");
+                  setAdjustQuantity("");
+                  setAdjustWeights("");
+                  setForm("adjust");
+                }}
               >
                 Ajustar existencias
               </AppButton>
@@ -124,9 +166,37 @@ export default function Inventory({
               className="settings-grid"
               onSubmit={(e) => {
                 e.preventDefault();
-                const values = Object.fromEntries(
+                const values: Row = Object.fromEntries(
                   new FormData(e.currentTarget),
                 );
+                if (
+                  form === "adjust" &&
+                  selectedVariant?.weight_min != null &&
+                  adjustWeights.trim()
+                ) {
+                  if (
+                    !weightPreviews.length ||
+                    weightPreviews.some((p) => p.matches.length !== 1)
+                  ) {
+                    state.setError(
+                      "Hay pesos sin rango válido o ambiguos. Revisa cada unidad antes de guardar.",
+                    );
+                    return;
+                  }
+                  values.quantity = weightValues.length;
+                  values.unit_weights = weightValues;
+                }
+                if (
+                  form === "adjust" &&
+                  selectedVariant?.weight_min != null &&
+                  Number(values.quantity) > 0 &&
+                  !adjustWeights.trim()
+                ) {
+                  state.setError(
+                    "Registra un peso real por cada unidad que agregas.",
+                  );
+                  return;
+                }
                 state.run(async () => {
                   await mutate(company, form, values);
                   setForm(null);
@@ -250,7 +320,12 @@ export default function Inventory({
                     <select
                       name="kind"
                       value={kind}
-                      onChange={(e) => setKind(e.target.value)}
+                      onChange={(e) => {
+                        setKind(e.target.value);
+                        setAdjustItem("");
+                        setAdjustWeights("");
+                        setAdjustQuantity("");
+                      }}
                     >
                       <option value="material">Material</option>
                       <option value="variant">Variante de producto</option>
@@ -258,7 +333,16 @@ export default function Inventory({
                   </label>
                   <label>
                     Artículo
-                    <select name="item" required key={kind}>
+                    <select
+                      name="item"
+                      required
+                      key={kind}
+                      value={adjustItem}
+                      onChange={(e) => {
+                        setAdjustItem(e.target.value);
+                        setAdjustWeights("");
+                      }}
+                    >
                       <option value="">Seleccionar</option>
                       {data[kind === "material" ? "materials" : "variants"].map(
                         (r: Row) => (
@@ -276,6 +360,13 @@ export default function Inventory({
                       type="number"
                       name="quantity"
                       step={kind === "variant" ? "1" : "any"}
+                      value={
+                        adjustWeights.trim()
+                          ? String(weightValues.length)
+                          : adjustQuantity
+                      }
+                      readOnly={!!adjustWeights.trim()}
+                      onChange={(e) => setAdjustQuantity(e.target.value)}
                       required
                     />
                     <small>
@@ -283,6 +374,39 @@ export default function Inventory({
                       unidad base; variantes: unidades.
                     </small>
                   </label>
+                  {selectedVariant?.weight_min != null && (
+                    <label className="form-wide">
+                      Pesos individuales de entrada (g)
+                      <AutoTextarea
+                        value={adjustWeights}
+                        onChange={(e) => setAdjustWeights(e.target.value)}
+                        placeholder={"89.99\n90.00"}
+                      />
+                      <small>
+                        Un peso por línea, hasta cuatro decimales. Se asigna la
+                        variante automáticamente dentro del producto y atributos
+                        seleccionados. Para retirar, deja los pesos vacíos y usa
+                        cantidad negativa.
+                      </small>
+                      {weightPreviews.length > 0 && (
+                        <ul>
+                          {weightPreviews.map((p, i) => (
+                            <li
+                              key={i}
+                              className={
+                                p.matches.length === 1 ? "" : "sheet-warning"
+                              }
+                            >
+                              {p.weight ?? "Peso inválido"} g ·{" "}
+                              {p.matches.length === 1
+                                ? p.matches[0].name
+                                : "Sin rango válido o ambiguo"}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </label>
+                  )}
                   <label>
                     Costo por unidad base ({currency}, opcional)
                     <input name="unit_cost" type="number" min="0" step="any" />
@@ -415,6 +539,7 @@ export default function Inventory({
                     <th>Cantidad</th>
                     <th>Origen</th>
                     <th>Nota</th>
+                    <th>Unidades físicas</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -422,8 +547,11 @@ export default function Inventory({
                     <tr key={r.id}>
                       <td>{new Date(r.created_at).toLocaleString("es-GT")}</td>
                       <td>
-                        {data.balances.find((b: Row) => b.item_id === r.item_id)
-                          ?.name || r.item_id}
+                        {movementNames.get(r.id) ||
+                          data.balances.find(
+                            (b: Row) => b.item_id === r.item_id,
+                          )?.name ||
+                          r.item_id}
                       </td>
                       <td>{Number(r.quantity)}</td>
                       <td>
@@ -439,12 +567,24 @@ export default function Inventory({
                         }[r.source_kind as string] || r.source_kind}
                       </td>
                       <td>{r.notes}</td>
+                      <td>
+                        <MovementUnits
+                          movement={r.id}
+                          units={physical.units}
+                          history={physical.history}
+                        />
+                      </td>
                     </tr>
                   ))}
                 </tbody>
               </ResponsiveTable>
             </div>
           </section>
+          <PhysicalUnits
+            units={physical.units}
+            query={query}
+            history={physical.history}
+          />
         </>
       )}
     </>

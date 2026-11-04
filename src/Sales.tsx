@@ -1,4 +1,5 @@
 import ResponsiveTable from "./ResponsiveTable";
+import { SaleUnits } from "./PhysicalUnits";
 import DecimalInput from "./DecimalInput";
 import { SearchField } from "./PoolControls";
 import { AppButton, AppIcon } from "./AppIcon";
@@ -451,10 +452,11 @@ export default function Sales({
                     </td>
                     <td>
                       {o.lines?.map((l: Row) => (
-                        <small key={l.id}>
+                        <div key={l.id} className="sale-line">
                           {l.quantity} × {l.description} ·{" "}
                           {money(l.unit_price, o.currency)} / ud
-                        </small>
+                          <SaleUnits units={l.physical_units || []} />
+                        </div>
                       ))}
                       {o.gift && <small>Regalo: {o.gift}</small>}
                       {o.gift_message && (

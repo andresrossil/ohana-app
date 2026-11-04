@@ -383,7 +383,13 @@ export default function BusinessPartners({
               {data.rows.map((row: Row) => (
                 <tr key={row.id}>
                   <td>{row.code}</td>
-                  <td>{row.name}</td>
+                  <td
+                    className={
+                      row.partner_type === "supplier" ? "admin-name" : ""
+                    }
+                  >
+                    {row.name}
+                  </td>
                   <td>{typeName(row.partner_type)}</td>
                   <td>{row.phone || "—"}</td>
                   <td>

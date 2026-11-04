@@ -14,6 +14,7 @@ import { confirmAction } from "./ConfirmDialog";
 import { AppButton, AppIcon } from "./AppIcon";
 import Formulas from "./Formulas";
 import { request } from "./commerce";
+import { usePriceRefresh } from "./price-events";
 import BatchTrace, { lotCode } from "./BatchTrace";
 import { useEffect, useState } from "react";
 import {
@@ -96,6 +97,11 @@ function ProductionBatches({
   useEffect(() => {
     state.run(load);
   }, [company]);
+  usePriceRefresh(company, () => {
+    request("formula_catalog", { p_company: company })
+      .then(setCostCatalog)
+      .catch((e) => state.setError(e.message));
+  });
   useEffect(() => {
     onDirty(dirty);
     return () => onDirty(false);
@@ -573,8 +579,9 @@ function ProductionBatches({
                     }}
                   />
                   <p>
-                    Deja en cero las variantes que no produjo este lote. El peso
-                    total de cada variante es opcional.
+                    Las variantes con rango de peso se registran unidad por
+                    unidad arriba. Para las demás puedes capturar la cantidad y,
+                    opcionalmente, el peso total.
                   </p>
                   {catalog.variants
                     .filter((v: Row) => v.product_id === selected!.product_id)
@@ -594,9 +601,10 @@ function ProductionBatches({
                             min="0"
                             step="1"
                             value={outputUnits[v.id] || "0"}
-                            readOnly={weighedUnits.some(
-                              (u) => u.variant === v.id,
-                            )}
+                            readOnly={
+                              v.weight_min != null ||
+                              weighedUnits.some((u) => u.variant === v.id)
+                            }
                           />
                         </label>
                         <label>
@@ -613,9 +621,10 @@ function ProductionBatches({
                                 [v.id]: e.target.value,
                               }))
                             }
-                            readOnly={weighedUnits.some(
-                              (u) => u.variant === v.id,
-                            )}
+                            readOnly={
+                              v.weight_min != null ||
+                              weighedUnits.some((u) => u.variant === v.id)
+                            }
                           />
                         </label>
                       </div>

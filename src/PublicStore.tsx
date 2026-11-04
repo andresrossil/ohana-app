@@ -4,6 +4,7 @@ import { request } from "./commerce";
 import { keyedRequest, money, type Row } from "./operations";
 import CompanyLogo, { defaultTheme } from "./CompanyBrand";
 import ProductImage from "./ProductImage";
+import { weightRangeLabel } from "./variant-weights";
 function ProductCard({
   product,
   onAdd,
@@ -32,7 +33,10 @@ function ProductCard({
                 {product.variants.map((v: Row) => (
                   <option key={v.id} value={v.id}>
                     {v.name}
-                    {v.weight_min ? ` · ${v.weight_min}–${v.weight_max} g` : ""}
+                    {v.weight_min
+                      ? " · " + weightRangeLabel({ ...v, id: v.id })
+                      : ""}{" "}
+                    · {money(v.price, currency)}
                   </option>
                 ))}
               </select>
@@ -53,12 +57,15 @@ function ProductCard({
             <p>
               {variant.available > 0
                 ? `${variant.available} disponibles`
-                : variant.allow_preorder
+                : variant.allow_preorder && variant.weight_min == null
                   ? "Disponible por pedido anticipado"
                   : "Agotado"}
             </p>
             <button
-              disabled={!variant.allow_preorder && variant.available <= 0}
+              disabled={
+                (!variant.allow_preorder || variant.weight_min != null) &&
+                variant.available <= 0
+              }
               onClick={() => onAdd(variant, product)}
             >
               Agregar al carrito
@@ -190,7 +197,8 @@ export default function PublicStore({ company }: { company: string }) {
     const line = cart.find((l) => l.id === v.id);
     if (
       (line && line.quantity >= 1000) ||
-      (!v.allow_preorder && (line?.quantity || 0) + 1 > v.available)
+      ((!v.allow_preorder || v.weight_min != null) &&
+        (line?.quantity || 0) + 1 > v.available)
     ) {
       setError("No hay más unidades disponibles de esta opción");
       return;
@@ -289,12 +297,14 @@ export default function PublicStore({ company }: { company: string }) {
                             carrito.
                           </p>
                         )}
-                        {l.allow_preorder && l.quantity > l.available && (
-                          <p>
-                            Pedido anticipado: hay unidades pendientes de
-                            disponibilidad.
-                          </p>
-                        )}
+                        {l.allow_preorder &&
+                          l.weight_min == null &&
+                          l.quantity > l.available && (
+                            <p>
+                              Pedido anticipado: hay unidades pendientes de
+                              disponibilidad.
+                            </p>
+                          )}
                       </div>
                       <label>
                         Cantidad

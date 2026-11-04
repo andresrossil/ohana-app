@@ -230,7 +230,7 @@ export default function ProductsCatalog({
                     <div className="catalog-photo">
                       <ProductImage path={p.photo_path} name={p.name} />
                     </div>
-                    <strong>{p.name}</strong>
+                    <strong className="admin-name">{p.name}</strong>
                     <small>{p.notes}</small>
                   </td>
                   <td>

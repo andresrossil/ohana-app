@@ -5,6 +5,8 @@ import { weightRangeError, weightRangeLabel } from "./variant-weights";
 import { AppButton, AppIcon } from "./AppIcon";
 import { useEffect, useState, lazy, Suspense } from "react";
 import { operation, mutate, useOperation, money, type Row } from "./operations";
+import { request } from "./commerce";
+import { usePriceRefresh } from "./price-events";
 const BarcodeDialog = lazy(() => import("./BarcodeDialog"));
 export default function VariantManager({
   company,
@@ -19,14 +21,23 @@ export default function VariantManager({
 }) {
   const [rows, setRows] = useState<Row[]>([]),
     [edit, setEdit] = useState<Row | null | undefined>(),
-    [barcode, setBarcode] = useState<Row | null>(null);
+    [barcode, setBarcode] = useState<Row | null>(null),
+    [baseName, setBaseName] = useState("");
   const state = useOperation(company, "catalog");
   async function load() {
-    setRows(await operation(company, "variants", { product: product.id }));
+    const [variants, base] = await Promise.all([
+      operation(company, "variants", { product: product.id }),
+      request("base_price_list", { p_company: company }),
+    ]);
+    setRows(variants);
+    setBaseName(base?.name || "");
   }
   useEffect(() => {
     state.run(load);
   }, [company, product.id]);
+  usePriceRefresh(company, () => {
+    load().catch((e) => state.setError(e.message));
+  });
   return (
     <div className="overlay">
       <section
@@ -227,7 +238,9 @@ export default function VariantManager({
                 <th>Variante</th>
                 <th>SKU / barras</th>
                 <th>Peso</th>
-                <th>Precio</th>
+                <th className="base-price-heading">
+                  {baseName ? "PRECIO · " + baseName : "PRECIO DE LISTA BASE"}
+                </th>
                 <th>Disponible / curación</th>
                 <th>Acciones</th>
               </tr>
@@ -236,7 +249,7 @@ export default function VariantManager({
               {rows.map((r) => (
                 <tr key={r.id}>
                   <td>
-                    {r.name}
+                    <span className="admin-name">{r.name}</span>
                     <small>
                       {Object.entries(r.attributes)
                         .map(([k, v]) => `${k}: ${v}`)

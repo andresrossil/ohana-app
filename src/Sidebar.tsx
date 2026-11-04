@@ -82,32 +82,32 @@ export default function Sidebar({
       <div id="ohana-navigation" className="sidebar-content">
         <div className="workspace">
           <span>ESPACIO DE TRABAJO</span>
-          {corporations.length > 1 && onCorporation && (
-            <select
-              aria-label="Corporación"
-              value={
-                companies.find((c) => c.id === company)?.corporation_id || ""
-              }
-              onChange={(e) => onCorporation(e.target.value)}
-            >
-              <option value="">Seleccionar corporación</option>
-              {corporations.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-          )}
           <select
             aria-label="Empresa"
             value={company}
             onChange={(e) => onCompany(e.target.value)}
           >
-            {companies.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
+            {[...new Set(companies.map((c) => c.corporation_id || ""))].map(
+              (id) => (
+                <optgroup
+                  key={id}
+                  label={
+                    corporations.find((c) => c.id === id)?.name ||
+                    companies.find((c) => c.corporation_id === id)
+                      ?.corporation_name ||
+                    "Empresas"
+                  }
+                >
+                  {companies
+                    .filter((c) => (c.corporation_id || "") === id)
+                    .map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                </optgroup>
+              ),
+            )}
           </select>
         </div>
         <nav aria-label="Navegación principal">
