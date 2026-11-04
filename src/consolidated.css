@@ -146,3 +146,13 @@
     min-height: 44px;
   }
 }
+.variant-sheet { min-width: 0; max-width: 100%; }
+.variant-sheet .form-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.variant-sheet .table-wrap { max-width: 100%; overflow-x: auto; }
+.variant-sheet td input:not([type="checkbox"]), .variant-sheet td select { min-width: 110px; width: 100%; padding: 8px; }
+.variant-sheet .variant-paste { display: grid; gap: 6px; margin: 12px 0; }
+.variant-sheet .variant-paste textarea { width: 100%; min-width: 0; max-width: 100%; box-sizing: border-box; }
+@media (max-width: 640px) {
+  .variant-sheet td input:not([type="checkbox"]), .variant-sheet td select { min-width: 0; }
+  .variant-sheet .form-actions button { min-height: 44px; }
+}

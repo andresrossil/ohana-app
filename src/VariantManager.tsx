@@ -7,6 +7,7 @@ import { useEffect, useState, lazy, Suspense } from "react";
 import { operation, mutate, useOperation, money, type Row } from "./operations";
 import { request } from "./commerce";
 import { usePriceRefresh } from "./price-events";
+import VariantSheet from "./VariantSheet";
 const BarcodeDialog = lazy(() => import("./BarcodeDialog"));
 export default function VariantManager({
   company,
@@ -23,6 +24,8 @@ export default function VariantManager({
     [edit, setEdit] = useState<Row | null | undefined>(),
     [barcode, setBarcode] = useState<Row | null>(null),
     [baseName, setBaseName] = useState("");
+  const [sheet, setSheet] = useState<"edit" | "import" | null>(null);
+  const [sheetDirty, setSheetDirty] = useState(false);
   const state = useOperation(company, "catalog");
   async function load() {
     const [variants, base] = await Promise.all([
@@ -55,8 +58,10 @@ export default function VariantManager({
             disabled={state.busy}
             className="secondary"
             onClick={async () => {
+              if (document.querySelector('.variant-sheet[aria-busy="true"]'))
+                return;
               if (
-                edit !== undefined &&
+                (edit !== undefined || sheetDirty) &&
                 !(await confirmAction(
                   "¿Descartar los cambios de esta variante?",
                 ))
@@ -80,7 +85,46 @@ export default function VariantManager({
         )}
         {state.notice && <p role="status">{state.notice}</p>}
         {state.canWrite && edit === undefined && (
-          <AppButton onClick={() => setEdit(null)}>Agregar variante</AppButton>
+          <div className="form-actions">
+            {!sheet && (
+              <>
+                <AppButton onClick={() => setEdit(null)}>
+                  Agregar variante individual
+                </AppButton>
+                <AppButton
+                  className="secondary"
+                  onClick={() => setSheet("edit")}
+                >
+                  Editar catálogo en tabla
+                </AppButton>
+                <AppButton
+                  className="secondary"
+                  onClick={() => setSheet("import")}
+                >
+                  Copiar de Tabla
+                </AppButton>
+              </>
+            )}
+          </div>
+        )}
+        {sheet && (
+          <VariantSheet
+            key={company + product.id + sheet}
+            company={company}
+            product={product}
+            existing={rows}
+            importing={sheet === "import"}
+            onDirty={setSheetDirty}
+            onClose={() => {
+              setSheet(null);
+              setSheetDirty(false);
+            }}
+            onSaved={async () => {
+              await load();
+              await onChanged?.();
+              state.setNotice("Variantes guardadas");
+            }}
+          />
         )}
         {edit !== undefined && (
           <form
@@ -231,68 +275,70 @@ export default function VariantManager({
             </div>
           </form>
         )}
-        <div className="table-wrap">
-          <ResponsiveTable>
-            <thead>
-              <tr>
-                <th>Variante</th>
-                <th>SKU / barras</th>
-                <th>Peso</th>
-                <th className="base-price-heading">
-                  {baseName ? "PRECIO · " + baseName : "PRECIO DE LISTA BASE"}
-                </th>
-                <th>Disponible / curación</th>
-                <th>Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r) => (
-                <tr key={r.id}>
-                  <td>
-                    <span className="admin-name">{r.name}</span>
-                    <small>
-                      {Object.entries(r.attributes)
-                        .map(([k, v]) => `${k}: ${v}`)
-                        .join(" · ")}{" "}
-                      <CatalogBadge
-                        active={r.active}
-                        label={r.active ? "Activa" : "Archivada"}
-                      />
-                    </small>
-                  </td>
-                  <td>
-                    {r.sku}
-                    <small>{r.barcode || "Sin código de barras"}</small>
-                  </td>
-                  <td>{weightRangeLabel({ ...r, id: r.id })}</td>
-                  <td>
-                    {r.price == null
-                      ? "Pendiente de precio"
-                      : money(r.price, r.currency)}
-                  </td>
-                  <td>
-                    {r.available} / {r.blocked}
-                  </td>
-                  <td className="actions">
-                    {state.canWrite && (
-                      <AppButton onClick={() => setEdit(r)}>Editar</AppButton>
-                    )}
-                    {r.barcode && (
-                      <AppButton onClick={() => setBarcode(r)}>
-                        Barras
-                      </AppButton>
-                    )}
-                  </td>
+        {!sheet && (
+          <div className="table-wrap">
+            <ResponsiveTable>
+              <thead>
+                <tr>
+                  <th>Variante</th>
+                  <th>SKU / barras</th>
+                  <th>Peso</th>
+                  <th className="base-price-heading">
+                    {baseName ? "PRECIO · " + baseName : "PRECIO DE LISTA BASE"}
+                  </th>
+                  <th>Disponible / curación</th>
+                  <th>Acciones</th>
                 </tr>
-              ))}
-            </tbody>
-          </ResponsiveTable>
-          {!rows.length && (
-            <p className="empty">
-              Agrega la primera variante para producir o vender este producto.
-            </p>
-          )}
-        </div>
+              </thead>
+              <tbody>
+                {rows.map((r) => (
+                  <tr key={r.id}>
+                    <td>
+                      <span className="admin-name">{r.name}</span>
+                      <small>
+                        {Object.entries(r.attributes)
+                          .map(([k, v]) => `${k}: ${v}`)
+                          .join(" · ")}{" "}
+                        <CatalogBadge
+                          active={r.active}
+                          label={r.active ? "Activa" : "Archivada"}
+                        />
+                      </small>
+                    </td>
+                    <td>
+                      {r.sku}
+                      <small>{r.barcode || "Sin código de barras"}</small>
+                    </td>
+                    <td>{weightRangeLabel({ ...r, id: r.id })}</td>
+                    <td>
+                      {r.price == null
+                        ? "Pendiente de precio"
+                        : money(r.price, r.currency)}
+                    </td>
+                    <td>
+                      {r.available} / {r.blocked}
+                    </td>
+                    <td className="actions">
+                      {state.canWrite && (
+                        <AppButton onClick={() => setEdit(r)}>Editar</AppButton>
+                      )}
+                      {r.barcode && (
+                        <AppButton onClick={() => setBarcode(r)}>
+                          Barras
+                        </AppButton>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </ResponsiveTable>
+            {!rows.length && (
+              <p className="empty">
+                Agrega la primera variante para producir o vender este producto.
+              </p>
+            )}
+          </div>
+        )}
         {barcode && (
           <Suspense fallback={<p>Preparando código…</p>}>
             <BarcodeDialog

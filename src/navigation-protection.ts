@@ -66,8 +66,11 @@ export function useNavigationProtection() {
   return {
     busy: () =>
       operations > 0 ||
-      !!document.querySelector('.shell form[aria-busy="true"]'),
+      !!document.querySelector(
+        '.shell form[aria-busy="true"], .variant-sheet[aria-busy="true"]',
+      ),
     dirty: () =>
+      !!document.querySelector('[data-navigation-dirty="true"]') ||
       [...forms.current].some(([f, s]) => f.isConnected && snapshot(f) !== s),
     clear: () => {
       forms.current.clear();
