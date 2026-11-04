@@ -31,6 +31,10 @@ export function priceCost(
   const formula = [...eligible].sort(
     (a, b) => Number(b.version) - Number(a.version),
   )[0];
+  return formulaCost(formula, catalog, saleReference);
+}
+
+export function formulaCost(formula: Row, catalog: Row, saleReference?: Row) {
   const source = `${formula.code} · v${formula.version}${formula.state === "testing" ? " · En pruebas" : ""}`;
   if (!(Number(formula.estimated_units) > 0))
     return { cost: null, reason: "Unidades estimadas pendientes", source };

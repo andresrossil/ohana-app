@@ -361,3 +361,11 @@
     grid-column: 1 / -1;
   }
 }
+.shell .formula-amount { min-width: 110px; font-variant-numeric: tabular-nums; }
+.shell .formula-amount small { display: block; max-width: 190px; color: var(--admin-muted); white-space: normal; overflow-wrap: anywhere; }
+.shell .formula-margin-positive { color: #16804a; font-weight: 600; }
+.shell .formula-margin-negative { color: #b91c1c; font-weight: 600; }
+.shell .formula-cost-note { display: block; padding: 10px 16px; color: var(--admin-muted); }
+@media (max-width: 760px) {
+  .shell .formula-amount { min-width: 0; overflow-wrap: anywhere; }
+}

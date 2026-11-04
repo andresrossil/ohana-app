@@ -11,6 +11,7 @@ import { useEffect, useRef, useState } from "react";
 import { AppButton, AppIcon } from "./AppIcon";
 import { request } from "./commerce";
 import { usePriceRefresh } from "./price-events";
+import { formulaCost } from "./price-cost";
 import { keyedRequest, money, useOperation, type Row } from "./operations";
 import {
   recipeMath,
@@ -925,112 +926,172 @@ export default function Formulas({
                 <th>Producto / fórmula</th>
                 <th>Versión</th>
                 <th>Estado</th>
+                <th>Precio de venta / unidad</th>
+                <th>Costo estimado / unidad</th>
+                <th>
+                  Margen aprox.<small>Precio − costo</small>
+                </th>
                 <th>Acciones</th>
               </tr>
             </thead>
             <tbody>
-              {filtered.map((f) => (
-                <tr key={f.id}>
-                  <td>{f.code}</td>
-                  <td>
-                    <div className="formula-product">
-                      <div className="formula-product-image">
-                        <ProductImage
-                          path={
-                            catalog.products.find(
-                              (p: Row) => p.id === f.product_id,
-                            )?.photo_path
-                          }
-                          name={f.product_name}
-                        />
+              {filtered.map((f) => {
+                const presentation = (catalog.presentations || []).find(
+                  (v: Row) =>
+                    v.id === f.estimate_variant_id &&
+                    v.product_id === f.product_id,
+                );
+                const price =
+                  presentation?.currency === catalog.currency &&
+                  presentation.price != null &&
+                  Number.isFinite(Number(presentation.price))
+                    ? Number(presentation.price)
+                    : null;
+                const estimate = formulaCost(f, catalog, presentation);
+                const margin =
+                  price != null && estimate.cost != null
+                    ? price - estimate.cost
+                    : null;
+                return (
+                  <tr key={f.id}>
+                    <td>{f.code}</td>
+                    <td>
+                      <div className="formula-product">
+                        <div className="formula-product-image">
+                          <ProductImage
+                            path={
+                              catalog.products.find(
+                                (p: Row) => p.id === f.product_id,
+                              )?.photo_path
+                            }
+                            name={f.product_name}
+                          />
+                        </div>
+                        <div className="formula-product-text">
+                          <strong>{f.product_name}</strong>
+                          <small>{f.name}</small>
+                        </div>
                       </div>
-                      <div className="formula-product-text">
-                        <strong>{f.product_name}</strong>
-                        <small>{f.name}</small>
-                      </div>
-                    </div>
-                  </td>
-                  <td>v{f.version}</td>
-                  <td>
-                    <div className={"formula-state formula-state-" + f.state}>
-                      <span className="formula-state-icon">
-                        <AppIcon
-                          name={
-                            f.state === "current"
-                              ? "status.active"
-                              : f.state === "inactive"
-                                ? "status.archived"
-                                : "status.warning"
-                          }
-                        />
-                      </span>
-                      {state.canWrite ? (
-                        <select
-                          aria-label={`Estado ${f.code} v${f.version}`}
-                          value={f.state}
-                          disabled={state.busy}
-                          onChange={(e) => changeState(f, e.target.value)}
-                        >
-                          {Object.entries(labels).map(([key, label]) => (
-                            <option key={key} value={key}>
-                              {label}
-                            </option>
-                          ))}
-                        </select>
-                      ) : (
-                        <span className="formula-state-label">
-                          {labels[f.state]}
+                    </td>
+                    <td>v{f.version}</td>
+                    <td>
+                      <div className={"formula-state formula-state-" + f.state}>
+                        <span className="formula-state-icon">
+                          <AppIcon
+                            name={
+                              f.state === "current"
+                                ? "status.active"
+                                : f.state === "inactive"
+                                  ? "status.archived"
+                                  : "status.warning"
+                            }
+                          />
                         </span>
+                        {state.canWrite ? (
+                          <select
+                            aria-label={`Estado ${f.code} v${f.version}`}
+                            value={f.state}
+                            disabled={state.busy}
+                            onChange={(e) => changeState(f, e.target.value)}
+                          >
+                            {Object.entries(labels).map(([key, label]) => (
+                              <option key={key} value={key}>
+                                {label}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <span className="formula-state-label">
+                            {labels[f.state]}
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="formula-amount">
+                      {price == null
+                        ? "Pendiente"
+                        : money(price, catalog.currency)}
+                      {price == null && (
+                        <small>
+                          {presentation
+                            ? "Sin precio base vigente"
+                            : "Sin presentación vinculada"}
+                        </small>
                       )}
-                    </div>
-                  </td>
-                  <td className="actions formula-actions">
-                    <AppButton
-                      className="secondary"
-                      disabled={state.busy}
-                      onClick={() => open("view", f)}
+                    </td>
+                    <td className="formula-amount">
+                      {estimate.cost == null
+                        ? "Pendiente"
+                        : money(estimate.cost, catalog.currency)}
+                      {estimate.reason && <small>{estimate.reason}</small>}
+                    </td>
+                    <td
+                      className={
+                        "formula-amount" +
+                        (margin == null || margin === 0
+                          ? ""
+                          : margin > 0
+                            ? " formula-margin-positive"
+                            : " formula-margin-negative")
+                      }
                     >
-                      Ver / escalar
-                    </AppButton>
-                    {state.canWrite && (
-                      <>
-                        <AppButton
-                          className="secondary"
-                          disabled={state.busy}
-                          iconKey="action.edit"
-                          onClick={() => open(f.locked ? "notes" : "edit", f)}
-                        >
-                          Editar fórmula
-                        </AppButton>
-                        <AppButton
-                          className="secondary"
-                          disabled={state.busy}
-                          onClick={() => open("version", f)}
-                        >
-                          Nueva versión
-                        </AppButton>
-                        <AppButton
-                          className="secondary"
-                          disabled={state.busy}
-                          onClick={() => open("variation", f)}
-                        >
-                          Crear variación
-                        </AppButton>
-                        <AppButton
-                          className="secondary"
-                          disabled={state.busy}
-                          onClick={() => open("duplicate", f)}
-                        >
-                          Duplicar fórmula
-                        </AppButton>
-                      </>
-                    )}
-                  </td>
-                </tr>
-              ))}
+                      {margin == null
+                        ? "Pendiente"
+                        : money(margin, catalog.currency)}
+                    </td>
+                    <td className="actions formula-actions">
+                      <AppButton
+                        className="secondary"
+                        disabled={state.busy}
+                        onClick={() => open("view", f)}
+                      >
+                        Ver / escalar
+                      </AppButton>
+                      {state.canWrite && (
+                        <>
+                          <AppButton
+                            className="secondary"
+                            disabled={state.busy}
+                            iconKey="action.edit"
+                            onClick={() => open(f.locked ? "notes" : "edit", f)}
+                          >
+                            Editar fórmula
+                          </AppButton>
+                          <AppButton
+                            className="secondary"
+                            disabled={state.busy}
+                            onClick={() => open("version", f)}
+                          >
+                            Nueva versión
+                          </AppButton>
+                          <AppButton
+                            className="secondary"
+                            disabled={state.busy}
+                            onClick={() => open("variation", f)}
+                          >
+                            Crear variación
+                          </AppButton>
+                          <AppButton
+                            className="secondary"
+                            disabled={state.busy}
+                            onClick={() => open("duplicate", f)}
+                          >
+                            Duplicar fórmula
+                          </AppButton>
+                        </>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </ResponsiveTable>
         </div>
+        <small className="formula-cost-note">
+          Importes por unidad estimada de cada versión, calculados con costos
+          actuales y el precio de la lista base. Incluyen materiales, empaque,
+          insumos y costos adicionales.
+        </small>
         {!filtered.length && (
           <p className="empty">
             {state.busy
