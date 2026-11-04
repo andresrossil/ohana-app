@@ -4,10 +4,11 @@ import ResponsiveTable from "./ResponsiveTable";
 import { confirmAction } from "./ConfirmDialog";
 import { keyedRequest, type Row } from "./operations";
 import { parseTSV, formatTSV } from "./sheet-model";
-import { weightRangeError } from "./variant-weights";
+import { weightRangeError, normalizedAttributes } from "./variant-weights";
 
 const columns = [
-  ["name", "Nombre de variante"],
+  ["commercial_code", "Código comercial"],
+  ["name", "Tamaño comercial"],
   ["sku", "SKU"],
   ["barcode", "Código de barras"],
   ["barcode_custom", "Barras personalizadas"],
@@ -28,10 +29,14 @@ const flags = new Set([
 ]);
 const editable = (r: Row): Row =>
   Object.fromEntries([
-    ...["name", "sku", "barcode", "weight_min", "weight_max"].map((k) => [
-      k,
-      r[k] ?? "",
-    ]),
+    ...[
+      "commercial_code",
+      "name",
+      "sku",
+      "barcode",
+      "weight_min",
+      "weight_max",
+    ].map((k) => [k, r[k] ?? ""]),
     ...[...flags].map((k) => [k, r[k] ?? k === "active"]),
     ["attributes", r.attributes || {}],
   ]);
@@ -99,6 +104,13 @@ export default function VariantSheet({
       : r[k];
   }
   function assign(r: Row, k: string, value: any): Row {
+    if (k === "sku") {
+      if (String(value).trim() && String(value).trim() !== String(r.sku || ""))
+        throw Error(
+          "El SKU se genera automáticamente. Escribe JT-1 y similares en Código comercial.",
+        );
+      return r;
+    }
     if (["aroma", "color", "tipo"].includes(k))
       return { ...r, attributes: { ...r.attributes, [k]: value } };
     return {
@@ -111,12 +123,21 @@ export default function VariantSheet({
     try {
       let grid = parseTSV(text).filter((r) => r.some((c) => c.trim()));
       let mapping: number[] | undefined;
-      if (grid[0] && normalize(grid[0][0]) === "nombredevariante") {
+      if (
+        grid[0] &&
+        [
+          "nombredevariante",
+          "codigocomercial",
+          "tamanocomercial",
+          "sku",
+        ].includes(normalize(grid[0][0]))
+      ) {
         mapping = grid
           .shift()!
           .map((h) =>
             columns.findIndex(
               ([k, label]) =>
+                (k === "name" && normalize(h) === "nombredevariante") ||
                 normalize(label) === normalize(h) ||
                 normalize(k) === normalize(h),
             ),
@@ -170,15 +191,45 @@ export default function VariantSheet({
       ...existing.filter((e) => !rows.some((r) => r.id === e.id)),
       ...rows,
     ];
+    const identities = new Set<string>(),
+      codes = new Set<string>();
+    for (const r of all) {
+      const attrs = normalizedAttributes(r.attributes);
+      const identity = JSON.stringify([
+        String(r.name || "")
+          .trim()
+          .toUpperCase(),
+        attrs,
+        r.weight_min === "" || r.weight_min == null
+          ? null
+          : Number(r.weight_min),
+        r.weight_max === "" || r.weight_max == null
+          ? null
+          : Number(r.weight_max),
+      ]);
+      const code = String(r.commercial_code || "")
+        .trim()
+        .toUpperCase();
+      const codeKey = JSON.stringify([code, attrs]);
+      if (identities.has(identity) || (code && codes.has(codeKey))) {
+        setError(
+          "Hay variantes duplicadas: revisa el código comercial y la combinación de tamaño, atributos y rango de peso.",
+        );
+        return;
+      }
+      identities.add(identity);
+      if (code) codes.add(codeKey);
+    }
     for (const r of changed) {
-      const issue = !r.name.trim()
-        ? "Indica el nombre."
-        : r.id && !r.sku.trim()
-          ? "El SKU existente no puede quedar vacío."
-          : weightRangeError(
-              all.map((x) => ({ ...x, id: x.id || x.key })),
-              { ...r, id: r.id || r.key },
-            );
+      const issue =
+        !r.name.trim() && !r.commercial_code.trim()
+          ? "Indica un código comercial o un tamaño comercial."
+          : r.id && !r.sku.trim()
+            ? "El SKU existente no puede quedar vacío."
+            : weightRangeError(
+                all.map((x) => ({ ...x, id: x.id || x.key })),
+                { ...r, id: r.id || r.key },
+              );
       if (issue) {
         setError(`Fila ${rows.indexOf(r) + 1}: ${issue}`);
         return;
@@ -299,8 +350,9 @@ export default function VariantSheet({
       </div>
       <p className="muted">
         Edita directamente en cada celda. Pega desde Excel para crear las filas
-        automáticamente. SKU vacío: se genera al guardar. Los precios se
-        administran en Listas de precios.
+        automáticamente. El SKU es automático y de solo lectura; usa Código
+        comercial para JT-1 y similares. Los precios se administran en Listas de
+        precios.
       </p>
       {error && (
         <p className="error" role="alert">
@@ -365,6 +417,7 @@ export default function VariantSheet({
                       </select>
                     ) : (
                       <input
+                        readOnly={k === "sku"}
                         aria-label={`${label}, fila ${i + 1}`}
                         disabled={busy}
                         value={cell(r, k)}

@@ -32,11 +32,7 @@ function ProductCard({
               >
                 {product.variants.map((v: Row) => (
                   <option key={v.id} value={v.id}>
-                    {v.name}
-                    {v.weight_min
-                      ? " · " + weightRangeLabel({ ...v, id: v.id })
-                      : ""}{" "}
-                    · {money(v.price, currency)}
+                    {v.name} · {money(v.price, currency)}
                   </option>
                 ))}
               </select>

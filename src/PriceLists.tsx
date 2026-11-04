@@ -88,6 +88,7 @@ export default function PriceLists({
       r.product.name,
       r.product.sku,
       r.variant?.name,
+      r.variant?.commercial_code,
       r.variant?.sku,
       r.variant ? weightRangeLabel(r.variant) : "",
       ...Object.entries(r.variant?.attributes || {}).flat(),
@@ -483,7 +484,7 @@ export default function PriceLists({
                       <td className="admin-name">{r.product.name}</td>
                       <td>{v?.sku || r.product.sku || "—"}</td>
                       <td className="admin-name">
-                        {v?.name || "Sin variantes comerciales"}
+                        {v ? variantLabel(v) : "Sin variantes comerciales"}
                       </td>
                       <td>{v ? weightRangeLabel(v) : "—"}</td>
                       <td>
@@ -598,3 +599,4 @@ export default function PriceLists({
     </section>
   );
 }
+import { variantLabel } from "./variant-label";

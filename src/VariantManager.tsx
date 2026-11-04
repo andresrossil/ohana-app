@@ -8,6 +8,7 @@ import { operation, mutate, useOperation, money, type Row } from "./operations";
 import { request } from "./commerce";
 import { usePriceRefresh } from "./price-events";
 import VariantSheet from "./VariantSheet";
+import { variantLabel } from "./variant-label";
 const BarcodeDialog = lazy(() => import("./BarcodeDialog"));
 export default function VariantManager({
   company,
@@ -133,10 +134,11 @@ export default function VariantManager({
             onSubmit={(e) => {
               e.preventDefault();
               const data = Object.fromEntries(new FormData(e.currentTarget));
-              let attributes: Row = {};
+              let attributes: Row = { ...edit?.attributes };
               for (const key of ["aroma", "color", "tipo"])
                 if (String(data[key] || "").trim())
                   attributes[key] = String(data[key]).trim().toLowerCase();
+                else delete attributes[key];
               const payload = {
                 ...data,
                 attributes,
@@ -147,6 +149,15 @@ export default function VariantManager({
                 active: data.active === "on",
                 allow_preorder: data.allow_preorder === "on",
               };
+              if (
+                !String(data.name || "").trim() &&
+                !String(data.commercial_code || "").trim()
+              ) {
+                state.setError(
+                  "Indica un código comercial o un tamaño comercial.",
+                );
+                return;
+              }
               const rangeError = weightRangeError(
                 rows.map((r) => ({ ...r, id: r.id })),
                 {
@@ -170,11 +181,20 @@ export default function VariantManager({
             }}
           >
             <label>
-              Nombre de variante
+              Código comercial
+              <input
+                name="commercial_code"
+                maxLength={80}
+                placeholder="JT-1, JT-2…"
+                defaultValue={edit?.commercial_code}
+              />
+            </label>
+            <label>
+              Tamaño comercial
               <input
                 name="name"
-                required
                 maxLength={120}
+                placeholder="PEQUEÑO, MEDIANO… Puede repetirse."
                 defaultValue={edit?.name}
               />
             </label>
@@ -182,6 +202,7 @@ export default function VariantManager({
               SKU
               <input
                 name="sku"
+                readOnly
                 maxLength={80}
                 required={!!edit}
                 placeholder="Se genera al guardar, por ejemplo P0001-01"
@@ -294,11 +315,8 @@ export default function VariantManager({
                 {rows.map((r) => (
                   <tr key={r.id}>
                     <td>
-                      <span className="admin-name">{r.name}</span>
+                      <span className="admin-name">{variantLabel(r)}</span>
                       <small>
-                        {Object.entries(r.attributes)
-                          .map(([k, v]) => `${k}: ${v}`)
-                          .join(" · ")}{" "}
                         <CatalogBadge
                           active={r.active}
                           label={r.active ? "Activa" : "Archivada"}

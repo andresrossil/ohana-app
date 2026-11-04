@@ -44,8 +44,7 @@ export default function VariantWeightCapture({
   const add = () => {
     if (match && !busy && onAdd(match, Number(weight))) setWeight("");
   };
-  const name = (v: WeightVariant) =>
-    [v.name, weightRangeLabel(v)].filter(Boolean).join(" · ");
+  const name = (v: WeightVariant) => variantLabel(v);
   return (
     <IconDetails className="formula-disclosure" open>
       <summary>
@@ -147,3 +146,4 @@ export default function VariantWeightCapture({
     </IconDetails>
   );
 }
+import { variantLabel } from "./variant-label";

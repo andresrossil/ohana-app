@@ -588,7 +588,7 @@ function ProductionBatches({
                     .map((v: Row) => (
                       <div className="ingredient-row" key={v.id}>
                         <label>
-                          {v.name}
+                          {variantLabel(v)}
                           <input
                             name={"output_" + v.id}
                             onChange={(e) =>
@@ -892,3 +892,4 @@ function ProductionBatches({
     </>
   );
 }
+import { variantLabel } from "./variant-label";
