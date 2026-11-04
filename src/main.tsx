@@ -99,6 +99,7 @@ function App() {
     [importNotice, setImportNotice] = useState("");
   const [section, setSection] = useState<Section>("dashboard"),
     [configView, setConfigView] = useState("profile"),
+    [expenseView, setExpenseView] = useState("overhead"),
     [classification, setClassification] = useState(""),
     [origin, setOrigin] = useState(""),
     [barcode, setBarcode] = useState<Row | null>(null);
@@ -599,6 +600,7 @@ function App() {
               ? ["customers"]
               : []),
             ...(activeCompany?.reports_read ? ["reports"] : []),
+            ...(activeCompany?.manage ? ["prices", "expenses"] : []),
             ...(activeCompany && (activeCompany.manage || canCreate)
               ? ["settings"]
               : []),
@@ -738,10 +740,6 @@ function App() {
                       ["origins", "Orígenes"],
                       ["presentations", "Presentaciones"],
                       ["units", "Unidades"],
-                      ["overhead", "Otros gastos"],
-                      ["labor", "Mano de obra"],
-                      ["advertising", "Publicidad"],
-                      ["prices", "Listas de precios"],
                     ]
                       .filter(
                         ([key]) =>
@@ -797,22 +795,6 @@ function App() {
                         onDirty={setSettingsDirty}
                       />
                     )}
-                  {["overhead", "labor", "advertising"].includes(configView) &&
-                    activeCompany?.manage && (
-                      <AdditionalCostSettings
-                        key={company + configView}
-                        company={company}
-                        kind={configView}
-                        onDirty={setSettingsDirty}
-                      />
-                    )}
-                  {configView === "prices" && activeCompany?.manage && (
-                    <PriceLists
-                      key={company}
-                      company={company}
-                      onDirty={setSettingsDirty}
-                    />
-                  )}
                   {configView === "store" && activeCompany?.manage && (
                     <StoreSettings
                       key={company}
@@ -884,6 +866,55 @@ function App() {
                   )}
                 </section>
               )}
+              {section === "prices" && activeCompany?.manage && (
+                <PriceLists
+                  key={company}
+                  company={company}
+                  onDirty={setSettingsDirty}
+                />
+              )}
+              {section === "expenses" && activeCompany?.manage && (
+                <>
+                  <section className="intro">
+                    <div>
+                      <p className="eyebrow">CATÁLOGOS DE TU EMPRESA</p>
+                      <h1 className="module-title">
+                        <AppIcon name="module.expenses" /> Gastos
+                      </h1>
+                      <p>Administra otros gastos, mano de obra y publicidad.</p>
+                    </div>
+                  </section>
+                  <nav
+                    className="settings-tabs"
+                    aria-label="Catálogos de gastos"
+                  >
+                    {[
+                      ["overhead", "Otros gastos"],
+                      ["labor", "Mano de obra"],
+                      ["advertising", "Publicidad"],
+                    ].map(([key, label]) => (
+                      <AppButton
+                        key={key}
+                        className={
+                          expenseView === key ? "selected" : "secondary"
+                        }
+                        onClick={async () => {
+                          if (key !== expenseView && (await leaveSheet()))
+                            setExpenseView(key);
+                        }}
+                      >
+                        {label}
+                      </AppButton>
+                    ))}
+                  </nav>
+                  <AdditionalCostSettings
+                    key={company + expenseView}
+                    company={company}
+                    kind={expenseView}
+                    onDirty={setSettingsDirty}
+                  />
+                </>
+              )}
               {section === "products" && (
                 <ProductsCatalog
                   key={company}
@@ -949,6 +980,8 @@ function App() {
                 "sales",
                 "customers",
                 "reports",
+                "prices",
+                "expenses",
               ].includes(section) && (
                 <section className="empty module-pending">
                   <p className="eyebrow">PRÓXIMAMENTE EN OHANA</p>
@@ -1024,22 +1057,39 @@ function App() {
                       </strong>
                     </div>
                     <div>
-                      <span>Proveedores activos</span>
-                      <strong>
-                        {data.suppliers
-                          .filter((r) => r.active)
-                          .length.toString()
-                          .padStart(2, "0")}
-                      </strong>
+                      <button
+                        type="button"
+                        className="stat-link"
+                        onClick={async () => {
+                          if (await leaveSheet()) setSection("customers");
+                        }}
+                      >
+                        <span>Proveedores activos</span>
+                        <strong>
+                          {data.suppliers
+                            .filter((r) => r.active)
+                            .length.toString()
+                            .padStart(2, "0")}
+                        </strong>
+                      </button>
                     </div>
                     <div>
-                      <span>Presentaciones con precio vigente</span>
-                      <strong>
-                        {prices
-                          .filter((p) => p.active && p.amount !== null)
-                          .length.toString()
-                          .padStart(2, "0")}
-                      </strong>
+                      <button
+                        type="button"
+                        className="stat-link"
+                        disabled={!activeCompany?.manage}
+                        onClick={async () => {
+                          if (await leaveSheet()) setSection("prices");
+                        }}
+                      >
+                        <span>Presentaciones con precio vigente</span>
+                        <strong>
+                          {prices
+                            .filter((p) => p.active && p.amount !== null)
+                            .length.toString()
+                            .padStart(2, "0")}
+                        </strong>
+                      </button>
                     </div>
                   </section>
                   {tab === "raw_materials" && (

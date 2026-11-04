@@ -1,6 +1,7 @@
 import ProductImage from "./ProductImage";
 import AutoTextarea from "./AutoTextarea";
 import AdditionalCostsPanel from "./AdditionalCostsPanel";
+import CostSummary from "./CostSummary";
 import { additionalCosts } from "./additional-costs";
 import ResponsiveTable from "./ResponsiveTable";
 import { confirmAction } from "./ConfirmDialog";
@@ -13,12 +14,7 @@ import { request } from "./commerce";
 import { usePriceRefresh } from "./price-events";
 import { formulaCost } from "./price-cost";
 import { keyedRequest, money, useOperation, type Row } from "./operations";
-import {
-  recipeMath,
-  roundQuantity,
-  estimatedUnitCost,
-  type RecipeLine,
-} from "./formula-model";
+import { recipeMath, roundQuantity, type RecipeLine } from "./formula-model";
 import "./formulas.css";
 import { productLabel, resolveProduct } from "./product-view";
 import BatchTrace, { lotCode } from "./BatchTrace";
@@ -1590,63 +1586,11 @@ export default function Formulas({
                 primas. Excluye el empaque y los insumos adicionales; si falta
                 un precio, el total y los porcentajes quedan pendientes.
               </p>
-              <section className="formula-summary">
-                <div>
-                  <span>% de costos de MP · sin empaque</span>
-                  <strong>
-                    {math.ingredientCost !== null && math.ingredientCost > 0
-                      ? "100 %"
-                      : "Pendiente de costos"}
-                  </strong>
-                </div>
-                <div>
-                  <span>Subtotal de materias primas</span>
-                  <strong>
-                    {money(math.ingredientCost, catalog.currency)}
-                  </strong>
-                </div>
-                <div>
-                  <span>Empaque · costo estimado</span>
-                  <strong>{money(math.packagingCost, catalog.currency)}</strong>
-                </div>
-                <div>
-                  <span>Insumos adicionales · costo estimado</span>
-                  <strong>{money(math.suppliesCost, catalog.currency)}</strong>
-                </div>
-                <div>
-                  <span>Total de materiales inventariables</span>
-                  <strong>{money(math.totalCost, catalog.currency)}</strong>
-                </div>
-                <div>
-                  <span>Costo de materiales por unidad</span>
-                  <strong>
-                    {estimatedUnitCost(
-                      math.totalCost,
-                      draft.estimated_units,
-                      readOnly ? Number(scale) : 1,
-                    ) !== null
-                      ? money(
-                          estimatedUnitCost(
-                            math.totalCost,
-                            draft.estimated_units,
-                            readOnly ? Number(scale) : 1,
-                          ),
-                          catalog.currency,
-                        )
-                      : "Pendiente de unidades o costos"}
-                  </strong>
-                </div>
-                {math.missingCosts > 0 && (
-                  <p className="form-wide muted">
-                    Hay {math.missingCosts} fila(s) sin precio utilizable en{" "}
-                    {catalog.currency}. Subtotal conocido:{" "}
-                    {money(math.knownCost, catalog.currency)}. No se sustituyen
-                    precios faltantes por cero.
-                  </p>
-                )}
-              </section>
               <AdditionalCostsPanel
-                quote={extraQuote}
+                quote={{
+                  ...extraQuote,
+                  variable_weight: draft.production_mode === "variable_weight",
+                }}
                 items={catalog.additional_costs || []}
                 overheadLines={draft.overhead_lines || []}
                 onOverheadChange={
@@ -1655,7 +1599,29 @@ export default function Formulas({
                     : undefined
                 }
                 baseCost={math.totalCost}
+                hideTotals
               />
+              <CostSummary
+                product={
+                  catalog.products.find((p: Row) => p.id === draft.product)
+                    ?.name ||
+                  draft.name ||
+                  "Producto sin seleccionar"
+                }
+                materials={{
+                  ingredients: math.ingredientCost,
+                  packaging: math.packagingCost,
+                  supplies: math.suppliesCost,
+                }}
+                quote={extraQuote}
+                variable={draft.production_mode === "variable_weight"}
+              />
+              {math.missingCosts > 0 && (
+                <p className="muted">
+                  Hay {math.missingCosts} fila(s) sin precio utilizable. Los
+                  costos faltantes permanecen pendientes.
+                </p>
+              )}
               {duplicates.length > 0 && (
                 <section className="formula-duplicates" role="status">
                   <h3>Hay una composición idéntica para este producto</h3>

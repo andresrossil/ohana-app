@@ -3,6 +3,8 @@ import VariantWeightCapture, { type WeighedUnit } from "./VariantWeightCapture";
 import { weightMatches } from "./variant-weights";
 import { IconDetails } from "./PoolControls";
 import AdditionalCostsPanel from "./AdditionalCostsPanel";
+import CostSummary from "./CostSummary";
+import { materialCosts, mergeCostLines } from "./financial-summary";
 import { additionalCosts } from "./additional-costs";
 import {
   recipeMath,
@@ -218,6 +220,48 @@ function ProductionBatches({
     baseMath?.totalCost != null && fixedPreview.additional_total != null
       ? baseMath.totalCost - perUnitPreview + fixedPreview.additional_total
       : null;
+  const summaryQuote = (() => {
+    if (!variableWeight || mode !== "finish" || producedUnits <= 0)
+      return { ...extraQuote, variable_weight: variableWeight };
+    const selectedCosts: Row[] = estimating?.overhead_lines || [];
+    const commercialSelection = selectedCosts.filter(
+      (l) =>
+        costCatalog.additional_costs.find((c: Row) => c.id === l.cost_id)
+          ?.kind !== "overhead",
+    );
+    const quotes = Object.entries(outputUnits)
+      .filter(([, n]) => Number(n) > 0)
+      .map(([id, count]) => ({
+        count: Number(count),
+        quote: additionalCosts(
+          costCatalog.additional_costs,
+          costCatalog.currency,
+          Number(count),
+          costCatalog.presentations.find((v: Row) => v.id === id),
+          "",
+          "",
+          commercialSelection,
+        ),
+      }));
+    const lines = mergeCostLines([
+      ...(fixedPreview.cost_lines || []),
+      ...quotes.flatMap((x) => x.quote.cost_lines),
+    ]);
+    const revenue = quotes.every((x) => x.quote.sale_price != null)
+      ? quotes.reduce((sum, x) => sum + x.count * Number(x.quote.sale_price), 0)
+      : null;
+    return {
+      ...extraQuote,
+      unit_basis_count: producedUnits,
+      sale_price: revenue != null ? revenue / producedUnits : null,
+      cost_lines: lines,
+      additional_total: lines.every((l) => l.total != null)
+        ? lines.reduce((sum, l) => sum + Number(l.total), 0)
+        : null,
+      average: true,
+      variable_weight: true,
+    };
+  })();
   return (
     <>
       <section className="intro">
@@ -580,11 +624,19 @@ function ProductionBatches({
                               )
                             : "";
                         });
-                      if (!variableWeight) catalog.variants.forEach((v:Row)=>{
-                        if (v.weight_min==null && !weighedUnits.some(u=>u.variant===v.id) && !units.some(u=>u.variant===v.id)) { delete amounts[v.id]; delete weights[v.id]; }
-                      });
-                      setOutputUnits(old=>({...old,...amounts}));
-                      setOutputWeights(old=>({...old,...weights}));
+                      if (!variableWeight)
+                        catalog.variants.forEach((v: Row) => {
+                          if (
+                            v.weight_min == null &&
+                            !weighedUnits.some((u) => u.variant === v.id) &&
+                            !units.some((u) => u.variant === v.id)
+                          ) {
+                            delete amounts[v.id];
+                            delete weights[v.id];
+                          }
+                        });
+                      setOutputUnits((old) => ({ ...old, ...amounts }));
+                      setOutputWeights((old) => ({ ...old, ...weights }));
                       setDirty(true);
                     }}
                     costFor={(v, w, n, totalWeight, quantities) => {
@@ -677,42 +729,6 @@ function ProductionBatches({
                       };
                     }}
                   />
-                  {variableWeight && (
-                    <section className="formula-summary">
-                      <div>
-                        <span>Unidades / peso real</span>
-                        <strong>
-                          {weighedUnits.length} ·{" "}
-                          {realWeight.toLocaleString("es-GT", {
-                            maximumFractionDigits: 4,
-                          })}{" "}
-                          g
-                        </strong>
-                      </div>
-                      <div>
-                        <span>Fabricación común por gramo · estimación</span>
-                        <strong>
-                          {commonPreview != null && realWeight > 0
-                            ? money(
-                                commonPreview / realWeight,
-                                costCatalog.currency,
-                              )
-                            : "Pendiente"}
-                        </strong>
-                      </div>
-                      <div>
-                        <span>Fabricación total · estimación</span>
-                        <strong>
-                          {commonPreview != null
-                            ? money(
-                                commonPreview + perUnitPreview,
-                                costCatalog.currency,
-                              )
-                            : "Pendiente"}
-                        </strong>
-                      </div>
-                    </section>
-                  )}
                   <p>
                     Las variantes con rango de peso se registran unidad por
                     unidad arriba. Para las demás puedes capturar la cantidad y,
@@ -835,11 +851,36 @@ function ProductionBatches({
                   units={Number(draftUnits)}
                 />
               )}
-              {estimating && mode !== "release" && !variableWeight && (
-                <AdditionalCostsPanel
-                  quote={extraQuote}
-                  baseCost={baseMath?.totalCost ?? null}
-                />
+              {estimating && mode !== "release" && (
+                <>
+                  <AdditionalCostsPanel
+                    quote={summaryQuote}
+                    baseCost={baseMath?.totalCost ?? null}
+                    hideTotals
+                  />
+                  {variableWeight && (
+                    <p className="muted">
+                      {weighedUnits.length} unidades ·{" "}
+                      {realWeight.toLocaleString("es-GT", {
+                        maximumFractionDigits: 4,
+                      })}{" "}
+                      g. Fabricación común por gramo:{" "}
+                      {commonPreview != null && realWeight > 0
+                        ? money(
+                            commonPreview / realWeight,
+                            costCatalog.currency,
+                          )
+                        : "Pendiente"}{" "}
+                      (estimación).
+                    </p>
+                  )}
+                  <CostSummary
+                    product={estimating.product_name || estimating.name}
+                    materials={materialCosts(baseMath?.rows || [])}
+                    quote={summaryQuote}
+                    variable={variableWeight}
+                  />
+                </>
               )}
               <div className="form-actions">
                 <AppButton disabled={state.busy}>

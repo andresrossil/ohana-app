@@ -10,6 +10,7 @@ export default function AdditionalCostsPanel({
   historical = false,
   overheadLines = [],
   onOverheadChange,
+  hideTotals = false,
 }: {
   quote: Row;
   items?: Row[];
@@ -17,6 +18,7 @@ export default function AdditionalCostsPanel({
   historical?: boolean;
   overheadLines?: Row[];
   onOverheadChange?: (lines: Row[]) => void;
+  hideTotals?: boolean;
 }) {
   const total =
     baseCost != null && quote.additional_total != null
@@ -32,10 +34,12 @@ export default function AdditionalCostsPanel({
         {historical ? " · histórico confirmado" : ""}
       </summary>
       <div className="additional-costs-content">
-        <p className="muted">
-          Precio de venta base:{" "}
+        <p className="cost-basis-panel">
+          Precio de venta base{quote.average ? " · promedio por unidad" : ""}:{" "}
           {quote.sale_price == null
-            ? "Pendiente de precio"
+            ? quote.variable_weight
+              ? "Según las variantes obtenidas"
+              : "Pendiente de precio"
             : amount(quote.sale_price)}
           .{" "}
           {n > 0
@@ -54,16 +58,22 @@ export default function AdditionalCostsPanel({
           Publicidad se estiman sobre el precio de venta base. No generan
           consumos de inventario.
         </p>
-        <div className="formula-summary">
-          <div>
-            <span>Costo estimado total · materiales y costos adicionales</span>
-            <strong>{amount(total)}</strong>
+        {!hideTotals && (
+          <div className="formula-summary">
+            <div>
+              <span>
+                Costo estimado total · materiales y costos adicionales
+              </span>
+              <strong>{amount(total)}</strong>
+            </div>
+            <div>
+              <span>Costo estimado por unidad</span>
+              <strong>
+                {amount(total != null && n > 0 ? total / n : null)}
+              </strong>
+            </div>
           </div>
-          <div>
-            <span>Costo estimado por unidad</span>
-            <strong>{amount(total != null && n > 0 ? total / n : null)}</strong>
-          </div>
-        </div>
+        )}
       </div>
     </IconDetails>
   );

@@ -187,3 +187,7 @@
   .shell .table-mobile-sort select { width: 100%; min-width: 0; max-width: 100%; min-height: 44px; }
   .shell .table-mobile-sort button { min-height: 44px; margin: 0; padding: 8px 10px; }
 }
+.shell .stats .stat-link { display: grid; align-content: start; gap: 12px; width: 100%; min-width: 0; padding: 0; margin: 0; border: 0; border-radius: 8px; background: transparent; text-align: left; font: inherit; color: inherit; box-shadow: none; }
+.shell .stats .stat-link:not(:disabled) { cursor: pointer; }
+.shell .stats .stat-link:not(:disabled):hover span { text-decoration: underline; color: var(--admin-primary); }
+.shell .stats .stat-link:focus-visible { outline: 2px solid var(--admin-primary); outline-offset: 8px; }

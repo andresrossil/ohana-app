@@ -257,8 +257,7 @@ export default function VariantManager({
               />
             </label>
             <p className="form-wide muted">
-              Los precios de venta se administran en Configuración → Listas de
-              precios.
+              Los precios de venta se administran en el menú Listas de precios.
             </p>
             <label>
               <input

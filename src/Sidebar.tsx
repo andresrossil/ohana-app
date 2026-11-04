@@ -13,6 +13,8 @@ export const sections = [
   ["inventory", "Inventario", "▤"],
   ["sales", "Ventas", "↗"],
   ["customers", "Socios de negocio", "♧"],
+  ["prices", "Listas de precios", ""],
+  ["expenses", "Gastos", ""],
   ["reports", "Reportes", "▥"],
   ["settings", "Configuración", "☷"],
 ] as const;

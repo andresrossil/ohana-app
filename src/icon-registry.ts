@@ -52,6 +52,8 @@ export const iconRegistry: IconEntry[] = [
     ["inventory", "Inventario", "warehouse"],
     ["sales", "Ventas", "trending-up"],
     ["customers", "Socios de negocio", "users"],
+    ["prices", "Listas de precios", "tags"],
+    ["expenses", "Gastos", "receipt"],
     ["reports", "Reportes", "chart-column"],
     ["settings", "Configuración", "settings"],
   ].map(([key, label, icon]) => ({
