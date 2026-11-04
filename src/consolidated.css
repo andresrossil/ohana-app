@@ -151,6 +151,19 @@
 .variant-sheet .table-wrap { max-width: 100%; overflow-x: auto; }
 .variant-sheet td input:not([type="checkbox"]), .variant-sheet td select { min-width: 110px; width: 100%; padding: 8px; }
 .variant-sheet .variant-paste { display: grid; gap: 6px; margin: 12px 0; }
+.shell .variant-sheet .variant-paste {
+  padding: 14px;
+  border: 1px solid var(--admin-border);
+  border-left: 4px solid var(--admin-primary);
+  border-radius: 12px;
+  background: var(--admin-secondary);
+  background: color-mix(in srgb, var(--admin-primary) 10%, var(--admin-surface));
+  color: var(--admin-heading);
+}
+.shell .variant-sheet .variant-paste textarea {
+  background: var(--admin-surface);
+  color: var(--admin-text);
+}
 .variant-sheet .variant-paste textarea { width: 100%; min-width: 0; max-width: 100%; box-sizing: border-box; }
 @media (max-width: 640px) {
   .variant-sheet td input:not([type="checkbox"]), .variant-sheet td select { min-width: 0; }

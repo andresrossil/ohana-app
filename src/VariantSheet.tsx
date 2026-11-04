@@ -9,7 +9,6 @@ import { weightRangeError, normalizedAttributes } from "./variant-weights";
 const columns = [
   ["commercial_code", "Código comercial"],
   ["name", "Tamaño comercial"],
-  ["sku", "SKU"],
   ["barcode", "Código de barras"],
   ["barcode_custom", "Barras personalizadas"],
   ["aroma", "Aroma"],
@@ -104,13 +103,6 @@ export default function VariantSheet({
       : r[k];
   }
   function assign(r: Row, k: string, value: any): Row {
-    if (k === "sku") {
-      if (String(value).trim() && String(value).trim() !== String(r.sku || ""))
-        throw Error(
-          "El SKU se genera automáticamente. Escribe JT-1 y similares en Código comercial.",
-        );
-      return r;
-    }
     if (["aroma", "color", "tipo"].includes(k))
       return { ...r, attributes: { ...r.attributes, [k]: value } };
     return {
@@ -135,14 +127,16 @@ export default function VariantSheet({
         mapping = grid
           .shift()!
           .map((h) =>
-            columns.findIndex(
-              ([k, label]) =>
-                (k === "name" && normalize(h) === "nombredevariante") ||
-                normalize(label) === normalize(h) ||
-                normalize(k) === normalize(h),
-            ),
+            normalize(h) === "sku"
+              ? -2
+              : columns.findIndex(
+                  ([k, label]) =>
+                    (k === "name" && normalize(h) === "nombredevariante") ||
+                    normalize(label) === normalize(h) ||
+                    normalize(k) === normalize(h),
+                ),
           );
-        if (mapping.some((i) => i < 0))
+        if (mapping.some((i) => i === -1))
           throw Error(
             "Hay encabezados desconocidos. Usa Copiar tabla para obtener la plantilla.",
           );
@@ -160,6 +154,8 @@ export default function VariantSheet({
       grid.forEach((values, i) => {
         while (next.length <= start + i) next.push(blank());
         values.forEach((value, j) => {
+          // Ignore the automatic identifier in older, explicitly headed templates.
+          if (mapping?.[j] === -2) return;
           const k = columns[mapping ? mapping[j] : col + j][0];
           let v: any = value.trim();
           if (flags.has(k)) {
@@ -350,9 +346,9 @@ export default function VariantSheet({
       </div>
       <p className="muted">
         Edita directamente en cada celda. Pega desde Excel para crear las filas
-        automáticamente. El SKU es automático y de solo lectura; usa Código
-        comercial para JT-1 y similares. Los precios se administran en Listas de
-        precios.
+        automáticamente. El SKU se genera al guardar y no forma parte de la
+        carga; usa Código comercial para JT-1 y similares. Los precios se
+        administran en Listas de precios.
       </p>
       {error && (
         <p className="error" role="alert">
@@ -417,11 +413,12 @@ export default function VariantSheet({
                       </select>
                     ) : (
                       <input
-                        readOnly={k === "sku"}
                         aria-label={`${label}, fila ${i + 1}`}
                         disabled={busy}
                         value={cell(r, k)}
-                        maxLength={k === "sku" || k === "barcode" ? 80 : 120}
+                        maxLength={
+                          k === "commercial_code" || k === "barcode" ? 80 : 120
+                        }
                         inputMode={k.startsWith("weight") ? "decimal" : "text"}
                         onChange={(e) =>
                           setRows(
