@@ -118,16 +118,7 @@ function App() {
   const legacyVisible =
     section === "materials" ||
     (section === "settings" &&
-      ![
-        "origins",
-        "profile",
-        "appearance",
-        "structure",
-        "store",
-        "overhead",
-        "labor",
-        "advertising",
-      ].includes(configView));
+      ["suppliers", "presentations", "units"].includes(configView));
   const filtered = data[tab].filter(
     (r) =>
       matchesCatalog(r, query) &&
@@ -608,7 +599,9 @@ function App() {
               ? ["customers"]
               : []),
             ...(activeCompany?.reports_read ? ["reports"] : []),
-            ...(activeCompany?.manage || canCreate ? ["settings"] : []),
+            ...(activeCompany && (activeCompany.manage || canCreate)
+              ? ["settings"]
+              : []),
           ]}
           corporations={corporations}
           onCorporation={async (id) => {
@@ -656,13 +649,7 @@ function App() {
             if (next === "materials") setTab("raw_materials");
             if (
               next === "settings" &&
-              ![
-                "origins",
-                "profile",
-                "appearance",
-                "structure",
-                "store",
-              ].includes(configView)
+              ["suppliers", "presentations", "units"].includes(configView)
             )
               setTab(configView as Tab);
             setQuery("");
@@ -775,17 +762,9 @@ function App() {
                             if (!(await leaveSheet())) return;
                             setConfigView(key);
                             if (
-                              ![
-                                "origins",
-                                "profile",
-                                "appearance",
-                                "structure",
-                                "store",
-                                "overhead",
-                                "labor",
-                                "advertising",
-                                "prices",
-                              ].includes(key)
+                              ["suppliers", "presentations", "units"].includes(
+                                key,
+                              )
                             )
                               setTab(key as Tab);
                             setEdit(undefined);

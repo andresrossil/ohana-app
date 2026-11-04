@@ -88,3 +88,61 @@
     flex-wrap: wrap;
   }
 }
+/* Compact list actions; modals and other modules keep their existing controls. */
+.shell .price-lists > .settings-grid > .form-actions {
+  align-self: center;
+  align-items: center;
+  margin: 0;
+  gap: 8px;
+}
+.shell .price-lists > .form-actions,
+.shell .price-lists > .hierarchy-toolbar > .actions {
+  align-items: center;
+  gap: 8px;
+}
+.shell .price-lists > .settings-grid > .form-actions > button,
+.shell .price-lists > .form-actions > button,
+.shell .price-lists > .hierarchy-toolbar > .actions > button {
+  min-height: 38px;
+  height: auto;
+  min-width: 0;
+  width: auto;
+  max-width: 100%;
+  padding: 8px 12px;
+  flex: 0 0 auto;
+  align-self: center;
+  font-size: 14px;
+  line-height: 1.25;
+  gap: 6px;
+  white-space: normal;
+}
+.shell .price-lists > .settings-grid > .form-actions > button .app-icon,
+.shell .price-lists > .form-actions > button .app-icon,
+.shell .price-lists > .hierarchy-toolbar > .actions > button .app-icon,
+.shell .price-lists > .settings-grid > .form-actions > button .app-icon svg,
+.shell .price-lists > .form-actions > button .app-icon svg,
+.shell .price-lists > .hierarchy-toolbar > .actions > button .app-icon svg {
+  width: 16px;
+  height: 16px;
+}
+.shell .company-corporation-group {
+  margin: 24px 0;
+  min-width: 0;
+}
+.shell .company-corporation-group > h2 {
+  font-size: 20px;
+  margin: 0 0 12px;
+}
+.shell .company-corporation-group .company-cards {
+  margin: 0;
+}
+.shell .company-card strong {
+  overflow-wrap: anywhere;
+}
+@media (max-width: 760px) {
+  .shell .price-lists > .settings-grid > .form-actions > button,
+  .shell .price-lists > .form-actions > button,
+  .shell .price-lists > .hierarchy-toolbar > .actions > button {
+    min-height: 44px;
+  }
+}

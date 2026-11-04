@@ -1,5 +1,4 @@
 import { AppButton } from "./AppIcon";
-import { useState } from "react";
 import type { CatalogRow } from "./sheet-model";
 import CompanyLogo from "./CompanyBrand";
 export default function CompanyPicker({
@@ -8,7 +7,6 @@ export default function CompanyPicker({
   onSelect,
   onManage,
   canCreate,
-  initialCorporation = "",
 }: {
   initialCorporation?: string;
   companies: CatalogRow[];
@@ -17,66 +15,50 @@ export default function CompanyPicker({
   onManage: () => void;
   canCreate: boolean;
 }) {
-  const [corporation, setCorporation] = useState(
-    initialCorporation || (corporations.length === 1 ? corporations[0].id : ""),
-  );
-  const list = companies.filter(
-    (c) =>
-      c.active !== false && (!corporation || c.corporation_id === corporation),
-  );
-  const pickCorp = (id: string) => {
-    const matches = companies.filter(
-      (c) => c.corporation_id === id && c.active !== false,
-    );
-    if (matches.length === 1) onSelect(matches[0].id);
-    else setCorporation(id);
-  };
+  const active = companies.filter((c) => c.active !== false);
+  const groupIds = [
+    ...new Set([
+      ...corporations.filter((c) => c.active !== false).map((c) => c.id),
+      ...active.map((c) => c.corporation_id || ""),
+    ]),
+  ];
   return (
     <section className="company-picker">
       <p className="eyebrow">TU ESPACIO DE TRABAJO</p>
-      <h1>
-        {!corporation && corporations.length > 1
-          ? "Selecciona una corporación"
-          : "Selecciona una empresa"}
-      </h1>
-      {!corporation && corporations.length > 1 ? (
-        <div className="company-cards">
-          {corporations.map((c) => (
-            <AppButton
-              className="company-card"
-              key={c.id}
-              onClick={() => pickCorp(c.id)}
-            >
-              <span className="company-initial">{c.name.slice(0, 1)}</span>
-              <strong>{c.name}</strong>
-            </AppButton>
-          ))}
-        </div>
-      ) : (
-        <>
-          {corporations.length > 1 && (
-            <AppButton className="secondary" onClick={() => setCorporation("")}>
-              Cambiar corporación
-            </AppButton>
-          )}
-          <div className="company-cards">
-            {list.map((c) => (
-              <AppButton
-                className="company-card"
-                key={c.id}
-                onClick={() => onSelect(c.id)}
-              >
-                <CompanyLogo company={c} />
-                <strong>{c.name}</strong>
-                <small>{c.corporation_name}</small>
-              </AppButton>
-            ))}
-          </div>
-          {!list.length && (
-            <p>No tienes empresas activas disponibles en esta corporación.</p>
-          )}
-        </>
-      )}
+      <h1>Selecciona una empresa</h1>
+      {groupIds.map((id) => {
+        const corporation = corporations.find((c) => c.id === id),
+          list = active.filter((c) => (c.corporation_id || "") === id);
+        const name =
+          corporation?.name || list[0]?.corporation_name || "Empresas";
+        return (
+          <section
+            className="company-corporation-group"
+            key={id}
+            aria-label={name}
+          >
+            <h2>{name}</h2>
+            <div className="company-cards">
+              {list.map((c) => (
+                <button
+                  type="button"
+                  className="company-card"
+                  key={c.id}
+                  onClick={() => onSelect(c.id)}
+                >
+                  <CompanyLogo company={c} />
+                  <strong>{c.name}</strong>
+                </button>
+              ))}
+            </div>
+            {!list.length && (
+              <p className="muted">
+                No hay empresas activas disponibles en esta corporación.
+              </p>
+            )}
+          </section>
+        );
+      })}
       {(canCreate ||
         companies.some((c) => c.manage) ||
         corporations.some((c) => c.manage)) && (
@@ -84,7 +66,7 @@ export default function CompanyPicker({
           Administrar corporaciones y empresas
         </AppButton>
       )}
-      {!companies.length && !canCreate && (
+      {!active.length && !canCreate && (
         <p>Una persona administradora debe asignarte acceso a una empresa.</p>
       )}
     </section>
