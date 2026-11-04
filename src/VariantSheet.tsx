@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { AppButton, AppIcon } from "./AppIcon";
 import ResponsiveTable from "./ResponsiveTable";
 import { confirmAction } from "./ConfirmDialog";
@@ -39,7 +39,8 @@ const editable = (r: Row): Row =>
     ...[...flags].map((k) => [k, r[k] ?? k === "active"]),
     ["attributes", r.attributes || {}],
   ]);
-const blank = (): Row => ({
+const blank = (ordinal: number): Row => ({
+  ordinal,
   key: crypto.randomUUID(),
   id: "",
   ...editable({}),
@@ -71,13 +72,15 @@ export default function VariantSheet({
   const [rows, setRows] = useState<Row[]>(() =>
     importing
       ? []
-      : existing.map((r) => ({
+      : existing.map((r, index) => ({
+          ordinal: index + 1,
           ...editable(r),
           id: r.id,
           key: r.id,
           expected: editable(r),
         })),
   );
+  const ordinal = useRef(importing ? 0 : existing.length);
   const [busy, setBusy] = useState(false),
     [error, setError] = useState("");
   const dirty = rows.some(
@@ -152,7 +155,7 @@ export default function VariantSheet({
         attributes: { ...r.attributes },
       }));
       grid.forEach((values, i) => {
-        while (next.length <= start + i) next.push(blank());
+        while (next.length <= start + i) next.push(blank(++ordinal.current));
         values.forEach((value, j) => {
           // Ignore the automatic identifier in older, explicitly headed templates.
           if (mapping?.[j] === -2) return;
@@ -227,7 +230,7 @@ export default function VariantSheet({
                 { ...r, id: r.id || r.key },
               );
       if (issue) {
-        setError(`Fila ${rows.indexOf(r) + 1}: ${issue}`);
+        setError(`Fila ${r.ordinal}: ${issue}`);
         return;
       }
     }
@@ -311,7 +314,7 @@ export default function VariantSheet({
         <AppButton
           className="secondary"
           disabled={busy}
-          onClick={() => setRows([...rows, blank()])}
+          onClick={() => setRows([...rows, blank(++ordinal.current)])}
         >
           Agregar fila
         </AppButton>
@@ -373,7 +376,9 @@ export default function VariantSheet({
         />
       </label>
       <div className="table-wrap">
-        <ResponsiveTable>
+        <ResponsiveTable
+          onSortRows={(indexes) => setRows(indexes.map((i) => rows[i]))}
+        >
           <thead>
             <tr>
               <th>#</th>
@@ -386,7 +391,7 @@ export default function VariantSheet({
           <tbody>
             {rows.map((r, i) => (
               <tr key={r.key}>
-                <td>{i + 1}</td>
+                <td>{r.ordinal}</td>
                 {columns.map(([k, label], j) => (
                   <td key={k}>
                     {flags.has(k) ? (

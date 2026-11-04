@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { AppButton, AppIcon } from "./AppIcon";
 import { IconDetails } from "./PoolControls";
 import ResponsiveTable from "./ResponsiveTable";
@@ -17,6 +17,7 @@ export type WeighedUnit = {
   materialQuantities?: Record<string, string>;
 };
 type Draft = {
+  ordinal: number;
   key: string;
   group: string;
   weight: string;
@@ -57,7 +58,8 @@ export default function VariantWeightCapture({
   const [group, setGroup] = useState(groups[0]?.[0] || ""),
     [error, setError] = useState("");
   const [drafts, setDrafts] = useState<Draft[]>(() =>
-    units.map((u) => ({
+    units.map((u, index) => ({
+      ordinal: index + 1,
       key: u.key,
       weight: String(u.weight),
       group: normalizedAttributes(
@@ -66,6 +68,7 @@ export default function VariantWeightCapture({
       materialQuantities: u.materialQuantities || {},
     })),
   );
+  const ordinal = useRef(units.length);
   useEffect(() => {
     if (!groups.some(([k]) => k === group)) setGroup(groups[0]?.[0] || "");
   }, [groups.map(([k]) => k).join("|"), group]);
@@ -121,6 +124,7 @@ export default function VariantWeightCapture({
       values.forEach(([v], i) => {
         while (next.length <= start + i)
           next.push({
+            ordinal: ++ordinal.current,
             key: crypto.randomUUID(),
             group,
             weight: "",
@@ -187,6 +191,7 @@ export default function VariantWeightCapture({
               update([
                 ...drafts,
                 {
+                  ordinal: ++ordinal.current,
                   key: crypto.randomUUID(),
                   group,
                   weight: "",
@@ -211,7 +216,9 @@ export default function VariantWeightCapture({
           </p>
         )}
         <div className="table-wrap">
-          <ResponsiveTable>
+          <ResponsiveTable
+            onSortRows={(indexes) => setDrafts(indexes.map((i) => drafts[i]))}
+          >
             <thead>
               <tr>
                 <th>#</th>
@@ -244,7 +251,7 @@ export default function VariantWeightCapture({
                     : null;
                 return (
                   <tr key={r.key}>
-                    <td>{i + 1}</td>
+                    <td>{r.ordinal}</td>
                     <td>
                       <input
                         aria-label={"Peso de unidad " + (i + 1)}

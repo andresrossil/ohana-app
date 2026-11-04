@@ -38,6 +38,7 @@ export default function PriceLists({
     formulas: [],
     error: "",
   });
+  const [rowOrder, setRowOrder] = useState<string[]>([]);
   const batch = useRef<{ payload: string; id: string } | null>(null),
     dirty = !!draft || !!variantProduct || Object.keys(changes).length > 0;
   const loadGeneration = useRef(0);
@@ -117,20 +118,27 @@ export default function PriceLists({
         Number(a.variant?.weight_min ?? Infinity) -
           Number(b.variant?.weight_min ?? Infinity),
     );
-  const rows = allRows.filter((r) =>
-    [
-      r.product.name,
-      r.product.sku,
-      r.variant?.name,
-      r.variant?.commercial_code,
-      r.variant?.sku,
-      r.variant ? weightRangeLabel(r.variant) : "",
-      ...Object.entries(r.variant?.attributes || {}).flat(),
-    ]
-      .join(" ")
-      .toLowerCase()
-      .includes(query.toLowerCase()),
-  );
+  const rowRanks = new Map(rowOrder.map((id, index) => [id, index]));
+  const rows = allRows
+    .filter((r) =>
+      [
+        r.product.name,
+        r.product.sku,
+        r.variant?.name,
+        r.variant?.commercial_code,
+        r.variant?.sku,
+        r.variant ? weightRangeLabel(r.variant) : "",
+        ...Object.entries(r.variant?.attributes || {}).flat(),
+      ]
+        .join(" ")
+        .toLowerCase()
+        .includes(query.toLowerCase()),
+    )
+    .sort(
+      (a, b) =>
+        (rowRanks.get(a.variant?.id || a.product.id) ?? Infinity) -
+        (rowRanks.get(b.variant?.id || b.product.id) ?? Infinity),
+    );
   function current(r: Row): Row {
     return (
       changes[r.variant.id] || {
@@ -491,7 +499,13 @@ export default function PriceLists({
             )}
           </div>
           <div className="table-wrap">
-            <ResponsiveTable>
+            <ResponsiveTable
+              onSortRows={(indexes) =>
+                setRowOrder(
+                  indexes.map((i) => rows[i].variant?.id || rows[i].product.id),
+                )
+              }
+            >
               <thead>
                 <tr>
                   <th>Producto</th>
@@ -597,13 +611,17 @@ export default function PriceLists({
                           <span>Pendiente</span>
                         )}
                       </td>
-                      <td className="price-estimate">
+                      <td
+                        className="price-estimate"
+                        data-sort-value={estimate.cost ?? ""}
+                      >
                         {estimate.cost == null
                           ? "Pendiente"
                           : money(estimate.cost, data.currency)}
                         <small>{estimate.reason || estimate.source}</small>
                       </td>
                       <td
+                        data-sort-value={margin ?? ""}
                         className={
                           margin == null
                             ? "price-estimate"

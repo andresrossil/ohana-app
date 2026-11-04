@@ -1015,7 +1015,10 @@ export default function Formulas({
                         )}
                       </div>
                     </td>
-                    <td className="formula-amount">
+                    <td
+                      className="formula-amount"
+                      data-sort-value={price ?? ""}
+                    >
                       {price == null
                         ? f.production_mode === "variable_weight"
                           ? "Según variante"
@@ -1031,7 +1034,10 @@ export default function Formulas({
                         </small>
                       )}
                     </td>
-                    <td className="formula-amount">
+                    <td
+                      className="formula-amount"
+                      data-sort-value={estimate.cost ?? ""}
+                    >
                       {estimate.cost == null
                         ? f.production_mode === "variable_weight"
                           ? "Según peso real"
@@ -1040,6 +1046,7 @@ export default function Formulas({
                       {estimate.reason && <small>{estimate.reason}</small>}
                     </td>
                     <td
+                      data-sort-value={margin ?? ""}
                       className={
                         "formula-amount" +
                         (margin == null || margin === 0
