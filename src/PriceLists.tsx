@@ -11,6 +11,7 @@ import { weightRangeLabel } from "./variant-weights";
 import { pricesChanged } from "./price-events";
 import VariantManager from "./VariantManager";
 import "./additional-costs.css";
+import { priceCost } from "./price-cost";
 export default function PriceLists({
   company,
   onDirty,
@@ -31,12 +32,42 @@ export default function PriceLists({
     [changes, setChanges] = useState<Record<string, Row>>({}),
     [query, setQuery] = useState(""),
     [variantProduct, setVariantProduct] = useState<Row | null>(null);
+  const [costs, setCosts] = useState<Row>({
+    company: "",
+    catalog: null,
+    formulas: [],
+    error: "",
+  });
   const batch = useRef<{ payload: string; id: string } | null>(null),
     dirty = !!draft || !!variantProduct || Object.keys(changes).length > 0;
+  const loadGeneration = useRef(0);
   async function load() {
-    const next = await request("price_list_command", {
-      p_company: company,
-      p_action: "list",
+    const ticket = ++loadGeneration.current;
+    const [next, catalogResult, formulasResult] = await Promise.all([
+      request("price_list_command", {
+        p_company: company,
+        p_action: "list",
+      }),
+      request("formula_catalog", { p_company: company }).then(
+        (value) => ({ value, error: null }),
+        (error) => ({ value: null, error }),
+      ),
+      request("formula_command", { p_company: company, p_action: "list" }).then(
+        (value) => ({ value, error: null }),
+        (error) => ({ value: null, error }),
+      ),
+    ]);
+    if (ticket !== loadGeneration.current) return;
+    const costError = catalogResult.error || formulasResult.error;
+    setCosts({
+      company,
+      catalog: catalogResult.value,
+      formulas: formulasResult.value || [],
+      error: costError
+        ? costError.code === "42501"
+          ? "Sin permiso para consultar costos"
+          : "No se pudieron cargar los costos"
+        : "",
     });
     setData(next);
     setSelected((old) =>
@@ -47,6 +78,9 @@ export default function PriceLists({
   }
   useEffect(() => {
     state.run(load);
+    return () => {
+      loadGeneration.current++;
+    };
   }, [company]);
   useEffect(() => {
     onDirty(dirty);
@@ -468,6 +502,10 @@ export default function PriceLists({
                   <th>
                     Precio {data.currency === "GTQ" ? "Q" : data.currency}
                   </th>
+                  <th>Costo total estimado / unidad</th>
+                  <th>
+                    Diferencia aprox.<small>Precio − costo</small>
+                  </th>
                   <th>Estado</th>
                   <th>Acciones</th>
                 </tr>
@@ -476,6 +514,49 @@ export default function PriceLists({
                 {rows.map((r) => {
                   const v = r.variant,
                     value = v ? current(r) : null;
+                  const reference =
+                    v &&
+                    costs.catalog?.presentations?.find(
+                      (p: Row) => p.id === v.id,
+                    );
+                  const previewReference =
+                    list?.is_base && value
+                      ? {
+                          ...reference,
+                          id: v?.id,
+                          currency: data.currency,
+                          price:
+                            value.active && !value.delete
+                              ? parseNumber(String(value.price))
+                              : null,
+                        }
+                      : reference;
+                  const estimate =
+                    v &&
+                    costs.company === company &&
+                    costs.catalog &&
+                    !costs.error
+                      ? priceCost(
+                          v,
+                          costs.formulas,
+                          costs.catalog,
+                          previewReference,
+                        )
+                      : {
+                          cost: null,
+                          reason:
+                            (costs.company === company && costs.error) ||
+                            "Pendiente",
+                          source: "",
+                        };
+                  const price =
+                    value && !value.delete && value.active
+                      ? parseNumber(String(value.price))
+                      : null;
+                  const margin =
+                    estimate.cost != null && price != null
+                      ? price - estimate.cost
+                      : null;
                   return (
                     <tr
                       key={v?.id || r.product.id}
@@ -515,6 +596,27 @@ export default function PriceLists({
                         ) : (
                           <span>Pendiente</span>
                         )}
+                      </td>
+                      <td className="price-estimate">
+                        {estimate.cost == null
+                          ? "Pendiente"
+                          : money(estimate.cost, data.currency)}
+                        <small>{estimate.reason || estimate.source}</small>
+                      </td>
+                      <td
+                        className={
+                          margin == null
+                            ? "price-estimate"
+                            : margin < 0
+                              ? "price-estimate margin-negative"
+                              : margin > 0
+                                ? "price-estimate margin-positive"
+                                : "price-estimate"
+                        }
+                      >
+                        {margin == null
+                          ? "Pendiente"
+                          : money(margin, data.currency)}
                       </td>
                       <td>
                         {v ? (
@@ -582,9 +684,12 @@ export default function PriceLists({
             </ResponsiveTable>
           </div>
           <small>
-            Editar una celda no crea registros hasta guardar. Puedes pegar una
-            columna de precios desde Excel. Los precios con historial pueden
-            desactivarse, pero no eliminarse.
+            Costo por unidad de la fórmula vinculada: materias primas, empaque,
+            insumos y costos adicionales. Mano de obra y publicidad usan el
+            precio de la lista base. La diferencia se actualiza al editar el
+            precio. Editar una celda no crea registros hasta guardar. Puedes
+            pegar una columna de precios desde Excel. Los precios con historial
+            pueden desactivarse, pero no eliminarse.
           </small>
         </>
       )}

@@ -169,3 +169,10 @@
   .variant-sheet td input:not([type="checkbox"]), .variant-sheet td select { min-width: 0; }
   .variant-sheet .form-actions button { min-height: 44px; }
 }
+.price-lists .price-estimate { min-width: 125px; font-variant-numeric: tabular-nums; }
+.price-lists .price-estimate small { display: block; max-width: 220px; white-space: normal; overflow-wrap: anywhere; color: var(--admin-muted); }
+.price-lists .margin-positive { color: #16804a; font-weight: 600; }
+.price-lists .margin-negative { color: #b91c1c; font-weight: 600; }
+@media (max-width: 760px) {
+  .price-lists .price-estimate { min-width: 0; overflow-wrap: anywhere; }
+}
