@@ -1,3 +1,4 @@
+import SearchSelect from "./SearchSelect";
 import {
   Children,
   Fragment,
@@ -191,7 +192,7 @@ export default forwardRef<
         <div className="table-mobile-sort">
           <label>
             Ordenar por
-            <select
+            <SearchSelect
               aria-label="Columna para ordenar"
               value={mobileColumn}
               onChange={(e) => {
@@ -211,7 +212,7 @@ export default forwardRef<
                   {label || "Columna " + (i + 1)}
                 </option>
               ))}
-            </select>
+            </SearchSelect>
           </label>
           <AppButton
             type="button"

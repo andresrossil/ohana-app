@@ -1,3 +1,4 @@
+import SearchSelect from "./SearchSelect";
 import MobileViewport from "./MobileViewport";
 import ResponsiveTable from "./ResponsiveTable";
 import { confirmAction, ConfirmHost, ConfirmDialog } from "./ConfirmDialog";
@@ -423,7 +424,7 @@ function App() {
   ) => (
     <label>
       {title}
-      <select
+      <SearchSelect
         name={key}
         required={required}
         defaultValue={edit?.[key] || ""}
@@ -440,7 +441,7 @@ function App() {
               {r.symbol ? ` (${r.symbol})` : ""}
             </option>
           ))}
-      </select>
+      </SearchSelect>
       {disabled && <input type="hidden" name={key} value={edit?.[key]} />}
     </label>
   );
@@ -1491,7 +1492,7 @@ function App() {
                     {input("symbol", "Símbolo", "text", true)}
                     <label>
                       Tipo
-                      <select
+                      <SearchSelect
                         name="dimension"
                         defaultValue={edit?.dimension || "mass"}
                         disabled={!!edit}
@@ -1499,7 +1500,7 @@ function App() {
                         <option value="mass">Masa (base: g)</option>
                         <option value="volume">Volumen (base: ml)</option>
                         <option value="count">Conteo (base: ud)</option>
-                      </select>
+                      </SearchSelect>
                     </label>
                     {edit && (
                       <input
@@ -1579,10 +1580,10 @@ function App() {
                 {edit && (
                   <label>
                     Estado
-                    <select name="active" defaultValue={String(edit.active)}>
+                    <SearchSelect name="active" defaultValue={String(edit.active)}>
                       <option value="true">Activo</option>
                       <option value="false">Archivado</option>
-                    </select>
+                    </SearchSelect>
                   </label>
                 )}
                 {error && (
@@ -1646,10 +1647,10 @@ function App() {
                   </label>
                   <label>
                     Moneda
-                    <select name="currency" defaultValue="GTQ">
+                    <SearchSelect name="currency" defaultValue="GTQ">
                       <option>GTQ</option>
                       <option>USD</option>
-                    </select>
+                    </SearchSelect>
                   </label>
                   <label>
                     Vigente desde

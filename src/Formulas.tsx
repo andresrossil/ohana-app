@@ -1,3 +1,4 @@
+import SearchSelect, { SortedDatalist } from "./SearchSelect";
 import ProductImage from "./ProductImage";
 import AutoTextarea from "./AutoTextarea";
 import AdditionalCostsPanel from "./AdditionalCostsPanel";
@@ -540,11 +541,11 @@ export default function Formulas({
                                 pickMaterial(line, e.target.value)
                               }
                             />
-                            <datalist id={`formula-material-${line.key}`}>
+                            <SortedDatalist id={`formula-material-${line.key}`}>
                               {candidates.map((m: Row) => (
                                 <option key={m.id} value={materialLabel(m)} />
                               ))}
-                            </datalist>
+                            </SortedDatalist>
                           </>
                         )}
                         <IconDetails
@@ -593,7 +594,7 @@ export default function Formulas({
                               {computed.unit?.symbol}
                             </small>
                           ) : (
-                            <select
+                            <SearchSelect
                               aria-label={`Base de cantidad fila ${index + 1}`}
                               disabled={state.busy}
                               value={line.quantity_basis || "batch"}
@@ -607,7 +608,7 @@ export default function Formulas({
                             >
                               <option value="batch">Por lote (fija)</option>
                               <option value="unit">Por unidad producida</option>
-                            </select>
+                            </SearchSelect>
                           ))}
                         {readOnly ? (
                           number(computed.plannedQuantity)
@@ -647,7 +648,7 @@ export default function Formulas({
                         {readOnly ? (
                           computed.unit?.symbol
                         ) : (
-                          <select
+                          <SearchSelect
                             disabled={state.busy}
                             aria-label={`Unidad fila ${index + 1}`}
                             value={line.unit}
@@ -683,7 +684,7 @@ export default function Formulas({
                                   {u.symbol}
                                 </option>
                               ))}
-                          </select>
+                          </SearchSelect>
                         )}
                         {kind === "ingredient" &&
                           computed.unit?.dimension === "volume" && (
@@ -992,7 +993,7 @@ export default function Formulas({
                           />
                         </span>
                         {state.canWrite ? (
-                          <select
+                          <SearchSelect
                             aria-label={`Estado ${f.code} v${f.version}`}
                             value={f.state}
                             disabled={state.busy}
@@ -1003,7 +1004,7 @@ export default function Formulas({
                                 {label}
                               </option>
                             ))}
-                          </select>
+                          </SearchSelect>
                         ) : (
                           <span className="formula-state-label">
                             {labels[f.state]}
@@ -1222,13 +1223,13 @@ export default function Formulas({
                       }
                     }}
                   />
-                  <datalist id="formula-products">
+                  <SortedDatalist id="formula-products">
                     {catalog.products
                       .filter((p: Row) => p.active)
                       .map((p: Row) => (
                         <option key={p.id} value={productLabel(p)} />
                       ))}
-                  </datalist>
+                  </SortedDatalist>
                 </label>
                 <label>
                   Nombre de fórmula
@@ -1241,7 +1242,7 @@ export default function Formulas({
                 </label>
                 <label>
                   Modalidad de captura
-                  <select
+                  <SearchSelect
                     value={draft.capture_mode}
                     onChange={(e) =>
                       switchCapture(e.target.value as "quantity" | "percentage")
@@ -1249,11 +1250,11 @@ export default function Formulas({
                   >
                     <option value="quantity">Por cantidades</option>
                     <option value="percentage">Por porcentajes</option>
-                  </select>
+                  </SearchSelect>
                 </label>
                 <label>
                   Estado
-                  <select
+                  <SearchSelect
                     value={draft.state}
                     onChange={(e) => field("state", e.target.value)}
                   >
@@ -1262,7 +1263,7 @@ export default function Formulas({
                         {label}
                       </option>
                     ))}
-                  </select>
+                  </SearchSelect>
                 </label>
                 {draft.capture_mode === "percentage" && (
                   <>
@@ -1284,7 +1285,7 @@ export default function Formulas({
                     </label>
                     <label>
                       Unidad del total
-                      <select
+                      <SearchSelect
                         required
                         value={draft.total_unit}
                         onChange={(e) => field("total_unit", e.target.value)}
@@ -1298,7 +1299,7 @@ export default function Formulas({
                               {u.symbol}
                             </option>
                           ))}
-                      </select>
+                      </SearchSelect>
                     </label>
                   </>
                 )}
@@ -1307,7 +1308,7 @@ export default function Formulas({
                 <legend>Producción estimada · opcional</legend>
                 <label>
                   Modalidad de producción
-                  <select
+                  <SearchSelect
                     value={draft.production_mode || "fixed"}
                     onChange={(e) => field("production_mode", e.target.value)}
                   >
@@ -1315,7 +1316,7 @@ export default function Formulas({
                     <option value="variable_weight">
                       Producción variable por peso
                     </option>
-                  </select>
+                  </SearchSelect>
                   <small>
                     {draft.production_mode === "variable_weight"
                       ? "Una misma fórmula produce distintas variantes. Los pesos reales se registran al terminar el lote."
@@ -1341,7 +1342,7 @@ export default function Formulas({
                   <>
                     <label>
                       Presentación comercial
-                      <select
+                      <SearchSelect
                         value={draft.estimate_variant_id || ""}
                         onChange={(e) => {
                           field("estimate_variant_id", e.target.value);
@@ -1377,7 +1378,7 @@ export default function Formulas({
                               {v.name}
                             </option>
                           ))}
-                      </select>
+                      </SearchSelect>
                       <small>
                         {(catalog.presentations || []).some(
                           (v: Row) =>
@@ -1389,7 +1390,7 @@ export default function Formulas({
                     </label>
                     <label>
                       Unidad del contenido
-                      <select
+                      <SearchSelect
                         value={draft.estimate_unit_id || ""}
                         onChange={(e) => {
                           field("estimate_unit_id", e.target.value);
@@ -1436,7 +1437,7 @@ export default function Formulas({
                               {u.symbol}
                             </option>
                           ))}
-                      </select>
+                      </SearchSelect>
                       <small>
                         Usa la unidad configurada en el producto o una
                         equivalente.

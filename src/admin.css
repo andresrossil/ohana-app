@@ -78,7 +78,7 @@
   font-size: 10px;
   font-weight: 650;
 }
-.shell .app-sidebar select {
+.shell .app-sidebar :is(select, input[data-search-select]) {
   background: var(--admin-secondary);
   border: 1px solid var(--admin-border);
   color: var(--admin-text);
@@ -153,7 +153,7 @@
 }
 .shell button:focus-visible,
 .shell input:focus-visible,
-.shell select:focus-visible,
+.shell :is(select, input[data-search-select]):focus-visible,
 .shell textarea:focus-visible {
   outline: 2px solid var(--admin-primary);
   outline-offset: 3px;
@@ -167,7 +167,7 @@
   text-underline-offset: 3px;
 }
 .shell input,
-.shell select,
+.shell :is(select, input[data-search-select]),
 .shell textarea {
   background: var(--admin-surface);
   color: var(--admin-text);
@@ -434,7 +434,7 @@
     grid-template-columns: 1fr 1fr;
   }
   .shell input,
-  .shell select,
+  .shell :is(select, input[data-search-select]),
   .shell textarea {
     font-size: 16px;
   }

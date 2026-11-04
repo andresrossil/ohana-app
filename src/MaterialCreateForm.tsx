@@ -1,3 +1,4 @@
+import SearchSelect, { SortedDatalist } from "./SearchSelect";
 import { useEffect, useRef, useState } from "react";
 import CatalogFields from "./CatalogFields";
 import AutoTextarea from "./AutoTextarea";
@@ -282,13 +283,13 @@ export default function MaterialCreateForm({
                 maxLength={160}
                 onChange={(e) => cell(0, e.target.value)}
               />
-              <datalist id="individual-material-suppliers">
+              <SortedDatalist id="individual-material-suppliers">
                 {catalog.suppliers
                   .filter((s) => s.active)
                   .map((s) => (
                     <option key={s.id} value={s.name} />
                   ))}
-              </datalist>
+              </SortedDatalist>
               <small>
                 Puedes elegir uno existente o escribir un proveedor nuevo.
               </small>
@@ -297,7 +298,7 @@ export default function MaterialCreateForm({
             {textField(4, "Cantidad de la presentación *", "number", true)}
             <label>
               Unidad de medida *
-              <select
+              <SearchSelect
                 required
                 value={row.cells[5]}
                 onChange={(e) => cell(5, e.target.value)}
@@ -310,7 +311,7 @@ export default function MaterialCreateForm({
                       {u.name} ({u.symbol})
                     </option>
                   ))}
-              </select>
+              </SearchSelect>
               <small>Será también la unidad base del material nuevo.</small>
             </label>
             <label className="form-wide">
@@ -371,7 +372,7 @@ export default function MaterialCreateForm({
             {textField(11, "Proveedor anterior")}
             <label className="form-wide">
               Interpretación del precio anterior
-              <select
+              <SearchSelect
                 value={basis}
                 onChange={(e) => {
                   setBasis(e.target.value);
@@ -385,7 +386,7 @@ export default function MaterialCreateForm({
                   Por la misma presentación, cantidad y unidad
                 </option>
                 <option value="unit">Precio por unidad de medida</option>
-              </select>
+              </SearchSelect>
               <small>
                 El antecedente se conserva como referencia. Los precios
                 posteriores mantienen su historial.

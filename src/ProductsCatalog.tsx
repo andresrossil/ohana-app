@@ -1,3 +1,4 @@
+import SearchSelect from "./SearchSelect";
 import ResponsiveTable from "./ResponsiveTable";
 import { SearchField } from "./PoolControls";
 import CatalogBadge from "./CatalogBadge";
@@ -329,7 +330,7 @@ export default function ProductsCatalog({
               />
               <label>
                 Unidad de medida (opcional)
-                <select name="unit_id" defaultValue={edit?.unit_id || ""}>
+                <SearchSelect name="unit_id" defaultValue={edit?.unit_id || ""}>
                   <option value="">Pendiente</option>
                   {units
                     .filter((u) => u.active || u.id === edit?.unit_id)
@@ -338,7 +339,7 @@ export default function ProductsCatalog({
                         {u.name}
                       </option>
                     ))}
-                </select>
+                </SearchSelect>
               </label>
               <label>
                 Fotografía (PNG, JPG o WebP, hasta 3 MB)
@@ -376,10 +377,10 @@ export default function ProductsCatalog({
               {edit && (
                 <label>
                   Estado
-                  <select name="active" defaultValue={String(edit.active)}>
+                  <SearchSelect name="active" defaultValue={String(edit.active)}>
                     <option value="true">Activo</option>
                     <option value="false">Archivado</option>
-                  </select>
+                  </SearchSelect>
                 </label>
               )}
               {error && (

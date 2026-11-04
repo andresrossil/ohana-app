@@ -1,3 +1,4 @@
+import SearchSelect from "./SearchSelect";
 import ResponsiveTable from "./ResponsiveTable";
 import PhysicalUnits, { MovementUnits } from "./PhysicalUnits";
 import { request } from "./commerce";
@@ -211,7 +212,7 @@ export default function Inventory({
                 <>
                   <label>
                     Material
-                    <select
+                    <SearchSelect
                       name="material"
                       required
                       value={material}
@@ -224,18 +225,18 @@ export default function Inventory({
                           {m.name}
                         </option>
                       ))}
-                    </select>
+                    </SearchSelect>
                   </label>
                   <label>
                     Proveedor
-                    <select name="supplier">
+                    <SearchSelect name="supplier">
                       <option value="">Sin proveedor</option>
                       {data.suppliers.map((s: Row) => (
                         <option key={s.id} value={s.id}>
                           {s.name}
                         </option>
                       ))}
-                    </select>
+                    </SearchSelect>
                   </label>
                   <label>
                     Cantidad recibida
@@ -249,7 +250,7 @@ export default function Inventory({
                   </label>
                   <label>
                     Unidad
-                    <select
+                    <SearchSelect
                       name="unit"
                       key={material}
                       defaultValue={baseUnit?.id || ""}
@@ -266,7 +267,7 @@ export default function Inventory({
                             {u.name} ({u.symbol})
                           </option>
                         ))}
-                    </select>
+                    </SearchSelect>
                   </label>
                   <label>
                     Importe total pagado
@@ -317,7 +318,7 @@ export default function Inventory({
                 <>
                   <label>
                     Tipo
-                    <select
+                    <SearchSelect
                       name="kind"
                       value={kind}
                       onChange={(e) => {
@@ -329,11 +330,11 @@ export default function Inventory({
                     >
                       <option value="material">Material</option>
                       <option value="variant">Variante de producto</option>
-                    </select>
+                    </SearchSelect>
                   </label>
                   <label>
                     Artículo
-                    <select
+                    <SearchSelect
                       name="item"
                       required
                       key={kind}
@@ -352,7 +353,7 @@ export default function Inventory({
                           </option>
                         ),
                       )}
-                    </select>
+                    </SearchSelect>
                   </label>
                   <label>
                     Cantidad que se agrega o retira

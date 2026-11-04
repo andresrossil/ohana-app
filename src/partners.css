@@ -5,7 +5,7 @@
   padding: 18px;
 }
 .partner-filters input,
-.partner-filters select {
+.partner-filters :is(select, input[data-search-select]) {
   width: 100%;
 }
 .partner-table-scroll {

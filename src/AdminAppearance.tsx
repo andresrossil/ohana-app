@@ -1,3 +1,4 @@
+import SearchSelect from "./SearchSelect";
 import ResponsiveTable from "./ResponsiveTable";
 import { confirmAction } from "./ConfirmDialog";
 import { AppButton, AppIcon } from "./AppIcon";
@@ -220,14 +221,14 @@ export default function AdminAppearance({
                 ))}
                 <label>
                   Tipografía
-                  <select
+                  <SearchSelect
                     value={theme.font}
                     onChange={(e) => change({ ...theme, font: e.target.value })}
                   >
                     {fonts.map((f) => (
                       <option key={f}>{f}</option>
                     ))}
-                  </select>
+                  </SearchSelect>
                 </label>
               </div>
               <AppButton

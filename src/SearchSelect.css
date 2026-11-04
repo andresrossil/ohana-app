@@ -1,0 +1,18 @@
+.search-select {
+  display: inline-block;
+  position: relative;
+  min-width: 0;
+  max-width: 100%;
+  width: 100%;
+  vertical-align: middle;
+}
+.search-select > input {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+.search-select > .search-select-native {
+  display: none !important;
+}
+
+.app-sidebar .workspace .search-select + .search-select { margin-top: 10px; }

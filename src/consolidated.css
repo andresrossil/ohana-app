@@ -1,7 +1,7 @@
 .shell .admin-name,
 .shell input[name="name"],
 .shell input[name="sku"],
-.shell select[name="classification"] {
+.shell :is(select, input[data-search-select])[name="classification"] {
   text-transform: uppercase;
 }
 .shell .vs-neutral {
@@ -15,7 +15,7 @@
 }
 .shell .admin-name input,
 .shell .admin-name textarea,
-.shell .admin-name select {
+.shell .admin-name :is(select, input[data-search-select]) {
   text-transform: uppercase;
 }
 .shell .base-price-heading {
@@ -149,7 +149,7 @@
 .variant-sheet { min-width: 0; max-width: 100%; }
 .variant-sheet .form-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
 .variant-sheet .table-wrap { max-width: 100%; overflow-x: auto; }
-.variant-sheet td input:not([type="checkbox"]), .variant-sheet td select { min-width: 110px; width: 100%; padding: 8px; }
+.variant-sheet td input:not([type="checkbox"]), .variant-sheet td :is(select, input[data-search-select]) { min-width: 110px; width: 100%; padding: 8px; }
 .variant-sheet .variant-paste { display: grid; gap: 6px; margin: 12px 0; }
 .shell .variant-sheet .variant-paste {
   padding: 14px;
@@ -166,7 +166,7 @@
 }
 .variant-sheet .variant-paste textarea { width: 100%; min-width: 0; max-width: 100%; box-sizing: border-box; }
 @media (max-width: 640px) {
-  .variant-sheet td input:not([type="checkbox"]), .variant-sheet td select { min-width: 0; }
+  .variant-sheet td input:not([type="checkbox"]), .variant-sheet td :is(select, input[data-search-select]) { min-width: 0; }
   .variant-sheet .form-actions button { min-height: 44px; }
 }
 .price-lists .price-estimate { min-width: 125px; font-variant-numeric: tabular-nums; }
@@ -184,7 +184,7 @@
 @media (max-width: 760px) {
   .shell .table-mobile-sort { display: flex; flex-wrap: wrap; align-items: end; gap: 8px; padding: 10px; max-width: 100%; box-sizing: border-box; }
   .shell .table-mobile-sort label { display: grid; gap: 4px; min-width: 0; flex: 1 1 160px; font-size: 12px; }
-  .shell .table-mobile-sort select { width: 100%; min-width: 0; max-width: 100%; min-height: 44px; }
+  .shell .table-mobile-sort :is(select, input[data-search-select]) { width: 100%; min-width: 0; max-width: 100%; min-height: 44px; }
   .shell .table-mobile-sort button { min-height: 44px; margin: 0; padding: 8px 10px; }
 }
 .shell .stats .stat-link { display: grid; align-content: start; gap: 12px; width: 100%; min-width: 0; padding: 0; margin: 0; border: 0; border-radius: 8px; background: transparent; text-align: left; font: inherit; color: inherit; box-shadow: none; }

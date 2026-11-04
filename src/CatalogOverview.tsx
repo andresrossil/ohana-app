@@ -1,3 +1,4 @@
+import SearchSelect from "./SearchSelect";
 import ResponsiveTable from "./ResponsiveTable";
 import { SearchField } from "./PoolControls";
 import { AppButton, AppIcon } from "./AppIcon";
@@ -110,7 +111,7 @@ export default function CatalogOverview({
             aria-label="Buscar catálogo consolidado"
             placeholder="Nombre, SKU o código de barras…"
           />
-          <select
+          <SearchSelect
             aria-label="Tipo de registro"
             value={kind}
             onChange={(e) => setKind(e.target.value)}
@@ -118,7 +119,7 @@ export default function CatalogOverview({
             <option value="">Materiales y productos</option>
             <option>Material</option>
             <option>Producto</option>
-          </select>
+          </SearchSelect>
         </div>
         <CatalogFilters
           classification={classification}

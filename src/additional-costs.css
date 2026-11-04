@@ -49,7 +49,7 @@
   align-items: center;
   justify-content: space-between;
 }
-.shell .formula-overheads table select {
+.shell .formula-overheads table :is(select, input[data-search-select]) {
   min-width: 180px;
   width: 100%;
 }
@@ -67,7 +67,7 @@
   .shell .formula-overheads .form-actions strong {
     flex-basis: 100%;
   }
-  .shell .formula-overheads table :is(input, select) {
+  .shell .formula-overheads table :is(input, :is(select, input[data-search-select])) {
     min-width: 0;
   }
 }

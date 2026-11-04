@@ -1,3 +1,4 @@
+import SearchSelect from "./SearchSelect";
 import { useEffect, useState, useRef } from "react";
 import { AppButton, AppIcon } from "./AppIcon";
 import ResponsiveTable from "./ResponsiveTable";
@@ -395,7 +396,7 @@ export default function VariantSheet({
                 {columns.map(([k, label], j) => (
                   <td key={k}>
                     {flags.has(k) ? (
-                      <select
+                      <SearchSelect
                         aria-label={`${label}, fila ${i + 1}`}
                         disabled={busy}
                         value={String(cell(r, k))}
@@ -415,7 +416,7 @@ export default function VariantSheet({
                       >
                         <option value="true">Sí</option>
                         <option value="false">No</option>
-                      </select>
+                      </SearchSelect>
                     ) : (
                       <input
                         aria-label={`${label}, fila ${i + 1}`}

@@ -1,3 +1,4 @@
+import SearchSelect from "./SearchSelect";
 import ResponsiveTable from "./ResponsiveTable";
 import CatalogBadge from "./CatalogBadge";
 import { IconDetails } from "./PoolControls";
@@ -75,7 +76,7 @@ export default function GlobalAdmin() {
             >
               <label>
                 Cuenta
-                <select
+                <SearchSelect
                   name="user"
                   required
                   value={self}
@@ -88,14 +89,14 @@ export default function GlobalAdmin() {
                       {u.platform_admin ? " · Superadministrador" : ""}
                     </option>
                   ))}
-                </select>
+                </SearchSelect>
               </label>
               <label>
                 Acceso global
-                <select name="enabled">
+                <SearchSelect name="enabled">
                   <option value="true">Asignar superadministrador</option>
                   <option value="false">Retirar superadministrador</option>
-                </select>
+                </SearchSelect>
               </label>
               <label>
                 <input type="checkbox" required /> Confirmo esta asignación
@@ -163,10 +164,10 @@ export default function GlobalAdmin() {
                 </label>
                 <label>
                   Estado
-                  <select name="active">
+                  <SearchSelect name="active">
                     <option value="true">Activo</option>
                     <option value="false">Inactivo</option>
-                  </select>
+                  </SearchSelect>
                 </label>
                 <AppButton disabled={busy}>Guardar código</AppButton>
               </form>

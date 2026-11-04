@@ -1,3 +1,4 @@
+import SearchSelect from "./SearchSelect";
 import { useEffect, useState, useRef } from "react";
 import { AppButton, AppIcon } from "./AppIcon";
 import { IconDetails } from "./PoolControls";
@@ -148,7 +149,7 @@ export default function VariantWeightCapture({
       <div className="additional-costs-content">
         <label>
           Atributos para nuevas filas
-          <select
+          <SearchSelect
             disabled={busy}
             value={group}
             onChange={(e) => setGroup(e.target.value)}
@@ -160,7 +161,7 @@ export default function VariantWeightCapture({
                   .join(" · ") || "Sin atributos"}
               </option>
             ))}
-          </select>
+          </SearchSelect>
         </label>
         <label className="weight-paste-panel">
           Pegar pesos desde Excel
@@ -280,7 +281,7 @@ export default function VariantWeightCapture({
                       />
                     </td>
                     <td>
-                      <select
+                      <SearchSelect
                         aria-label={"Atributos de unidad " + (i + 1)}
                         value={r.group}
                         disabled={busy}
@@ -297,7 +298,7 @@ export default function VariantWeightCapture({
                             {Object.values(a).join(" · ") || "Sin atributos"}
                           </option>
                         ))}
-                      </select>
+                      </SearchSelect>
                     </td>
                     <td>
                       {v ? (

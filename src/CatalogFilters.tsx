@@ -1,3 +1,4 @@
+import SearchSelect from "./SearchSelect";
 import { AppIcon } from "./AppIcon";
 import { classifications } from "./sheet-model";
 import type { CatalogRow } from "./sheet-model";
@@ -33,7 +34,7 @@ export default function CatalogFilters({
           <span className="field-caption">
             <AppIcon name="control.filter" /> Clasificación
           </span>
-          <select
+          <SearchSelect
             value={classification}
             onChange={(e) => onClassification(e.target.value)}
           >
@@ -42,14 +43,14 @@ export default function CatalogFilters({
               <option key={c}>{c}</option>
             ))}
             <option value="pending">Pendientes de clasificar</option>
-          </select>
+          </SearchSelect>
         </label>
       )}
       <label>
         <span className="field-caption">
           <AppIcon name="control.filter" /> Origen
         </span>
-        <select value={origin} onChange={(e) => onOrigin(e.target.value)}>
+        <SearchSelect value={origin} onChange={(e) => onOrigin(e.target.value)}>
           <option value="">Todos los orígenes</option>
           {origins.map((o) => (
             <option key={o.id} value={o.id}>
@@ -58,7 +59,7 @@ export default function CatalogFilters({
             </option>
           ))}
           <option value="pending">Pendiente de definir</option>
-        </select>
+        </SearchSelect>
       </label>
     </div>
   );

@@ -1,3 +1,4 @@
+import SearchSelect from "./SearchSelect";
 import { AppIcon, AppButton } from "./AppIcon";
 import NavIcon from "./NavIcon";
 import { useState } from "react";
@@ -84,7 +85,7 @@ export default function Sidebar({
       <div id="ohana-navigation" className="sidebar-content">
         <div className="workspace">
           <span>ESPACIO DE TRABAJO</span>
-          <select
+          <SearchSelect
             aria-label="Empresa"
             value={company}
             onChange={(e) => onCompany(e.target.value)}
@@ -110,7 +111,7 @@ export default function Sidebar({
                 </optgroup>
               ),
             )}
-          </select>
+          </SearchSelect>
         </div>
         <nav aria-label="Navegación principal">
           {sections

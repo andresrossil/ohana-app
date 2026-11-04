@@ -1,3 +1,4 @@
+import SearchSelect from "./SearchSelect";
 import { confirmAction } from "./ConfirmDialog";
 import { AppButton } from "./AppIcon";
 import { SearchField } from "./PoolControls";
@@ -177,14 +178,14 @@ export default function IconSettings({
         </label>
         <label>
           Categoría
-          <select
+          <SearchSelect
             value={category}
             onChange={(e) => setCategory(e.target.value)}
           >
             {["Todos", ...categories].map((c) => (
               <option key={c}>{c}</option>
             ))}
-          </select>
+          </SearchSelect>
         </label>
       </div>
       {categories.map((c) => {

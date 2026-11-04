@@ -1,3 +1,4 @@
+import SearchSelect from "./SearchSelect";
 import MaterialRequirements from "./MaterialRequirements";
 import VariantWeightCapture, { type WeighedUnit } from "./VariantWeightCapture";
 import { weightMatches } from "./variant-weights";
@@ -442,7 +443,7 @@ function ProductionBatches({
                 <div className="settings-grid">
                   <label>
                     Producto
-                    <select
+                    <SearchSelect
                       required
                       value={draftProduct}
                       onChange={(e) => {
@@ -456,11 +457,11 @@ function ProductionBatches({
                           {p.name}
                         </option>
                       ))}
-                    </select>
+                    </SearchSelect>
                   </label>
                   <label>
                     Fórmula
-                    <select
+                    <SearchSelect
                       name="formula"
                       value={draftFormula}
                       onChange={(e) => setDraftFormula(e.target.value)}
@@ -480,7 +481,7 @@ function ProductionBatches({
                             {f.version}
                           </option>
                         ))}
-                    </select>
+                    </SearchSelect>
                   </label>
                   <label>
                     Factor de escala de fórmula

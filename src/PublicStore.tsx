@@ -1,3 +1,4 @@
+import SearchSelect from "./SearchSelect";
 import { useEffect, useState } from "react";
 import type { CSSProperties } from "react";
 import { request } from "./commerce";
@@ -26,7 +27,7 @@ function ProductCard({
           <>
             <label>
               Selecciona tu opción
-              <select
+              <SearchSelect
                 value={selected}
                 onChange={(e) => setSelected(e.target.value)}
               >
@@ -35,7 +36,7 @@ function ProductCard({
                     {v.name} · {money(v.price, currency)}
                   </option>
                 ))}
-              </select>
+              </SearchSelect>
             </label>
             <p>
               {Object.entries(variant.attributes || {})
@@ -398,7 +399,7 @@ export default function PublicStore({ company }: { company: string }) {
                       </label>
                       <label>
                         Entrega
-                        <select
+                        <SearchSelect
                           value={delivery}
                           onChange={(e) => setDelivery(e.target.value)}
                         >
@@ -416,7 +417,7 @@ export default function PublicStore({ company }: { company: string }) {
                                 )}
                               </option>
                             )}
-                        </select>
+                        </SearchSelect>
                       </label>
                       {delivery === "delivery" && (
                         <label>
@@ -432,13 +433,13 @@ export default function PublicStore({ company }: { company: string }) {
                       )}
                       <label>
                         Pago
-                        <select name="payment">
+                        <SearchSelect name="payment">
                           <option value="transfer">
                             Transferencia bancaria
                           </option>
                           <option value="cash">Efectivo</option>
                           <option value="cod">Contra entrega</option>
-                        </select>
+                        </SearchSelect>
                       </label>
                       <label>
                         Código promocional (opcional)

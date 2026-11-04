@@ -1,3 +1,4 @@
+import SearchSelect from "./SearchSelect";
 import { AppButton } from "./AppIcon";
 import ResponsiveTable from "./ResponsiveTable";
 import DecimalInput from "./DecimalInput";
@@ -74,7 +75,7 @@ export default function FormulaOverheads({
                 <tr key={line.cost_id || i}>
                   <td>
                     {onChange ? (
-                      <select
+                      <SearchSelect
                         aria-label={`Costo fila ${i + 1}`}
                         required
                         value={line.cost_id}
@@ -115,7 +116,7 @@ export default function FormulaOverheads({
                             </optgroup>
                           ),
                         )}
-                      </select>
+                      </SearchSelect>
                     ) : (
                       <>
                         {costCatalogNames[row?.kind || "overhead"]} ·{" "}

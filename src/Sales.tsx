@@ -1,3 +1,4 @@
+import SearchSelect from "./SearchSelect";
 import ResponsiveTable from "./ResponsiveTable";
 import { SaleUnits } from "./PhysicalUnits";
 import DecimalInput from "./DecimalInput";
@@ -165,7 +166,7 @@ export default function Sales({
                   <div className="settings-grid">
                     <label className="form-wide">
                       Cliente
-                      <select
+                      <SearchSelect
                         value={customerId}
                         onChange={(e) => setCustomerId(e.target.value)}
                       >
@@ -177,7 +178,7 @@ export default function Sales({
                               {c.code} · {c.name}
                             </option>
                           ))}
-                      </select>
+                      </SearchSelect>
                     </label>
                     {!customerId && (
                       <>
@@ -214,11 +215,11 @@ export default function Sales({
                     )}
                     <label>
                       Pago
-                      <select name="payment">
+                      <SearchSelect name="payment">
                         <option value="cash">Efectivo</option>
                         <option value="transfer">Transferencia</option>
                         <option value="cod">Contra entrega</option>
-                      </select>
+                      </SearchSelect>
                     </label>
                   </div>
                   <p>
@@ -229,7 +230,7 @@ export default function Sales({
                     <div key={l.key} className="ingredient-row">
                       <label>
                         Variante
-                        <select
+                        <SearchSelect
                           required
                           value={l.variant}
                           onChange={(e) =>
@@ -261,7 +262,7 @@ export default function Sales({
                                 · {v.available} disponibles
                               </option>
                             ))}
-                        </select>
+                        </SearchSelect>
                       </label>
                       <label>
                         Cantidad

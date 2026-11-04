@@ -1,3 +1,4 @@
+import SearchSelect from "./SearchSelect";
 import { AppButton, AppIcon } from "./AppIcon";
 import { useEffect, useRef, useState } from "react";
 import { supabase as db } from "./client";
@@ -88,7 +89,7 @@ export default function CatalogFields({
       {kind === "material" && (
         <label>
           Clasificación
-          <select
+          <SearchSelect
             name="classification"
             value={classification}
             onChange={(e) => {
@@ -102,7 +103,7 @@ export default function CatalogFields({
             {classifications.map((c) => (
               <option key={c}>{c}</option>
             ))}
-          </select>
+          </SearchSelect>
         </label>
       )}
       <label>
@@ -129,7 +130,7 @@ export default function CatalogFields({
       </label>
       <label>
         Origen
-        <select name="origin_id" defaultValue={item?.origin_id || ""}>
+        <SearchSelect name="origin_id" defaultValue={item?.origin_id || ""}>
           <option value="">Pendiente de definir</option>
           {origins
             .filter((o) => o.active || o.id === item?.origin_id)
@@ -139,7 +140,7 @@ export default function CatalogFields({
                 {o.active ? "" : " (inactivo)"}
               </option>
             ))}
-        </select>
+        </SearchSelect>
       </label>
       <label>
         Código de barras (opcional)

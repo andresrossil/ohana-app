@@ -1,6 +1,6 @@
 .shell .sheet-table td > span,
 .shell .sheet-table td input,
-.shell .sheet-table td select {
+.shell .sheet-table td :is(select, input[data-search-select]) {
   color: var(--admin-text);
 }
 .shell .sheet-table .cell-selected {

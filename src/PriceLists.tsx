@@ -1,3 +1,4 @@
+import SearchSelect from "./SearchSelect";
 import { useEffect, useRef, useState } from "react";
 import { AppButton, AppIcon } from "./AppIcon";
 import { confirmAction } from "./ConfirmDialog";
@@ -394,7 +395,7 @@ export default function PriceLists({
             </label>
             <label>
               Lista base
-              <select
+              <SearchSelect
                 value={String(draft.is_base)}
                 onChange={(e) =>
                   setDraft({ ...draft, is_base: e.target.value === "true" })
@@ -402,11 +403,11 @@ export default function PriceLists({
               >
                 <option value="false">No</option>
                 <option value="true">Sí</option>
-              </select>
+              </SearchSelect>
             </label>
             <label>
               Estado
-              <select
+              <SearchSelect
                 value={String(draft.active)}
                 onChange={(e) =>
                   setDraft({ ...draft, active: e.target.value === "true" })
@@ -414,7 +415,7 @@ export default function PriceLists({
               >
                 <option value="true">Activa</option>
                 <option value="false">Inactiva</option>
-              </select>
+              </SearchSelect>
             </label>
             <div className="form-actions form-wide">
               <AppButton iconKey="action.save">Guardar cambios</AppButton>
@@ -434,7 +435,7 @@ export default function PriceLists({
           <div className="settings-grid">
             <label>
               Lista de precios
-              <select
+              <SearchSelect
                 value={selected}
                 disabled={state.busy}
                 onChange={(e) => select(e.target.value)}
@@ -447,7 +448,7 @@ export default function PriceLists({
                     {!l.active ? " · Inactiva" : ""}
                   </option>
                 ))}
-              </select>
+              </SearchSelect>
             </label>
             <div className="form-actions">
               {list && (
@@ -655,7 +656,7 @@ export default function PriceLists({
                       </td>
                       <td>
                         {v ? (
-                          <select
+                          <SearchSelect
                             aria-label={"Estado del precio de " + v.name}
                             disabled={
                               state.busy ||
@@ -676,7 +677,7 @@ export default function PriceLists({
                                 <option value="inactive">Inactivo</option>
                               </>
                             )}
-                          </select>
+                          </SearchSelect>
                         ) : (
                           "—"
                         )}

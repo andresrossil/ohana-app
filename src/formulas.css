@@ -30,7 +30,7 @@
 .shell .formula-dialog form label {
   font-size: 12px;
 }
-.shell .formula-dialog form :is(input, select) {
+.shell .formula-dialog form :is(input, :is(select, input[data-search-select])) {
   min-height: 36px;
   padding: 8px 10px;
 }
@@ -77,7 +77,7 @@
 .formula-lines td:nth-child(3) {
   min-width: 95px;
 }
-.shell .formula-lines :is(input, select) {
+.shell .formula-lines :is(input, :is(select, input[data-search-select])) {
   margin: 0;
   min-height: 36px;
   font-size: 12px;
@@ -161,7 +161,7 @@
   .formula-summary {
     grid-template-columns: 1fr;
   }
-  .shell .formula-lines :is(input, select) {
+  .shell .formula-lines :is(input, :is(select, input[data-search-select])) {
     font-size: 16px;
     min-height: 42px;
   }
@@ -286,7 +286,7 @@
   justify-content: center;
   width: 24px;
 }
-.shell .formula-state select {
+.shell .formula-state :is(select, input[data-search-select]) {
   min-width: 0;
   width: 100%;
   margin: 0;
@@ -302,15 +302,15 @@
 .shell .formula-state-inactive {
   color: #a12635;
 }
-.shell .formula-state-current select {
+.shell .formula-state-current :is(select, input[data-search-select]) {
   background: #edf8f0;
   border-color: #8ebd9d;
 }
-.shell .formula-state-testing select {
+.shell .formula-state-testing :is(select, input[data-search-select]) {
   background: #fff7da;
   border-color: #d7b85e;
 }
-.shell .formula-state-inactive select {
+.shell .formula-state-inactive :is(select, input[data-search-select]) {
   background: #fff0f1;
   border-color: #d49aa2;
 }
@@ -351,7 +351,7 @@
     grid-template-columns: 22px minmax(0, 1fr);
     gap: 6px;
   }
-  .shell .formula-state select {
+  .shell .formula-state :is(select, input[data-search-select]) {
     font-size: 16px;
     padding-inline: 8px;
   }

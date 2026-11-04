@@ -1,3 +1,4 @@
+import SearchSelect, { SortedDatalist } from "./SearchSelect";
 import { confirmAction } from "./ConfirmDialog";
 import { SearchField } from "./PoolControls";
 import AutoTextarea from "./AutoTextarea";
@@ -688,7 +689,7 @@ export default function MaterialSheet({
   }
   function key(e: KeyboardEvent) {
     if (e.target instanceof Element && e.target.closest("button")) return;
-    if (e.target instanceof HTMLSelectElement && e.key !== "Tab") return;
+    if ((e.target instanceof HTMLSelectElement || (e.target instanceof HTMLInputElement && e.target.dataset.searchSelect)) && e.key !== "Tab") return;
     const arrows: Record<string, Point> = {
       ArrowUp: { row: -1, col: 0 },
       ArrowDown: { row: 1, col: 0 },
@@ -971,7 +972,7 @@ export default function MaterialSheet({
         <td key={col} className={editable(ci) ? "" : "cell-auto"}>
           {editable(ci) ? (
             [14, 15].includes(visualOrder[ci]) ? (
-              <select
+              <SearchSelect
                 data-row={rows.length}
                 data-col={ci}
                 aria-label={`Nueva fila ${col}`}
@@ -981,7 +982,7 @@ export default function MaterialSheet({
                 onChange={(e) => change(rows.length, ci, e.target.value)}
               >
                 {selectOptions(visualOrder[ci])}
-              </select>
+              </SearchSelect>
             ) : (
               <input
                 data-row={rows.length}
@@ -1298,7 +1299,7 @@ export default function MaterialSheet({
                         >
                           {isEditable ? (
                             [14, 15].includes(visualOrder[ci]) ? (
-                              <select
+                              <SearchSelect
                                 data-row={ri}
                                 data-col={ci}
                                 aria-label={`Fila ${ri + 1} ${col}`}
@@ -1311,7 +1312,7 @@ export default function MaterialSheet({
                                 onChange={(e) => change(ri, ci, e.target.value)}
                               >
                                 {selectOptions(visualOrder[ci], shown)}
-                              </select>
+                              </SearchSelect>
                             ) : [2, 6].includes(visualOrder[ci]) ? (
                               <AutoTextarea
                                 data-row={ri}
@@ -1410,14 +1411,14 @@ export default function MaterialSheet({
           {canWrite && <AppButton onClick={add}>+ Primera fila</AppButton>}
         </div>
       )}
-      <datalist id="sheet-suppliers">
+      <SortedDatalist id="sheet-suppliers">
         {suppliers
           .filter((s) => s.active)
           .map((s) => (
             <option key={s.id} value={s.name} />
           ))}
-      </datalist>
-      <datalist id="sheet-units">
+      </SortedDatalist>
+      <SortedDatalist id="sheet-units">
         {units
           .filter((u) => u.active)
           .map((u) => (
@@ -1425,7 +1426,7 @@ export default function MaterialSheet({
               {u.name}
             </option>
           ))}
-      </datalist>
+      </SortedDatalist>
       <p className="muted sheet-footnote">
         {importing ? (
           `${rows.length} filas para cargar · ${errors.length ? `${new Set(errors.map((e) => e.key)).size} con errores por corregir` : warnings.length ? `${new Set(warnings.map((w) => w.key)).size} con datos pendientes (puedes guardar)` : "Máximo 500 filas por carga"}`
@@ -1570,7 +1571,7 @@ export default function MaterialSheet({
                     {isDuplicate && (
                       <label>
                         Posible duplicado: elige cómo guardar
-                        <select
+                        <SearchSelect
                           aria-label={`Duplicado fila ${viewRows.indexOf(r) + 1}`}
                           value={r.duplicateChoice ? r.mode : ""}
                           onChange={(e) =>
@@ -1594,7 +1595,7 @@ export default function MaterialSheet({
                           <option value="add">
                             Agregar otra presentación intencionalmente
                           </option>
-                        </select>
+                        </SearchSelect>
                       </label>
                     )}
                     {r.id && (

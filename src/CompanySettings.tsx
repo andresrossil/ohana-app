@@ -1,3 +1,4 @@
+import SearchSelect from "./SearchSelect";
 import { AppButton, AppIcon } from "./AppIcon";
 import AdminAppearance from "./AdminAppearance";
 import { useEffect, useState } from "react";
@@ -281,7 +282,7 @@ function CompanyProfile({
               ))}
               <label>
                 Tipografía
-                <select
+                <SearchSelect
                   value={theme.font}
                   onChange={(e) => {
                     setTheme({ ...theme, font: e.target.value });
@@ -291,7 +292,7 @@ function CompanyProfile({
                   {["DM Sans", "Arial", "Georgia", "Verdana"].map((f) => (
                     <option key={f}>{f}</option>
                   ))}
-                </select>
+                </SearchSelect>
               </label>
             </div>
             <div
@@ -371,7 +372,7 @@ function CompanyProfile({
                 {field("tax_id", "NIT / identificación fiscal")}
                 <label>
                   País *
-                  <select
+                  <SearchSelect
                     required
                     value={details.country || ""}
                     onChange={(e) => update("country", e.target.value)}
@@ -382,11 +383,11 @@ function CompanyProfile({
                         {c.name}
                       </option>
                     ))}
-                  </select>
+                  </SearchSelect>
                 </label>
                 <label>
                   Moneda *
-                  <select
+                  <SearchSelect
                     required
                     value={currency}
                     onChange={(e) => {
@@ -399,7 +400,7 @@ function CompanyProfile({
                         {c.code} · {c.name}
                       </option>
                     ))}
-                  </select>
+                  </SearchSelect>
                 </label>
               </div>
               <p className="muted">

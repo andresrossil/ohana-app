@@ -1,3 +1,4 @@
+import SearchSelect from "./SearchSelect";
 import { confirmAction } from "./ConfirmDialog";
 import { IconDetails, SearchField } from "./PoolControls";
 import { AppButton, AppIcon } from "./AppIcon";
@@ -175,7 +176,7 @@ function Members({
         </label>
         <label>
           Acceso
-          <select name="role">
+          <SearchSelect name="role">
             {corporation ? (
               <>
                 <option value="corporation_admin">
@@ -197,7 +198,7 @@ function Members({
                 <option value="remove">Retirar acceso a esta empresa</option>
               </>
             )}
-          </select>
+          </SearchSelect>
         </label>
         <AppButton disabled={busy}>Aplicar acceso</AppButton>
       </form>
@@ -556,13 +557,13 @@ export default function OrganizationAdmin({
                 {dialog.type === "edit_company" && (
                   <label>
                     Estado
-                    <select
+                    <SearchSelect
                       name="active"
                       defaultValue={String(dialog.row.active !== false)}
                     >
                       <option value="true">Activa</option>
                       <option value="false">Inactiva</option>
-                    </select>
+                    </SearchSelect>
                   </label>
                 )}
                 <div className="form-actions">

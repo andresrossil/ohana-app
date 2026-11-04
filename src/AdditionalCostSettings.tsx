@@ -1,3 +1,4 @@
+import SearchSelect from "./SearchSelect";
 import { useEffect, useState } from "react";
 import { AppButton, AppIcon } from "./AppIcon";
 import { confirmAction } from "./ConfirmDialog";
@@ -161,7 +162,7 @@ export default function AdditionalCostSettings({
                 </label>
                 <label>
                   Moneda
-                  <select
+                  <SearchSelect
                     value={draft.currency}
                     onChange={(e) => update("currency", e.target.value)}
                   >
@@ -170,7 +171,7 @@ export default function AdditionalCostSettings({
                     ).map((c) => (
                       <option key={c}>{c}</option>
                     ))}
-                  </select>
+                  </SearchSelect>
                 </label>
               </>
             ) : (

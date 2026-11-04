@@ -1,3 +1,4 @@
+import SearchSelect from "./SearchSelect";
 import ResponsiveTable from "./ResponsiveTable";
 import { confirmAction } from "./ConfirmDialog";
 import CatalogBadge from "./CatalogBadge";
@@ -312,7 +313,7 @@ export default function BusinessPartners({
           </label>
           <label>
             Tipo
-            <select
+            <SearchSelect
               value={type}
               onChange={(e) => {
                 setType(e.target.value);
@@ -324,11 +325,11 @@ export default function BusinessPartners({
               {data.supplierRead && (
                 <option value="supplier">Proveedores</option>
               )}
-            </select>
+            </SearchSelect>
           </label>
           <label>
             Estado
-            <select
+            <SearchSelect
               value={status}
               onChange={(e) => {
                 setStatus(e.target.value);
@@ -338,7 +339,7 @@ export default function BusinessPartners({
               <option value="">Todos</option>
               <option value="active">Activos</option>
               <option value="inactive">Inactivos</option>
-            </select>
+            </SearchSelect>
           </label>
         </div>
         <div className="partner-table-scroll" aria-busy={loading}>
@@ -492,14 +493,14 @@ export default function BusinessPartners({
                 {field("code", "Código", { max: 40, required: true })}
                 <label>
                   Tipo de socio
-                  <select
+                  <SearchSelect
                     value={draft.type}
                     disabled={!canChangeType}
                     onChange={(e) => changeType(e.target.value)}
                   >
                     <option value="customer">Cliente</option>
                     <option value="supplier">Proveedor</option>
-                  </select>
+                  </SearchSelect>
                 </label>
                 {!canChangeType && (
                   <p className="form-wide muted">
@@ -521,7 +522,7 @@ export default function BusinessPartners({
                 })}
                 <label>
                   Estado
-                  <select
+                  <SearchSelect
                     value={String(draft.active)}
                     onChange={(e) =>
                       change("active", e.target.value === "true")
@@ -529,7 +530,7 @@ export default function BusinessPartners({
                   >
                     <option value="true">Activo</option>
                     <option value="false">Inactivo</option>
-                  </select>
+                  </SearchSelect>
                 </label>
                 {draft.contact && (
                   <p className="form-wide">
