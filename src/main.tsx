@@ -41,6 +41,7 @@ const Sales = lazy(() => import("./Sales"));
 const PublicStore = lazy(() => import("./PublicStore"));
 const AdditionalCostSettings = lazy(() => import("./AdditionalCostSettings"));
 const PriceLists = lazy(() => import("./PriceLists"));
+const MaterialCreateForm = lazy(() => import("./MaterialCreateForm"));
 const StoreSettings = lazy(() => import("./StoreSettings"));
 type Tab = "raw_materials" | "suppliers" | "presentations" | "units";
 type Catalog = Record<Tab, Row[]> & { products: Row[]; catalog_origins: Row[] };
@@ -1433,7 +1434,17 @@ function App() {
             }}
           />
         )}
-        {edit !== undefined && (
+        {tab === "raw_materials" && edit === null && (
+          <MaterialCreateForm
+            company={company}
+            currency={activeCompany?.currency || "GTQ"}
+            catalog={data}
+            onSaved={load}
+            onClose={() => setEdit(undefined)}
+            onDirty={setSheetDirty}
+          />
+        )}
+        {edit !== undefined && !(tab === "raw_materials" && edit === null) && (
           <div className="overlay">
             <section
               role="dialog"

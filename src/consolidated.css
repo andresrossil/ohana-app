@@ -191,3 +191,7 @@
 .shell .stats .stat-link:not(:disabled) { cursor: pointer; }
 .shell .stats .stat-link:not(:disabled):hover span { text-decoration: underline; color: var(--admin-primary); }
 .shell .stats .stat-link:focus-visible { outline: 2px solid var(--admin-primary); outline-offset: 8px; }
+.shell .material-create-modal { width: min(1100px,calc(100vw - 24px)); max-width: 100%; max-height: calc(100dvh - 24px); overflow-y: auto; box-sizing: border-box; }
+.shell .material-create-modal > header { display: flex; align-items: start; justify-content: space-between; gap: 12px; }
+.shell .material-create-modal .catalog-fields { grid-column: 1/-1; }
+.shell .material-create-vs { min-height: 42px; display: flex; align-items: center; gap: 8px; padding: 8px; border: 1px solid var(--admin-border); border-radius: 8px; }
