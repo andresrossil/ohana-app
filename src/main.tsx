@@ -1,3 +1,5 @@
+import { MaterialTypesProvider, MaterialTypeLabel } from "./MaterialTypesContext";
+const MaterialTypeSettings = lazy(() => import("./MaterialTypeSettings"));
 import { MarginProvider } from "./MarginBadge";
 const MarginSettings = lazy(() => import("./MarginSettings"));
 import SearchSelect from "./SearchSelect";
@@ -579,7 +581,7 @@ function App() {
       </main>
     );
   return (
-    <IconProvider company={company}><MarginProvider company={company}>
+    <IconProvider company={company}><MarginProvider company={company}><MaterialTypesProvider company={company}>
       <div className="shell">
         <Sidebar
           section={section}
@@ -740,6 +742,7 @@ function App() {
                       ["profile", "Datos de empresa"],
                       ["appearance", "Apariencia"],
                       ["margin", "Margen esperado"],
+                      ["materials", "Materiales"],
                       ["structure", "Corporaciones y accesos"],
                       ["store", "Tienda y ventas"],
                       ["origins", "Orígenes"],
@@ -801,6 +804,7 @@ function App() {
                         onDirty={setSettingsDirty}
                       />
                     )}
+                  {configView === "materials" && activeCompany?.manage && <MaterialTypeSettings key={company} company={company} onDirty={setSettingsDirty} />}
                   {configView === "margin" && activeCompany?.manage && <MarginSettings key={company} company={company} onDirty={setSettingsDirty} />}
                   {configView === "store" && activeCompany?.manage && (
                     <StoreSettings
@@ -1107,7 +1111,7 @@ function App() {
                           onClick={async () => {
                             if (
                               !(await confirmAction(
-                                "¿Generar los SKU faltantes? Se conservarán los existentes. Solo se incluyen materiales y empaques con clasificación definida.",
+                                "¿Generar los SKU faltantes? Se conservarán los existentes. Se usarán los prefijos configurados para cada tipo de material.",
                               ))
                             )
                               return;
@@ -1239,7 +1243,7 @@ function App() {
                                       <>
                                         <td>{r.sku || "—"}</td>
                                         <td>
-                                          {r.classification || "Pendiente"}
+                                          <MaterialTypeLabel typeKey={r.classification}/>
                                         </td>
                                         <td>
                                           <CatalogBadge
@@ -1713,7 +1717,7 @@ function App() {
         )}
         <ConfirmHost key={company} />
       </div>
-    </MarginProvider></IconProvider>
+    </MaterialTypesProvider></MarginProvider></IconProvider>
   );
 }
 createRoot(document.getElementById("root")!).render(

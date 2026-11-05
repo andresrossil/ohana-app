@@ -1,3 +1,4 @@
+import { useMaterialTypes } from "./MaterialTypesContext";
 import SearchSelect, { SortedDatalist } from "./SearchSelect";
 import { useEffect, useRef, useState } from "react";
 import CatalogFields from "./CatalogFields";
@@ -39,6 +40,7 @@ export default function MaterialCreateForm({
   onClose: () => void;
   onDirty: (dirty: boolean) => void;
 }) {
+  const types = useMaterialTypes();
   const state = useOperation(company, "catalog");
   const [row, setRow] = useState(() => ({ ...blankRow(), currency })),
     [basis, setBasis] = useState("unknown"),
@@ -134,6 +136,7 @@ export default function MaterialCreateForm({
       catalog.units,
       catalog.suppliers,
       catalog.raw_materials,
+      types.map((t) => t.key),
     );
     if (issues.length) {
       state.setError(issues.join(" · "));

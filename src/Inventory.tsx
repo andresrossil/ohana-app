@@ -1,3 +1,5 @@
+import {useMaterialTypes, MaterialTypeLabel} from "./MaterialTypesContext";
+import {materialTypeName} from "./material-types-model";
 import SearchSelect from "./SearchSelect";
 import ResponsiveTable from "./ResponsiveTable";
 import PhysicalUnits, { MovementUnits } from "./PhysicalUnits";
@@ -25,6 +27,7 @@ export default function Inventory({
   purchases?: boolean;
   currency?: string;
 }) {
+  const types=useMaterialTypes();
   const state = useOperation(company, "inventory"),
     [data, setData] = useState<Row>({
       balances: [],
@@ -87,7 +90,7 @@ export default function Inventory({
     ]),
   );
   const balances = data.balances.filter((r: Row) =>
-    [r.name, r.sku, r.barcode, r.classification]
+    [r.name, r.sku, r.barcode, materialTypeName(r.classification,types)]
       .join(" ")
       .toLowerCase()
       .includes(query.toLowerCase()),
@@ -507,7 +510,7 @@ export default function Inventory({
                         {r.name}
                         <small>
                           {r.sku || "Sin SKU"} ·{" "}
-                          {r.classification || "Producto"}
+                          {r.classification ? <MaterialTypeLabel typeKey={r.classification}/> : "Producto"}
                         </small>
                       </td>
                       <td>{Number(r.on_hand)}</td>

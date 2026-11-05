@@ -1,3 +1,5 @@
+import { useMaterialTypes } from "./MaterialTypesContext";
+import { materialTypeName } from "./material-types-model";
 import SearchSelect from "./SearchSelect";
 import ResponsiveTable from "./ResponsiveTable";
 import { SearchField } from "./PoolControls";
@@ -21,6 +23,7 @@ export default function CatalogOverview({
   origins: CatalogRow[];
   report?: boolean;
 }) {
+  const types = useMaterialTypes();
   const [classification, setClassification] = useState(""),
     [origin, setOrigin] = useState(""),
     [query, setQuery] = useState(""),
@@ -62,7 +65,7 @@ export default function CatalogOverview({
         r.kind,
         r.sku || "",
         r.name,
-        r.classification || "",
+        materialTypeName(r.classification, types),
         origins.find((o) => o.id === r.origin_id)?.name || "",
         r.barcode || "",
         r.active ? "Activo" : "Archivado",
@@ -149,7 +152,9 @@ export default function CatalogOverview({
                     {r.name}
                     {!r.active && <small>Archivado</small>}
                   </td>
-                  <td>{r.classification || "Pendiente"}</td>
+                  <td>
+                    {materialTypeName(r.classification, types) || "Pendiente"}
+                  </td>
                   <td>
                     {origins.find((o) => o.id === r.origin_id)?.name ||
                       "Pendiente"}

@@ -1,3 +1,5 @@
+import { useMaterialTypes } from "./MaterialTypesContext";
+import { materialTypeKey, materialTypeName } from "./material-types-model";
 import SearchSelect, { SortedDatalist } from "./SearchSelect";
 import { confirmAction } from "./ConfirmDialog";
 import { SearchField } from "./PoolControls";
@@ -11,7 +13,6 @@ import {
   visualOrder,
   pasteLayout,
   comparison,
-  classifications,
   manualColumns,
   blankRow as coreBlankRow,
   parseTSV,
@@ -139,6 +140,8 @@ export default function MaterialSheet({
     return data;
   },
 }: Props) {
+  const types = useMaterialTypes();
+  const typeKeys = types.map((t) => t.key);
   const blankRow = () => {
     const row = { ...coreBlankRow(), currency };
     if (materialId) {
@@ -425,6 +428,7 @@ export default function MaterialSheet({
           if (logical === 10) return calc.previousDisplay;
           if ([4, 7].includes(logical)) return parseNumber(row.cells[logical]);
           if (logical === 12) return parseDate(row.cells[logical]);
+          if (logical === 14) return materialTypeName(row.cells[logical], types);
           if (logical === 11)
             return calc.previousSupplier === "—" ? null : calc.previousSupplier;
           return row.cells[logical] || null;
@@ -449,7 +453,7 @@ export default function MaterialSheet({
   async function suggestRows(draft: SheetRow[]) {
     const requests = new Map<string, { key: string; prefix: string }>();
     for (const row of draft) {
-      const prefix = prefixFor("material", row.cells[14] || ""),
+      const prefix = prefixFor("material", row.cells[14] || "", types),
         key = groupKey(row);
       if (
         !prefix ||
@@ -480,7 +484,7 @@ export default function MaterialSheet({
             !request ||
             r.cells[13] ||
             r.skuTouched ||
-            prefixFor("material", r.cells[14] || "") !== request.prefix
+            prefixFor("material", r.cells[14] || "", types) !== request.prefix
           )
             return r;
           const next = {
@@ -584,7 +588,11 @@ export default function MaterialSheet({
           "El portapapeles no contiene datos de una tabla. Copia las celdas en Excel e intenta de nuevo.",
         );
       const start = { row: selected.r0, col: selected.c0 };
-      const { matrix, mapping } = pasteLayout(parseTSV(text), start.col);
+      const { matrix, mapping } = pasteLayout(
+        parseTSV(text),
+        start.col,
+        types.flatMap((t) => [t.key, t.name]),
+      );
       if (!matrix.length) return;
       if (matrix.length > 500)
         throw Error("Pega como máximo 500 filas por lote.");
@@ -602,7 +610,7 @@ export default function MaterialSheet({
             (col < 13 && manualColumns.includes(col)) ||
             ([10, 11].includes(col) && (legacyImport || hasHistorical))
           ) {
-            row.cells[col] = text;
+            row.cells[col] = col === 14 ? materialTypeKey(text, types) : text;
             row.dirty = true;
             row.duplicateChoice = undefined;
             if (col === 7 && /^(USD|\$)/i.test(text.trim()))
@@ -623,7 +631,7 @@ export default function MaterialSheet({
         line.forEach((text, ci) => {
           const col = mapping[ci];
           if (col < 13) return;
-          row.cells[col] = text;
+          row.cells[col] = col === 14 ? materialTypeKey(text, types) : text;
           row.metadataEdited = true;
           row.dirty = true;
           if (col === 13 && (text.trim() || row.id)) row.skuTouched = true;
@@ -681,7 +689,12 @@ export default function MaterialSheet({
       .map((r) =>
         displayColumns
           .slice(selected.c0, selected.c1 + 1)
-          .map((_, i) => value(r, selected.c0 + i).replace(/ \*$/, "")),
+          .map((_, i) =>
+            (visualOrder[selected.c0 + i] === 14
+              ? materialTypeName(r.cells[14], types)
+              : value(r, selected.c0 + i)
+            ).replace(/ \*$/, ""),
+          ),
       );
     if (!matrix.length) return;
     e.preventDefault();
@@ -689,7 +702,13 @@ export default function MaterialSheet({
   }
   function key(e: KeyboardEvent) {
     if (e.target instanceof Element && e.target.closest("button")) return;
-    if ((e.target instanceof HTMLSelectElement || (e.target instanceof HTMLInputElement && e.target.dataset.searchSelect)) && e.key !== "Tab") return;
+    if (
+      (e.target instanceof HTMLSelectElement ||
+        (e.target instanceof HTMLInputElement &&
+          e.target.dataset.searchSelect)) &&
+      e.key !== "Tab"
+    )
+      return;
     const arrows: Record<string, Point> = {
       ArrowUp: { row: -1, col: 0 },
       ArrowDown: { row: 1, col: 0 },
@@ -777,7 +796,7 @@ export default function MaterialSheet({
   }
   const rowLimitError = dirty.length > 500;
   const validate = (r: SheetRow) => [
-    ...validateRow(r, units, suppliers, materials),
+    ...validateRow(r, units, suppliers, materials, typeKeys),
     ...identityErrors(r, rows, materials, products, origins),
   ];
   const errors = dirty.flatMap((r) =>
@@ -913,7 +932,12 @@ export default function MaterialSheet({
           ...viewRows
             .filter(visibleRow)
             .map((r) =>
-              displayColumns.map((_, c) => value(r, c).replace(/ \*$/, "")),
+              displayColumns.map((_, c) =>
+                (visualOrder[c] === 14
+                  ? materialTypeName(r.cells[14], types)
+                  : value(r, c)
+                ).replace(/ \*$/, ""),
+              ),
             ),
         ]),
       );
@@ -947,8 +971,10 @@ export default function MaterialSheet({
     return col === 14 ? (
       <>
         <option value="">Pendiente de clasificar</option>
-        {classifications.map((c) => (
-          <option key={c}>{c}</option>
+        {types.map((c) => (
+          <option key={c.key} value={c.key}>
+            {c.name}
+          </option>
         ))}
       </>
     ) : (
@@ -1368,7 +1394,9 @@ export default function MaterialSheet({
                                   }
                                 />
                               ) : (
-                                shown || "—"
+                                (visualOrder[ci] === 14
+                                  ? materialTypeName(shown, types)
+                                  : shown) || "—"
                               )}
                             </span>
                           )}

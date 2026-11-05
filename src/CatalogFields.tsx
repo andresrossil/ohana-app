@@ -1,8 +1,8 @@
+import { useMaterialTypes } from "./MaterialTypesContext";
 import SearchSelect from "./SearchSelect";
 import { AppButton, AppIcon } from "./AppIcon";
 import { useEffect, useRef, useState } from "react";
 import { supabase as db } from "./client";
-import { classifications } from "./sheet-model";
 import type { CatalogRow } from "./sheet-model";
 import { linkedBarcode, prefixFor } from "./catalog-model";
 
@@ -28,6 +28,7 @@ export default function CatalogFields({
     requests: { key: string; prefix: string }[],
   ) => Promise<{ key: string; sku: string }[]>;
 }) {
+  const types = useMaterialTypes();
   const [sku, setSku] = useState(item?.sku || ""),
     [barcode, setBarcode] = useState(item?.barcode || ""),
     [custom, setCustom] = useState(!!item?.barcode_custom),
@@ -44,7 +45,7 @@ export default function CatalogFields({
     if (!customRef.current) setBarcode(linkedBarcode(v, "", false));
   }
   async function suggest(value = classification) {
-    const prefix = prefixFor(kind, value);
+    const prefix = prefixFor(kind, value, types);
     if (!prefix) {
       setError("Elige una clasificación para sugerir un SKU.");
       return;
@@ -100,8 +101,10 @@ export default function CatalogFields({
             }}
           >
             <option value="">Pendiente de clasificar</option>
-            {classifications.map((c) => (
-              <option key={c}>{c}</option>
+            {types.map((c) => (
+              <option key={c.key} value={c.key}>
+                {c.name}
+              </option>
             ))}
           </SearchSelect>
         </label>

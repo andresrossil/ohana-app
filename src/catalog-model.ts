@@ -1,3 +1,7 @@
+import {
+  defaultMaterialTypes,
+  type MaterialType,
+} from "./material-types-model";
 import { normalize } from "./sheet-model.ts";
 import type { CatalogRow } from "./sheet-model";
 export function matchesCatalog(row: CatalogRow, query: string) {
@@ -8,14 +12,11 @@ export function matchesCatalog(row: CatalogRow, query: string) {
 export function prefixFor(
   kind: "material" | "product",
   classification: string,
+  types: MaterialType[] = defaultMaterialTypes,
 ) {
   return kind === "product"
     ? "P"
-    : classification === "Materia prima" || classification === "Insumos"
-      ? "M"
-      : classification === "Material de empaque"
-        ? "E"
-        : null;
+    : types.find((t) => t.key === classification)?.prefix || null;
 }
 export function linkedBarcode(sku: string, barcode: string, custom: boolean) {
   return custom ? barcode : /^[\x20-\x7E]*$/.test(sku) ? sku : "";

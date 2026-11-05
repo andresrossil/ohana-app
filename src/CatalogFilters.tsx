@@ -1,6 +1,6 @@
+import { useMaterialTypes } from "./MaterialTypesContext";
 import SearchSelect from "./SearchSelect";
 import { AppIcon } from "./AppIcon";
-import { classifications } from "./sheet-model";
 import type { CatalogRow } from "./sheet-model";
 export function classificationMatches(
   value: string | null | undefined,
@@ -27,6 +27,7 @@ export default function CatalogFilters({
   onOrigin: (value: string) => void;
   origins: CatalogRow[];
 }) {
+  const types = useMaterialTypes();
   return (
     <div className="catalog-filters">
       {onClassification && (
@@ -39,8 +40,10 @@ export default function CatalogFilters({
             onChange={(e) => onClassification(e.target.value)}
           >
             <option value="">Todas las clasificaciones</option>
-            {classifications.map((c) => (
-              <option key={c}>{c}</option>
+            {types.map((c) => (
+              <option key={c.key} value={c.key}>
+                {c.name}
+              </option>
             ))}
             <option value="pending">Pendientes de clasificar</option>
           </SearchSelect>

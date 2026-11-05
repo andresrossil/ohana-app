@@ -142,7 +142,11 @@ const headerKey = (s: string) =>
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/[ ._]/g, "");
-export function pasteLayout(matrix: string[][], start = 0) {
+export function pasteLayout(
+  matrix: string[][],
+  start = 0,
+  typeKeys: string[] = classifications,
+) {
   const keys = matrix[0]?.map(headerKey) || [];
   const aliases = new Map(columns.map((c, i) => [headerKey(c), i]));
   aliases.set("mp", 2);
@@ -168,7 +172,7 @@ export function pasteLayout(matrix: string[][], start = 0) {
   const legacy =
     start === 0 &&
     width === 13 &&
-    !matrix.some((r) => classifications.includes(r[1])) &&
+    !matrix.some((r) => typeKeys.includes(r[1])) &&
     matrix.some((r) => parseNumber(r[4] || "") !== null);
   const mapping = legacy
     ? Array.from({ length: 13 }, (_, i) => i)
@@ -200,6 +204,7 @@ export function validateRow(
   units: CatalogRow[],
   suppliers: CatalogRow[],
   materials: CatalogRow[],
+  typeKeys: string[] = classifications,
 ) {
   const c = row.cells,
     errors: string[] = [];
@@ -240,9 +245,9 @@ export function validateRow(
       (parseNumber(row.importedPrevious) as number) < 0)
   )
     errors.push("PRECIO ANTERIOR inválido");
-  if (c[14] && !classifications.includes(c[14]))
+  if (c[14] && !typeKeys.includes(c[14]))
     errors.push(
-      "CLASIFICACIÓN: elige Materia prima, Material de empaque o Insumos",
+      "TIPO DE MATERIAL: elige una opción configurada para esta empresa",
     );
   if ((c[13] || "").length > 80) errors.push("SKU: máximo 80 caracteres");
   if (c[16] && (!/^[\x20-\x7E]+$/.test(c[16]) || c[16].length > 80))
