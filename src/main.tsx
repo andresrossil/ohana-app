@@ -1,3 +1,4 @@
+import MoneyInput from "./MoneyInput";
 import { MaterialTypesProvider, MaterialTypeLabel } from "./MaterialTypesContext";
 const MaterialTypeSettings = lazy(() => import("./MaterialTypeSettings"));
 import { MarginProvider } from "./MarginBadge";
@@ -71,6 +72,7 @@ const money = (n: number, c = "GTQ") =>
     maximumFractionDigits: 4,
   }).format(n);
 function App() {
+  const [quoteCurrency,setQuoteCurrency]=useState("GTQ");
   const protection = useNavigationProtection();
   const [pendingNavigation, setPendingNavigation] = useState<Section | null>(
     null,
@@ -1646,7 +1648,7 @@ function App() {
                 <form onSubmit={addPrice}>
                   <label>
                     Precio por presentación
-                    <input
+                    <MoneyInput currency={quoteCurrency}
                       name="amount"
                       type="number"
                       min="0"
@@ -1656,7 +1658,7 @@ function App() {
                   </label>
                   <label>
                     Moneda
-                    <SearchSelect name="currency" defaultValue="GTQ">
+                    <SearchSelect name="currency" value={quoteCurrency} onChange={e=>setQuoteCurrency(e.target.value)}>
                       <option>GTQ</option>
                       <option>USD</option>
                     </SearchSelect>

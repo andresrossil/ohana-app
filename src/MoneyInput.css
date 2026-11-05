@@ -1,0 +1,15 @@
+.money-input {
+  display: inline-block;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  vertical-align: middle;
+}
+.money-input > input:not([type="hidden"]) {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+.money-input > input[type="hidden"] {
+  display: none !important;
+}

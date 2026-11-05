@@ -4,13 +4,13 @@ import { useEffect, useRef, useState } from "react";
 import { AppButton, AppIcon } from "./AppIcon";
 import { confirmAction } from "./ConfirmDialog";
 import ResponsiveTable from "./ResponsiveTable";
-import DecimalInput from "./DecimalInput";
+import MoneyInput from "./MoneyInput";
 import { SearchField } from "./PoolControls";
 import { request } from "./commerce";
 import { money, useOperation, type Row } from "./operations";
 import { parseNumber } from "./sheet-model";
 import { weightRangeLabel } from "./variant-weights";
-import { pricesChanged } from "./price-events";
+import { pricesChanged, usePriceRefresh } from "./price-events";
 import VariantManager from "./VariantManager";
 import "./additional-costs.css";
 import { priceCost } from "./price-cost";
@@ -79,6 +79,7 @@ export default function PriceLists({
         : next.lists.find((l: Row) => l.is_base)?.id || next.lists[0]?.id || "",
     );
   }
+  usePriceRefresh(company,()=>{load().catch(e=>state.setError(e.message));});
   useEffect(() => {
     state.run(load);
     return () => {
@@ -591,7 +592,8 @@ export default function PriceLists({
                       </td>
                       <td>
                         {v ? (
-                          <DecimalInput
+                          <MoneyInput
+                            currency={data.currency}
                             aria-label={"Precio de " + v.name}
                             type="number"
                             min="0"
@@ -620,6 +622,24 @@ export default function PriceLists({
                         {estimate.cost == null
                           ? "Pendiente"
                           : money(estimate.cost, data.currency)}
+                        {estimate.manufacturingCost != null && (
+                          <small>
+                            Fabricación:{" "}
+                            {money(estimate.manufacturingCost, data.currency)} ·{" "}
+                            {money(estimate.costPerGram, data.currency)} / g ·
+                            peso promedio{" "}
+                            {Number(estimate.midpoint).toLocaleString("es-GT", {
+                              maximumFractionDigits: 2,
+                            })}{" "}
+                            g
+                          </small>
+                        )}
+                        {estimate.expenses != null && (
+                          <small>
+                            Gastos por unidad:{" "}
+                            {money(estimate.expenses, data.currency)}
+                          </small>
+                        )}
                         <small>{estimate.reason || estimate.source}</small>
                       </td>
                       <td
@@ -641,9 +661,11 @@ export default function PriceLists({
                           <>
                             <small>
                               Margen / venta:{" "}
-                              {price != null && price > 0
-                                ? <MarginBadge value={margin / price * 100} />
-                                : "Pendiente"}
+                              {price != null && price > 0 ? (
+                                <MarginBadge value={(margin / price) * 100} />
+                              ) : (
+                                "Pendiente"
+                              )}
                             </small>
                             <small>
                               Recargo / costo:{" "}

@@ -1,3 +1,4 @@
+import { priceCost } from "./price-cost";
 import ResponsiveTable from "./ResponsiveTable";
 import { confirmAction } from "./ConfirmDialog";
 import CatalogBadge from "./CatalogBadge";
@@ -25,15 +26,25 @@ export default function VariantManager({
     [edit, setEdit] = useState<Row | null | undefined>(),
     [barcode, setBarcode] = useState<Row | null>(null),
     [baseName, setBaseName] = useState("");
+  const [costData, setCostData] = useState<Row>({
+    catalog: null,
+    formulas: [],
+  });
   const [sheet, setSheet] = useState<"edit" | "import" | null>(null);
   const [sheetDirty, setSheetDirty] = useState(false);
   const state = useOperation(company, "catalog");
   async function load() {
-    const [variants, base] = await Promise.all([
+    const [variants, base, catalog, formulas] = await Promise.all([
       operation(company, "variants", { product: product.id }),
       request("base_price_list", { p_company: company }),
+      request("formula_catalog", { p_company: company }).catch(() => null),
+      request("formula_command", {
+        p_company: company,
+        p_action: "list",
+      }).catch(() => []),
     ]);
     setRows(variants);
+    setCostData({ catalog, formulas });
     setBaseName(base?.name || "");
   }
   useEffect(() => {
@@ -306,6 +317,7 @@ export default function VariantManager({
                   <th className="base-price-heading">
                     {baseName ? "PRECIO · " + baseName : "PRECIO DE LISTA BASE"}
                   </th>
+                  <th>Costo estimado por variante</th>
                   <th>Disponible / curación</th>
                   <th>Acciones</th>
                 </tr>
@@ -331,6 +343,9 @@ export default function VariantManager({
                       {r.price == null
                         ? "Pendiente de precio"
                         : money(r.price, r.currency)}
+                    </td>
+                    <td>
+                      <VariantEstimate variant={r} data={costData} />
                     </td>
                     <td>
                       {r.available} / {r.blocked}
@@ -366,5 +381,46 @@ export default function VariantManager({
         )}
       </section>
     </div>
+  );
+}
+
+function VariantEstimate({ variant, data }: { variant: Row; data: Row }) {
+  if (!data.catalog)
+    return (
+      <>
+        Pendiente<small>Sin información de fórmula o permiso de costos.</small>
+      </>
+    );
+  const estimate = priceCost(variant, data.formulas, data.catalog, variant);
+  return (
+    <>
+      <strong>
+        {estimate.manufacturingCost == null
+          ? estimate.cost == null
+            ? "Pendiente"
+            : money(estimate.cost, variant.currency)
+          : money(estimate.manufacturingCost, variant.currency)}
+      </strong>
+      {estimate.costPerGram != null && (
+        <small>
+          {Number(estimate.midpoint).toLocaleString("es-GT", {
+            maximumFractionDigits: 2,
+          })}{" "}
+          g × {money(estimate.costPerGram, variant.currency)} / g
+        </small>
+      )}
+      {estimate.packagingUnit != null && <small>Empaque por unidad: {money(estimate.packagingUnit,variant.currency)} · Insumos por unidad: {money(estimate.suppliesUnit,variant.currency)}</small>}
+      {estimate.manufacturingCost != null && (
+        <small>
+          Costo total con gastos: {money(estimate.cost, variant.currency)}
+        </small>
+      )}
+      {estimate.expenses != null && (
+        <small>
+          Gastos por unidad: {money(estimate.expenses, variant.currency)}
+        </small>
+      )}
+      <small>{estimate.reason}</small>
+    </>
   );
 }

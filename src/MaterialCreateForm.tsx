@@ -1,3 +1,5 @@
+import { pricesChanged } from "./price-events";
+import MoneyInput from "./MoneyInput";
 import { useMaterialTypes } from "./MaterialTypesContext";
 import SearchSelect, { SortedDatalist } from "./SearchSelect";
 import { useEffect, useRef, useState } from "react";
@@ -95,27 +97,45 @@ export default function MaterialCreateForm({
     label: string,
     type = "text",
     required = false,
-  ) => (
-    <label>
-      {label}
-      <input
-        name={"material_cell_" + index}
-        value={row.cells[index]}
-        type={type}
-        required={required}
-        maxLength={type === "text" ? (index === 6 ? 2000 : 160) : undefined}
-        min={type === "number" ? (index === 4 ? "0.00000001" : "0") : undefined}
-        step={
-          type === "number"
-            ? index === 4
-              ? "0.00000001"
-              : "0.0001"
-            : undefined
-        }
-        onChange={(e) => cell(index, e.target.value)}
-      />
-    </label>
-  );
+  ) => {
+    if ([7, 10].includes(index))
+      return (
+        <label>
+          {label}
+          <MoneyInput
+            currency={currency}
+            name={"material_cell_" + index}
+            value={row.cells[index]}
+            min="0"
+            required={required}
+            onChange={(e) => cell(index, e.target.value)}
+          />
+        </label>
+      );
+    return (
+      <label>
+        {label}
+        <input
+          name={"material_cell_" + index}
+          value={row.cells[index]}
+          type={type}
+          required={required}
+          maxLength={type === "text" ? (index === 6 ? 2000 : 160) : undefined}
+          min={
+            type === "number" ? (index === 4 ? "0.00000001" : "0") : undefined
+          }
+          step={
+            type === "number"
+              ? index === 4
+                ? "0.00000001"
+                : "0.0001"
+              : undefined
+          }
+          onChange={(e) => cell(index, e.target.value)}
+        />
+      </label>
+    );
+  };
   async function save(form: HTMLFormElement) {
     if (saved || state.busy || !state.canWrite) return;
     const data = new FormData(form),
@@ -196,6 +216,7 @@ export default function MaterialCreateForm({
       onDirty(false);
       try {
         await onSaved();
+        pricesChanged(company);
         onClose();
       } catch {
         state.setNotice(

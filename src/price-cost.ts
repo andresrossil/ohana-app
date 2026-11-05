@@ -1,9 +1,10 @@
+import { estimatedWeightCost } from "./estimated-weight-cost.ts";
 import {
   recipeMath,
   estimatedUnitCost,
   type RecipeLine,
-} from "./formula-model";
-import { additionalCosts } from "./additional-costs";
+} from "./formula-model.ts";
+import { additionalCosts } from "./additional-costs.ts";
 import type { Row } from "./operations";
 
 export function priceCost(
@@ -11,12 +12,14 @@ export function priceCost(
   formulas: Row[],
   catalog: Row,
   saleReference?: Row,
-) {
+): Row {
+  const hasRange = variant.weight_min != null && variant.weight_max != null;
   const candidates = formulas.filter(
     (f) =>
       f.product_id === variant.product_id &&
       (f.estimate_variant_id === variant.id ||
-        f.production_mode === "variable_weight") &&
+        f.production_mode === "variable_weight" ||
+        hasRange) &&
       ["current", "testing"].includes(f.state),
   );
   const current = candidates.filter((f) => f.state === "current");
@@ -40,11 +43,12 @@ export function formulaCost(
   catalog: Row,
   saleReference?: Row,
   weightVariant?: Row,
-) {
+): Row {
   const source = `${formula.code} · v${formula.version}${formula.state === "testing" ? " · En pruebas" : ""}`;
   if (
     !(Number(formula.estimated_units) > 0) &&
-    formula.production_mode !== "variable_weight"
+    formula.production_mode !== "variable_weight" &&
+    weightVariant?.weight_min == null
   )
     return { cost: null, reason: "Unidades estimadas pendientes", source };
   const lines: RecipeLine[] = (formula.ingredients || []).map((i: Row) => ({
@@ -74,39 +78,17 @@ export function formulaCost(
   );
   if (math.totalCost == null || math.errors.length)
     return { cost: null, reason: "Costo de materiales incompleto", source };
-  if (formula.production_mode === "variable_weight") {
-    if (
-      !weightVariant ||
-      !(Number(weightVariant.weight_min) > 0) ||
-      !(Number(weightVariant.weight_max) > Number(weightVariant.weight_min))
-    )
-      return { cost: null, reason: "Según pesos y variantes del lote", source };
-    if (math.massPartial || !(math.theoreticalGrams > 0))
-      return {
-        cost: null,
-        reason: "Peso teórico incompleto para estimar",
-        source,
-      };
-    const perUnit = math.rows
-      .filter(
-        (r) =>
-          r.line_kind === "packaging" ||
-          (r.line_kind === "auxiliary" && r.quantity_basis === "unit"),
-      )
-      .reduce((s, r) => s + (r.cost ?? 0), 0);
-    if (perUnit > 0 && !(Number(formula.estimated_units) > 0))
-      return {
-        cost: null,
-        reason: "Unidades estimadas pendientes para empaque",
-        source,
-      };
+  if (
+    formula.production_mode === "variable_weight" ||
+    weightVariant?.weight_min != null
+  ) {
     const fixedLines = (formula.overhead_lines || []).filter(
-      (l: Row) =>
-        catalog.additional_costs?.find((c: Row) => c.id === l.cost_id)?.kind ===
-        "overhead",
+      (line: Row) =>
+        catalog.additional_costs?.find((item: Row) => item.id === line.cost_id)
+          ?.kind === "overhead",
     );
-    const percentageLines = (formula.overhead_lines || []).filter(
-      (l: Row) => !fixedLines.includes(l),
+    const commercialLines = (formula.overhead_lines || []).filter(
+      (line: Row) => !fixedLines.includes(line),
     );
     const fixed = additionalCosts(
       catalog.additional_costs || [],
@@ -124,23 +106,49 @@ export function formulaCost(
       saleReference,
       "",
       "",
-      percentageLines,
+      commercialLines,
     );
-    if (fixed.additional_total == null || commercial.additional_total == null)
-      return { cost: null, reason: "Costos adicionales pendientes", source };
-    const midpoint =
-      (Number(weightVariant.weight_min) + Number(weightVariant.weight_max)) / 2;
+    const packagingTotal = math.rows
+      .filter((row) => row.line_kind === "packaging")
+      .reduce((sum, row) => sum + (row.cost ?? 0), 0);
+    const suppliesTotal = math.rows
+      .filter(
+        (row) => row.line_kind === "auxiliary" && row.quantity_basis === "unit",
+      )
+      .reduce((sum, row) => sum + (row.cost ?? 0), 0);
+    const units = Number(formula.estimated_units),
+      validUnits = Number.isFinite(units) && units > 0;
+    const perUnit = (amount: number) =>
+      amount === 0 ? 0 : validUnits ? amount / units : null;
+    const commonMaterials = math.totalCost - packagingTotal - suppliesTotal;
+    const estimate = estimatedWeightCost(
+      commonMaterials,
+      formula.estimated_final_weight_g,
+      weightVariant?.weight_min,
+      weightVariant?.weight_max,
+      perUnit(packagingTotal),
+      perUnit(suppliesTotal),
+    );
+    const overheadUnit = fixedLines.length ? fixed.additional_unit : 0;
+    const expenses =
+      overheadUnit != null && commercial.additional_total != null
+        ? overheadUnit + commercial.additional_total
+        : null;
     const cost =
-      ((math.totalCost - perUnit + fixed.additional_total) * midpoint) /
-        math.theoreticalGrams +
-      (Number(formula.estimated_units) > 0
-        ? perUnit / Number(formula.estimated_units)
-        : 0) +
-      commercial.additional_total;
+      estimate.manufacturingCost != null && expenses != null
+        ? estimate.manufacturingCost + expenses
+        : null;
     return {
+      ...estimate,
+      commonMaterials,
       cost,
-      reason: "Aprox. por peso medio; confirmar con pesos reales",
+      expenses,
       source,
+      reason:
+        estimate.reason ||
+        (expenses == null
+          ? "Gastos pendientes de precio o unidades"
+          : "Estimado por peso promedio; gastos separados"),
     };
   }
   const extra = additionalCosts(
@@ -158,5 +166,14 @@ export function formulaCost(
     math.totalCost + extra.additional_total,
     formula.estimated_units,
   );
-  return { cost, reason: cost == null ? "Costo pendiente" : "", source };
+  return {
+    cost,
+    manufacturingCost: estimatedUnitCost(
+      math.totalCost,
+      formula.estimated_units,
+    ),
+    expenses: extra.additional_unit,
+    reason: cost == null ? "Costo pendiente" : "",
+    source,
+  };
 }

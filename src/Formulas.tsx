@@ -13,7 +13,7 @@ import DecimalInput from "./DecimalInput";
 import { useEffect, useRef, useState } from "react";
 import { AppButton, AppIcon } from "./AppIcon";
 import { request } from "./commerce";
-import { usePriceRefresh } from "./price-events";
+import { usePriceRefresh, pricesChanged } from "./price-events";
 import { formulaCost } from "./price-cost";
 import { keyedRequest, money, useOperation, type Row } from "./operations";
 import { recipeMath, roundQuantity, type RecipeLine } from "./formula-model";
@@ -73,6 +73,7 @@ const initial = (): Row => ({
   estimate_unit_id: "",
   estimate_variant_id: "",
   quantity_per_unit: "",
+  estimated_final_weight_g: "",
   labor_level_id: "",
   advertising_level_id: "",
   overhead_lines: [],
@@ -380,11 +381,26 @@ export default function Formulas({
         setDirty(false);
         state.setNotice("Notas administrativas guardadas.");
         await load();
+        pricesChanged(company);
       });
       return;
     }
     if (!draft.product) {
       state.setError("Selecciona un producto de la lista por nombre o SKU.");
+      return;
+    }
+    if (
+      draft.estimated_final_weight_g !== "" &&
+      draft.estimated_final_weight_g != null &&
+      !(
+        Number.isFinite(Number(draft.estimated_final_weight_g)) &&
+        Number(draft.estimated_final_weight_g) > 0 &&
+        Number(draft.estimated_final_weight_g) < 1e12
+      )
+    ) {
+      state.setError(
+        "Indica un rendimiento final estimado mayor que cero o déjalo pendiente.",
+      );
       return;
     }
     const expenses: Row[] = draft.overhead_lines || [];
@@ -453,6 +469,7 @@ export default function Formulas({
           : `Fórmula guardada · versión ${result.version}`,
       );
       await load();
+      pricesChanged(company);
     });
   }
   async function changeState(f: Row, next: string) {
@@ -471,6 +488,7 @@ export default function Formulas({
       );
       state.setNotice("Estado actualizado.");
       await load();
+      pricesChanged(company);
     });
   }
   function rowsTable(kind: RecipeLine["line_kind"]) {
@@ -1049,6 +1067,12 @@ export default function Formulas({
                           ? "Según peso real"
                           : "Pendiente"
                         : money(estimate.cost, catalog.currency)}
+                      {estimate.costPerGram != null && (
+                        <small>
+                          {money(estimate.costPerGram, catalog.currency)} / g ·
+                          fabricación
+                        </small>
+                      )}
                       {estimate.reason && <small>{estimate.reason}</small>}
                     </td>
                     <td
@@ -1475,6 +1499,56 @@ export default function Formulas({
                       />
                     </label>
                   </>
+                )}
+                <label>
+                  Rendimiento final estimado del lote (g)
+                  <DecimalInput
+                    type="number"
+                    min="0.00000001"
+                    max="999999999999"
+                    step="any"
+                    value={draft.estimated_final_weight_g ?? ""}
+                    onChange={(e) =>
+                      field("estimated_final_weight_g", e.target.value)
+                    }
+                  />
+                  <small>
+                    Peso final esperado de producto terminado para esta receta.
+                    No se infiere del peso inicial de ingredientes.
+                  </small>
+                </label>
+                {draft.production_mode === "variable_weight" && (
+                  <label>
+                    Costo estimado de fabricación por gramo
+                    <input
+                      readOnly
+                      value={
+                        math.totalCost != null &&
+                        math.packagingCost != null &&
+                        Number(draft.estimated_final_weight_g) > 0
+                          ? money(
+                              (math.totalCost -
+                                math.packagingCost -
+                                math.rows
+                                  .filter(
+                                    (r) =>
+                                      r.line_kind === "auxiliary" &&
+                                      r.quantity_basis === "unit",
+                                  )
+                                  .reduce((sum, r) => sum + (r.cost ?? 0), 0)) /
+                                Number(draft.estimated_final_weight_g),
+                              catalog.currency,
+                            ) + " / g"
+                          : "Pendiente de rendimiento o costos"
+                      }
+                    />
+                    <small>
+                      Solo materias primas e insumos compartidos repartidos por
+                      peso. Empaque e insumos por unidad se suman después; Otros
+                      gastos, Mano de obra y Publicidad se descuentan aparte
+                      para obtener la utilidad antes de impuestos.
+                    </small>
+                  </label>
                 )}
                 <label>
                   Peso teórico de ingredientes

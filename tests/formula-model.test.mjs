@@ -230,3 +230,32 @@ test("estimated unit cost stays optional and stable when scaling the same recipe
   assert.equal(estimatedUnitCost(27, 0), null);
   assert.equal(estimatedUnitCost(27, 10, 0), null);
 });
+
+// Weight estimates use final output, with packaging and unit supplies kept outside the gram rate.
+import { estimatedWeightCost } from '../src/estimated-weight-cost.ts';
+import { formulaCost } from '../src/price-cost.ts';
+test('weight variant estimates use final yield and retain per-unit packaging', () => {
+  const expected = [12.75,14.25,15.75,17.25];
+  for (let i=0;i<4;i++) assert.equal(estimatedWeightCost(150,1000,80+i*10,90+i*10).manufacturingCost,expected[i]);
+  assert.equal(estimatedWeightCost(150,1000,80,90,2,1).manufacturingCost,15.75);
+  assert.equal(estimatedWeightCost(150,1000,90,100,2,1).manufacturingCost,17.25);
+  assert.equal(estimatedWeightCost(150,null,80,90).manufacturingCost,null);
+  assert.equal(estimatedWeightCost(null,1000,80,90).manufacturingCost,null);
+  assert.equal(estimatedWeightCost(150,0,80,90).manufacturingCost,null);
+  assert.equal(estimatedWeightCost(150,1000,90,80).manufacturingCost,null);
+  assert.equal(estimatedWeightCost(0,1000,80,90).manufacturingCost,0);
+});
+test('formula costs keep overhead and percentage expenses separate without doubling them', () => {
+ const catalog={currency:'GTQ',units,materials:[{id:'raw',name:'Raw',unit_id:'g',unit_cost:.15},{id:'pack',name:'Pack',unit_id:'ud',unit_cost:2},{id:'supply',name:'Supply',unit_id:'ud',unit_cost:1}],additional_costs:[{id:'overhead',name:'Gas',kind:'overhead',unit_price:.5,currency:'GTQ'},{id:'labor',kind:'labor',percent:5},{id:'advertising',kind:'advertising',percent:3}]};
+ const formula={code:'F000001',version:1,production_mode:'variable_weight',capture_mode:'quantity',estimated_units:10,estimated_final_weight_g:1000,ingredients:[{id:'i',material_id:'raw',unit_id:'g',quantity:1000,line_kind:'ingredient'},{id:'p',material_id:'pack',unit_id:'ud',quantity:10,line_kind:'packaging'},{id:'a',material_id:'supply',unit_id:'ud',quantity:1,line_kind:'auxiliary',quantity_basis:'unit'}],overhead_lines:[{cost_id:'overhead',quantity:1},{cost_id:'labor',quantity:1},{cost_id:'advertising',quantity:1}]};
+ const variant={id:'v',weight_min:80,weight_max:90,price:50,currency:'GTQ'};
+ const result=formulaCost(formula,catalog,variant,variant);
+ assert.equal(result.costPerGram,.15);
+ assert.equal(result.manufacturingCost,15.75);
+ assert.equal(result.expenses,4.5);
+ assert.equal(result.cost,20.25);
+ assert.equal(formulaCost({...formula,estimated_final_weight_g:null},catalog,variant,variant).cost,null);
+ assert.equal(formulaCost({...formula,estimated_final_weight_g:1200},catalog,variant,variant).costPerGram,.125);
+ const changed={...catalog,materials:catalog.materials.map(m=>m.id==='raw'?{...m,unit_cost:.3}:m)};
+ assert.equal(formulaCost(formula,changed,variant,variant).costPerGram,.3);
+});

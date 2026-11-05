@@ -228,6 +228,12 @@ export default function BatchTrace({
                                   </td>
                                   <td>
                                     {money(u.commercial_cost, u.currency)}
+                                    {u.overhead_cost !== undefined && (
+                                      <small>
+                                        Otros gastos:{" "}
+                                        {money(u.overhead_cost, u.currency)}
+                                      </small>
+                                    )}
                                   </td>
                                   <td>{money(u.total_cost, u.currency)}</td>
                                   <td>

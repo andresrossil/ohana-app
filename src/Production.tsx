@@ -218,9 +218,7 @@ function ProductionBatches({
       )
       .reduce((sum, r) => sum + (r.cost ?? 0), 0) ?? 0;
   const commonPreview =
-    baseMath?.totalCost != null && fixedPreview.additional_total != null
-      ? baseMath.totalCost - perUnitPreview + fixedPreview.additional_total
-      : null;
+    baseMath?.totalCost != null ? baseMath.totalCost - perUnitPreview : null;
   const summaryQuote = (() => {
     if (!variableWeight || mode !== "finish" || producedUnits <= 0)
       return { ...extraQuote, variable_weight: variableWeight };
@@ -686,13 +684,8 @@ function ProductionBatches({
                         0,
                       );
                       const manufacturing =
-                        baseMath?.totalCost != null &&
-                        fixed.additional_total != null &&
-                        totalWeight > 0
-                          ? ((baseMath.totalCost -
-                              perUnitCost +
-                              fixed.additional_total) *
-                              w) /
+                        baseMath?.totalCost != null && totalWeight > 0
+                          ? ((baseMath.totalCost - perUnitCost) * w) /
                               totalWeight +
                             assigned
                           : null;
@@ -715,12 +708,19 @@ function ProductionBatches({
                       );
                       const total =
                         manufacturing != null &&
-                        commercial.additional_total != null
-                          ? manufacturing + commercial.additional_total
+                        commercial.additional_total != null &&
+                        fixed.additional_total != null
+                          ? manufacturing +
+                            commercial.additional_total +
+                            fixed.additional_total / n
                           : null;
                       return {
                         manufacturing_cost: manufacturing,
                         commercial_cost: commercial.additional_total,
+                        overhead_cost:
+                          fixed.additional_total == null
+                            ? null
+                            : fixed.additional_total / n,
                         total_cost: total,
                         sale_price: ref?.price ?? null,
                         margin:

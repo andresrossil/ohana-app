@@ -1,3 +1,5 @@
+import { pricesChanged } from "./price-events";
+import MoneyInput from "./MoneyInput";
 import SearchSelect from "./SearchSelect";
 import { useEffect, useState } from "react";
 import { AppButton, AppIcon } from "./AppIcon";
@@ -118,6 +120,7 @@ export default function AdditionalCostSettings({
               setDirty(false);
               state.setNotice("Cambios guardados.");
               await load();
+              pricesChanged(company);
             });
           }}
         >
@@ -150,7 +153,8 @@ export default function AdditionalCostSettings({
                 </label>
                 <label>
                   Precio unitario ({draft.currency})
-                  <input
+                  <MoneyInput
+                    currency={draft.currency}
                     required
                     type="number"
                     min="0"
@@ -278,6 +282,7 @@ export default function AdditionalCostSettings({
                               p_data: { ...x, active: !x.active },
                             });
                             await load();
+                            pricesChanged(company);
                           })
                         }
                       >
@@ -296,6 +301,7 @@ export default function AdditionalCostSettings({
                                 });
                                 state.setNotice("Registro eliminado.");
                                 await load();
+                                pricesChanged(company);
                               });
                           }}
                         >

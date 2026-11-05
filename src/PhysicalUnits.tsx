@@ -139,6 +139,15 @@ export default function PhysicalUnits({
                           u.cost_snapshot.currency,
                         )}
                       </small>
+                      {u.cost_snapshot.overhead_cost !== undefined && (
+                        <small>
+                          Otros gastos:{" "}
+                          {money(
+                            u.cost_snapshot.overhead_cost,
+                            u.cost_snapshot.currency,
+                          )}
+                        </small>
+                      )}
                       <small>
                         {u.cost_snapshot.formula_code} · v
                         {u.cost_snapshot.formula_version}

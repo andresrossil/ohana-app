@@ -35,7 +35,12 @@ export default function CostSummary({
     ["Mano de obra", s.unit(s.groups.labor), s.groups.labor],
     ["Publicidad", s.unit(s.groups.advertising), s.groups.advertising],
     ["Costo total estimado", s.unit(s.totalCost), s.totalCost, "subtotal"],
-    ["Utilidad estimada", s.unit(s.profit), s.profit, "profit"],
+    [
+      "Utilidad estimada antes de impuestos",
+      s.unit(s.profit),
+      s.profit,
+      "profit",
+    ],
     ["Margen estimado sobre venta", s.margin, s.margin, "percent"],
   ];
   return (

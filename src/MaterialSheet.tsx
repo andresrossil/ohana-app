@@ -1,3 +1,6 @@
+import { pricesChanged } from "./price-events";
+import { money } from "./operations";
+import MoneyInput from "./MoneyInput";
 import { useMaterialTypes } from "./MaterialTypesContext";
 import { materialTypeKey, materialTypeName } from "./material-types-model";
 import SearchSelect, { SortedDatalist } from "./SearchSelect";
@@ -428,7 +431,8 @@ export default function MaterialSheet({
           if (logical === 10) return calc.previousDisplay;
           if ([4, 7].includes(logical)) return parseNumber(row.cells[logical]);
           if (logical === 12) return parseDate(row.cells[logical]);
-          if (logical === 14) return materialTypeName(row.cells[logical], types);
+          if (logical === 14)
+            return materialTypeName(row.cells[logical], types);
           if (logical === 11)
             return calc.previousSupplier === "—" ? null : calc.previousSupplier;
           return row.cells[logical] || null;
@@ -904,6 +908,7 @@ export default function MaterialSheet({
       setRows((old) => old.map((r) => ({ ...r, dirty: false })));
       setPreview(false);
       await onSaved();
+      pricesChanged(company);
       if (importing && onComplete) {
         batch.current = null;
         onComplete(dirty.length);
@@ -1349,6 +1354,21 @@ export default function MaterialSheet({
                                 onFocus={() => select({ row: ri, col: ci })}
                                 onChange={(e) => change(ri, ci, e.target.value)}
                               />
+                            ) : [7, 10].includes(visualOrder[ci]) ? (
+                              <MoneyInput
+                                currency={r.currency || currency}
+                                min="0"
+                                data-row={ri}
+                                data-col={ci}
+                                aria-label={"Importe fila " + (ri + 1)}
+                                value={shown}
+                                disabled={busy}
+                                onFocus={() => {
+                                  if (!dragging.current && !moving.current)
+                                    select({ row: ri, col: ci });
+                                }}
+                                onChange={(e) => change(ri, ci, e.target.value)}
+                              />
                             ) : (
                               <input
                                 data-row={ri}
@@ -1394,9 +1414,21 @@ export default function MaterialSheet({
                                   }
                                 />
                               ) : (
-                                (visualOrder[ci] === 14
-                                  ? materialTypeName(shown, types)
-                                  : shown) || "—"
+                                ([7, 8, 10].includes(visualOrder[ci])
+                                  ? money(
+                                      visualOrder[ci] === 8
+                                        ? result(r).current
+                                        : visualOrder[ci] === 10
+                                          ? result(r).previousDisplay
+                                          : parseNumber(shown),
+                                      r.currency,
+                                    ) +
+                                    (visualOrder[ci] === 10 && result(r).unknown
+                                      ? " *"
+                                      : "")
+                                  : visualOrder[ci] === 14
+                                    ? materialTypeName(shown, types)
+                                    : shown) || "—"
                               )}
                             </span>
                           )}
@@ -1565,7 +1597,7 @@ export default function MaterialSheet({
                       {newSupplier ? " · Se creará este proveedor" : ""} ·{" "}
                       {r.cells[4]} {r.cells[5]} ·{" "}
                       {r.cells[7].trim()
-                        ? `${r.currency} ${r.cells[7]}`
+                        ? money(parseNumber(r.cells[7]), r.currency)
                         : "Precio pendiente"}{" "}
                       ·{" "}
                       {parseDate(r.cells[12]) ||
@@ -1579,12 +1611,12 @@ export default function MaterialSheet({
                       </p>
                     ))}
                     <p>
-                      Precio actual: {numeric(calc.current)} · VS:{" "}
+                      Precio actual: {money(calc.current, r.currency)} · VS:{" "}
                       <VsIcon
                         variation={calc.variation}
                         noPrevious={calc.previousDisplay === null}
                       />{" "}
-                      {numeric(calc.variation)}
+                      {money(calc.variation, r.currency)}
                       {calc.unknown
                         ? " · Antecedente sin unidad conocida, no comparable"
                         : ""}

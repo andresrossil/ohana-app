@@ -347,8 +347,16 @@ export default function VariantWeightCapture({
                       {cost && (
                         <small>
                           Fabricación:{" "}
-                          {money(cost.manufacturing_cost, currency)} ·
-                          Comerciales: {money(cost.commercial_cost, currency)}
+                          {money(cost.manufacturing_cost, currency)} · Mano de
+                          obra y Publicidad:{" "}
+                          {money(cost.commercial_cost, currency)}
+                          {cost.overhead_cost !== undefined && (
+                            <>
+                              {" "}
+                              · Otros gastos:{" "}
+                              {money(cost.overhead_cost, currency)}
+                            </>
+                          )}
                         </small>
                       )}
                     </td>

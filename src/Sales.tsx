@@ -1,7 +1,7 @@
 import SearchSelect from "./SearchSelect";
 import ResponsiveTable from "./ResponsiveTable";
 import { SaleUnits } from "./PhysicalUnits";
-import DecimalInput from "./DecimalInput";
+import MoneyInput from "./MoneyInput";
 import { SearchField } from "./PoolControls";
 import { AppButton, AppIcon } from "./AppIcon";
 import { useEffect, useState } from "react";
@@ -286,7 +286,8 @@ export default function Sales({
                       </label>
                       <label>
                         Precio realmente vendido · {currency}
-                        <DecimalInput
+                        <MoneyInput
+                          currency={currency}
                           type="number"
                           min="0"
                           step="any"

@@ -1,5 +1,6 @@
-import {useMaterialTypes, MaterialTypeLabel} from "./MaterialTypesContext";
-import {materialTypeName} from "./material-types-model";
+import MoneyInput from "./MoneyInput";
+import { useMaterialTypes, MaterialTypeLabel } from "./MaterialTypesContext";
+import { materialTypeName } from "./material-types-model";
 import SearchSelect from "./SearchSelect";
 import ResponsiveTable from "./ResponsiveTable";
 import PhysicalUnits, { MovementUnits } from "./PhysicalUnits";
@@ -27,7 +28,8 @@ export default function Inventory({
   purchases?: boolean;
   currency?: string;
 }) {
-  const types=useMaterialTypes();
+  const types = useMaterialTypes();
+  const [paymentCurrency, setPaymentCurrency] = useState(currency);
   const state = useOperation(company, "inventory"),
     [data, setData] = useState<Row>({
       balances: [],
@@ -46,6 +48,7 @@ export default function Inventory({
     [adjustItem, setAdjustItem] = useState(""),
     [adjustQuantity, setAdjustQuantity] = useState(""),
     [adjustWeights, setAdjustWeights] = useState("");
+  useEffect(() => setPaymentCurrency(currency), [company, currency, form]);
   async function load() {
     const [d, r, p] = await Promise.all([
       operation(company, "inventory"),
@@ -90,7 +93,7 @@ export default function Inventory({
     ]),
   );
   const balances = data.balances.filter((r: Row) =>
-    [r.name, r.sku, r.barcode, materialTypeName(r.classification,types)]
+    [r.name, r.sku, r.barcode, materialTypeName(r.classification, types)]
       .join(" ")
       .toLowerCase()
       .includes(query.toLowerCase()),
@@ -274,7 +277,8 @@ export default function Inventory({
                   </label>
                   <label>
                     Importe total pagado
-                    <input
+                    <MoneyInput
+                      currency={paymentCurrency}
                       name="amount"
                       type="number"
                       min="0"
@@ -289,7 +293,10 @@ export default function Inventory({
                       required
                       pattern="[A-Z]{3}"
                       maxLength={3}
-                      defaultValue={currency}
+                      value={paymentCurrency}
+                      onChange={(e) =>
+                        setPaymentCurrency(e.target.value.toUpperCase())
+                      }
                     />
                   </label>
                   <label>
@@ -413,7 +420,13 @@ export default function Inventory({
                   )}
                   <label>
                     Costo por unidad base ({currency}, opcional)
-                    <input name="unit_cost" type="number" min="0" step="any" />
+                    <MoneyInput
+                      currency={currency}
+                      name="unit_cost"
+                      type="number"
+                      min="0"
+                      step="any"
+                    />
                     <small>
                       Solo aplica a entradas. Si no se conoce, el costo queda
                       pendiente.
@@ -510,7 +523,11 @@ export default function Inventory({
                         {r.name}
                         <small>
                           {r.sku || "Sin SKU"} ·{" "}
-                          {r.classification ? <MaterialTypeLabel typeKey={r.classification}/> : "Producto"}
+                          {r.classification ? (
+                            <MaterialTypeLabel typeKey={r.classification} />
+                          ) : (
+                            "Producto"
+                          )}
                         </small>
                       </td>
                       <td>{Number(r.on_hand)}</td>
