@@ -981,8 +981,9 @@ export default function Formulas({
                 <th>Precio BASE / unidad</th>
                 <th>Costo estimado / unidad</th>
                 <th>
-                  Margen aprox.<small>Precio − costo</small>
+                  Margen aprox. (monto)<small>Precio − costo / unidad</small>
                 </th>
+                <th>Margen aprox. (%)</th>
                 <th>Acciones</th>
               </tr>
             </thead>
@@ -1009,6 +1010,9 @@ export default function Formulas({
                   price != null && estimate.cost != null
                     ? price - estimate.cost
                     : null;
+                const marginPercent = margin != null && price != null && price > 0
+                  ? (margin / price) * 100
+                  : null;
                 return (
                   <tr key={f.id}>
                     <td>{f.code}</td>
@@ -1121,9 +1125,9 @@ export default function Formulas({
                           ? "Según peso real"
                           : "Pendiente"
                         : money(margin, catalog.currency)}
-                      {margin != null && price != null && price > 0 && (
-                        <MarginBadge value={(margin / price) * 100} />
-                      )}
+                    </td>
+                    <td data-sort-value={marginPercent ?? ""}>
+                      <MarginBadge value={marginPercent} />
                     </td>
                     <td className="actions formula-actions">
                       <AppButton
