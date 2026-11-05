@@ -58,8 +58,8 @@ export default function Kardex({
   const names: Record<string, string> = {
     receipt: "Compra",
     inventory_document: "Ajuste / Inventario inicial",
-    production_consumption: "Consumo producción",
-    production_output: "Salida producción",
+    production_consumption: "Salida de materiales",
+    production_output: "Ingreso de producto",
     order_reservation: "Reserva",
     order_dispatch: "Venta / Regalo",
     order_cancel: "Cancelación",
@@ -164,11 +164,17 @@ export default function Kardex({
               onChange={(e) => field("type", e.target.value)}
             >
               <option value="">Todos</option>
-              {Object.entries(inventoryKinds).map(([k, v]) => (
-                <option key={k} value={k}>
-                  {v}
-                </option>
-              ))}
+              {Object.entries({
+                ...inventoryKinds,
+                production_consumption: "Salida de materiales",
+                production_output: "Ingreso de producto",
+              })
+                .filter(([k]) => !["production", "release"].includes(k))
+                .map(([k, v]) => (
+                  <option key={k} value={k}>
+                    {v}
+                  </option>
+                ))}
             </SearchSelect>
           </label>
           <label>
@@ -178,11 +184,13 @@ export default function Kardex({
               onChange={(e) => field("source", e.target.value)}
             >
               <option value="">Todos</option>
-              {Object.entries(names).map(([k, v]) => (
-                <option key={k} value={k}>
-                  {v}
-                </option>
-              ))}
+              {Object.entries(names)
+                .filter(([k]) => k !== "release")
+                .map(([k, v]) => (
+                  <option key={k} value={k}>
+                    {v}
+                  </option>
+                ))}
             </SearchSelect>
           </label>
           <label>
@@ -264,7 +272,11 @@ export default function Kardex({
                     </AppButton>
                   </td>
                   <td>
-                    {inventoryKinds[r.movement_type] ||
+                    {(["production_consumption", "production_output"].includes(
+                      r.source_kind,
+                    )
+                      ? names[r.source_kind]
+                      : inventoryKinds[r.movement_type]) ||
                       names[r.source_kind] ||
                       r.movement_type}
                   </td>
@@ -277,8 +289,26 @@ export default function Kardex({
                       </small>
                     )}
                   </td>
-                  <td data-sort-value={r.entry}>{Number(r.entry)}</td>
-                  <td data-sort-value={r.exit}>{Number(r.exit)}</td>
+                  <td data-sort-value={r.entry}>
+                    <span
+                      className={
+                        Number(r.entry) > 0
+                          ? "kardex-entry-quantity"
+                          : undefined
+                      }
+                    >
+                      {Number(r.entry)}
+                    </span>
+                  </td>
+                  <td data-sort-value={r.exit}>
+                    <span
+                      className={
+                        Number(r.exit) > 0 ? "kardex-exit-quantity" : undefined
+                      }
+                    >
+                      {Number(r.exit)}
+                    </span>
+                  </td>
                   <td data-sort-value={r.balance}>
                     <strong>{Number(r.balance)}</strong>
                   </td>
@@ -626,8 +656,28 @@ export default function Kardex({
                         {l.sku} · {l.name}
                         <small>{l.variant}</small>
                       </td>
-                      <td>{l.entry}</td>
-                      <td>{l.exit}</td>
+                      <td data-sort-value={l.entry}>
+                        <span
+                          className={
+                            Number(l.entry) > 0
+                              ? "kardex-entry-quantity"
+                              : undefined
+                          }
+                        >
+                          {l.entry}
+                        </span>
+                      </td>
+                      <td data-sort-value={l.exit}>
+                        <span
+                          className={
+                            Number(l.exit) > 0
+                              ? "kardex-exit-quantity"
+                              : undefined
+                          }
+                        >
+                          {l.exit}
+                        </span>
+                      </td>
                       <td>{l.unit}</td>
                       <td>{money(l.unit_cost, l.currency)}</td>
                       <td>{money(l.value, l.currency)}</td>
