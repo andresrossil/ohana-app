@@ -254,8 +254,15 @@ export default function BatchTrace({
                       historical
                     />
                     <p className="muted">
-                      Peso real confirmado: {num(weightCosts.total_weight)} g ·
-                      Fabricación común por gramo:{" "}
+                      {weightCosts.weights_estimated
+                        ? "Peso de referencia estimado: "
+                        : "Peso real confirmado: "}
+                      {num(
+                        weightCosts.weights_estimated
+                          ? weightCosts.reference_weight
+                          : weightCosts.total_weight,
+                      )}{" "}
+                      g · Fabricación común por gramo:{" "}
                       {money(weightCosts.cost_per_gram, snapshot.currency)}.
                     </p>
                     <section className="formula-summary">
@@ -264,7 +271,11 @@ export default function BatchTrace({
                           <thead>
                             <tr>
                               <th>Variante</th>
-                              <th>Peso real</th>
+                              <th>
+                                {weightCosts.weights_estimated
+                                  ? "Peso estimado de referencia"
+                                  : "Peso real"}
+                              </th>
                               <th>Fabricación</th>
                               <th>Comerciales</th>
                               <th>Costo total</th>
@@ -278,7 +289,14 @@ export default function BatchTrace({
                               (u: Row, i: number) => (
                                 <tr key={i}>
                                   <td>{u.variant_name || u.variant_id}</td>
-                                  <td>{num(u.weight)} g</td>
+                                  <td>
+                                    {num(
+                                      weightCosts.weights_estimated
+                                        ? u.reference_weight
+                                        : u.weight,
+                                    )}{" "}
+                                    g
+                                  </td>
                                   <td>
                                     {money(u.manufacturing_cost, u.currency)}
                                   </td>

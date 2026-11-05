@@ -724,7 +724,9 @@ export default function InventoryAdjustment({
                                     .map((p: Row) => (
                                       <option key={p.id} value={p.id}>
                                         {p.external_code || "U-" + p.id} ·{" "}
-                                        {p.weight} g
+                                        {p.weight == null
+                                          ? "Sin peso real"
+                                          : p.weight + " g"}
                                       </option>
                                     ))}
                                 </SearchSelect>

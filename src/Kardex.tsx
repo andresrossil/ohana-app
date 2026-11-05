@@ -312,7 +312,8 @@ export default function Kardex({
                     ))}
                     {r.units?.map((u: Row) => (
                       <small key={u.id}>
-                        {u.code} · {u.weight} g
+                        {u.code} ·{" "}
+                        {u.weight == null ? "Sin peso real" : u.weight + " g"}
                       </small>
                     ))}
                   </td>

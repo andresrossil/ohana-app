@@ -12,6 +12,11 @@ export const unitStatus: Record<string, string> = {
   released: "Reserva liberada",
 };
 export const unitLabel = (id: string) => "U-" + id.toUpperCase();
+const weightLabel = (weight: any) =>
+  weight == null
+    ? "Sin peso real"
+    : Number(weight).toLocaleString("es-GT", { maximumFractionDigits: 4 }) +
+      " g";
 export function UnitState({ status }: { status: string }) {
   return (
     <span className={"physical-state unit-" + status}>
@@ -112,10 +117,14 @@ export default function PhysicalUnits({
                     : u.batch_id || "Ajuste · " + u.lot_id}
                 </td>
                 <td>
-                  {Number(u.weight).toLocaleString("es-GT", {
-                    maximumFractionDigits: 4,
-                  })}{" "}
-                  g
+                  {weightLabel(u.weight)}
+                  {u.weight == null &&
+                    u.variant_snapshot?.reference_weight != null && (
+                      <small>
+                        Referencia estimada:{" "}
+                        {weightLabel(u.variant_snapshot.reference_weight)}
+                      </small>
+                    )}
                 </td>
                 <td>
                   {u.cost_snapshot?.cost_basis === "inventory_document" ? (
@@ -230,7 +239,7 @@ export function MovementUnits({
           return (
             <li key={h.unit_id}>
               <span className="unit-id">{unitLabel(h.unit_id)}</span> ·{" "}
-              {u?.weight} g · {u?.variant_snapshot?.name} ·{" "}
+              {weightLabel(u?.weight)} · {u?.variant_snapshot?.name} ·{" "}
               {unitStatus[h.status_after]}
             </li>
           );
@@ -249,10 +258,8 @@ export function SaleUnits({ units }: { units: Row[] }) {
         {units.map((u) => (
           <li key={u.id}>
             <span className="unit-id">{unitLabel(u.id)}</span> ·{" "}
-            {Number(u.weight).toLocaleString("es-GT", {
-              maximumFractionDigits: 4,
-            })}{" "}
-            g · {u.variant_snapshot?.name} · {unitStatus[u.status] || u.status}
+            {weightLabel(u.weight)} · {u.variant_snapshot?.name} ·{" "}
+            {unitStatus[u.status] || u.status}
           </li>
         ))}
       </ul>

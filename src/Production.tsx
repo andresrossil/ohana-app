@@ -1,8 +1,6 @@
 import { plannedProductionUnits } from "./formula-model";
 import SearchSelect from "./SearchSelect";
 import MaterialRequirements from "./MaterialRequirements";
-import VariantWeightCapture, { type WeighedUnit } from "./VariantWeightCapture";
-import { weightMatches } from "./variant-weights";
 import { IconDetails } from "./PoolControls";
 import { plannedLineQuantity, recipeLineKinds } from "./formula-model";
 import ResponsiveTable from "./ResponsiveTable";
@@ -64,10 +62,7 @@ function ProductionBatches({
     [dirty, setDirty] = useState(false),
     [draftScale, setDraftScale] = useState("1"),
     [consumed, setConsumed] = useState<Record<string, string>>({}),
-    [outputUnits, setOutputUnits] = useState<Record<string, string>>({}),
-    [outputWeights, setOutputWeights] = useState<Record<string, string>>({}),
-    [weighedUnits, setWeighedUnits] = useState<WeighedUnit[]>([]),
-    [pendingUnitWeight, setPendingUnitWeight] = useState(false);
+    [outputUnits, setOutputUnits] = useState<Record<string, string>>({});
   async function load() {
     const [c, f, b] = await Promise.all([
       operation(company, "production_catalog"),
@@ -85,9 +80,6 @@ function ProductionBatches({
     onDirty(dirty);
     return () => onDirty(false);
   }, [dirty, onDirty]);
-  useEffect(() => {
-    if (pendingUnitWeight) setDirty(true);
-  }, [pendingUnitWeight]);
   useEffect(() => {
     const leave = (e: BeforeUnloadEvent) => {
       if (dirty) {
@@ -135,13 +127,6 @@ function ProductionBatches({
     (sum, n) => sum + Number(n || 0),
     0,
   );
-  const variableWeight = estimating?.production_mode === "variable_weight";
-  const perUnitMaterials = (estimating?.ingredients || []).filter(
-    (i: Row) =>
-      i.line_kind === "packaging" ||
-      (i.line_kind === "auxiliary" && i.quantity_basis === "unit"),
-  );
-  const realWeight = weighedUnits.reduce((sum, u) => sum + u.weight, 0);
   const neededUnits =
     mode === "start"
       ? Number(draftUnits)
@@ -257,42 +242,12 @@ function ProductionBatches({
                     quantity: draftUnits,
                   };
                 } else if (mode === "finish") {
-                  if (pendingUnitWeight) {
-                    state.setError(
-                      "Registra la unidad pesada o borra el peso pendiente antes de confirmar.",
-                    );
-                    return;
-                  }
-                  const manualMismatch = catalog.variants.some((v: Row) => {
-                    const weight = f.get("weight_" + v.id);
-                    if (
-                      v.product_id !== selected!.product_id ||
-                      Number(f.get("output_" + v.id)) !== 1 ||
-                      weight == null ||
-                      weight === ""
-                    )
-                      return false;
-                    const matches = weightMatches(
-                      catalog.variants.filter(
-                        (r: Row) => r.product_id === selected!.product_id,
-                      ),
-                      v.attributes || {},
-                      weight,
-                    );
-                    return matches.length !== 1 || matches[0].id !== v.id;
-                  });
-                  if (manualMismatch) {
-                    state.setError(
-                      "Un peso individual no corresponde a la variante seleccionada o no tiene un rango válido. Usa Registrar por peso unitario.",
-                    );
-                    return;
-                  }
                   action = "batch_finish";
                   payload = {
                     batch: selected!.id,
                     expected_revision: formula!.edit_revision,
                     scrap: f.get("scrap"),
-                    weight: variableWeight ? realWeight : f.get("weight"),
+                    capture_mode: "variant_units",
                     consumptions: formula!.ingredients.map((r: Row) => ({
                       material: r.material_id,
                       unit: r.unit_id,
@@ -307,17 +262,6 @@ function ProductionBatches({
                       .map((v: Row) => ({
                         variant: v.id,
                         quantity: f.get("output_" + v.id),
-                        weight: f.get("weight_" + v.id),
-                        ...(weighedUnits.some((u) => u.variant === v.id)
-                          ? {
-                              unit_weights: weighedUnits
-                                .filter((u) => u.variant === v.id)
-                                .map((u) => u.weight),
-                              unit_materials: weighedUnits
-                                .filter((u) => u.variant === v.id)
-                                .map((u) => u.materialQuantities || {}),
-                            }
-                          : {}),
                       })),
                   };
                 } else {
@@ -503,121 +447,66 @@ function ProductionBatches({
                     </label>
                   ))}
                   <h3>Variantes obtenidas</h3>
-                  <VariantWeightCapture
-                    variants={catalog.variants.filter(
-                      (v: Row) => v.product_id === selected!.product_id,
-                    )}
-                    units={weighedUnits}
-                    busy={state.busy}
-                    onPending={setPendingUnitWeight}
-                    showCosts={false}
-                    unitMaterials={
-                      variableWeight
-                        ? perUnitMaterials.map((m: Row) => ({
-                            id: m.material_id,
-                            name: m.name,
-                            unit: m.unit,
-                            quantity: consumed[m.material_id] ?? suggested(m),
-                          }))
-                        : []
-                    }
-                    onReplace={(units) => {
-                      setWeighedUnits(units);
-                      const amounts: Record<string, string> = {},
-                        weights: Record<string, string> = {};
-                      catalog.variants
-                        .filter(
-                          (v: Row) => v.product_id === selected!.product_id,
+                  <div className="actions">
+                    <AppButton
+                      type="button"
+                      className="secondary"
+                      disabled={state.busy}
+                      onClick={() =>
+                        state.run(async () =>
+                          setCatalog(
+                            await operation(company, "production_catalog"),
+                          ),
                         )
-                        .forEach((v: Row) => {
-                          const group = units.filter((u) => u.variant === v.id);
-                          amounts[v.id] = String(group.length);
-                          weights[v.id] = group.length
-                            ? String(
-                                Math.round(
-                                  group.reduce((s, u) => s + u.weight, 0) *
-                                    10000,
-                                ) / 10000,
-                              )
-                            : "";
-                        });
-                      if (!variableWeight)
-                        catalog.variants.forEach((v: Row) => {
-                          if (
-                            v.weight_min == null &&
-                            !weighedUnits.some((u) => u.variant === v.id) &&
-                            !units.some((u) => u.variant === v.id)
-                          ) {
-                            delete amounts[v.id];
-                            delete weights[v.id];
-                          }
-                        });
-                      setOutputUnits((old) => ({ ...old, ...amounts }));
-                      setOutputWeights((old) => ({ ...old, ...weights }));
-                      setDirty(true);
-                    }}
-                  />
+                      }
+                    >
+                      Actualizar variantes
+                    </AppButton>
+                  </div>
                   <p>
-                    Las variantes con rango de peso se registran unidad por
-                    unidad arriba. Para las demás puedes capturar la cantidad y,
-                    opcionalmente, el peso total.
+                    Indica las unidades buenas obtenidas de cada variante. Si
+                    falta alguna, agrégala en Productos y actualiza esta lista
+                    antes de confirmar.
                   </p>
-                  {catalog.variants
-                    .filter((v: Row) => v.product_id === selected!.product_id)
-                    .map((v: Row) => (
-                      <div className="ingredient-row" key={v.id}>
-                        <label>
-                          {variantLabel(v)}
-                          <input
-                            name={"output_" + v.id}
-                            onChange={(e) =>
-                              setOutputUnits((old) => ({
-                                ...old,
-                                [v.id]: e.target.value,
-                              }))
-                            }
-                            type="number"
-                            min="0"
-                            step="1"
-                            value={outputUnits[v.id] || "0"}
-                            readOnly={
-                              v.weight_min != null ||
-                              variableWeight ||
-                              weighedUnits.some((u) => u.variant === v.id)
-                            }
-                          />
-                        </label>
-                        <label>
-                          Peso total de esta variante (g)
-                          <input
-                            name={"weight_" + v.id}
-                            type="number"
-                            step="any"
-                            min="0.0001"
-                            value={outputWeights[v.id] || ""}
-                            onChange={(e) =>
-                              setOutputWeights((old) => ({
-                                ...old,
-                                [v.id]: e.target.value,
-                              }))
-                            }
-                            readOnly={
-                              v.weight_min != null ||
-                              variableWeight ||
-                              weighedUnits.some((u) => u.variant === v.id)
-                            }
-                          />
-                        </label>
-                      </div>
-                    ))}
-                  {!catalog.variants.some(
-                    (v: Row) => v.product_id === selected!.product_id,
-                  ) && (
-                    <p className="error">
-                      <AppIcon name="status.error" />
-                      Primero crea variantes en Productos.
-                    </p>
-                  )}
+                  <div className="table-wrap">
+                    <ResponsiveTable>
+                      <thead>
+                        <tr>
+                          <th>Variante</th>
+                          <th>Unidades obtenidas</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {catalog.variants
+                          .filter(
+                            (v: Row) => v.product_id === selected!.product_id,
+                          )
+                          .map((v: Row) => (
+                            <tr key={v.id}>
+                              <td>{variantLabel(v)}</td>
+                              <td>
+                                <input
+                                  aria-label={"Unidades de " + variantLabel(v)}
+                                  name={"output_" + v.id}
+                                  type="number"
+                                  min="0"
+                                  max="10000"
+                                  step="1"
+                                  required
+                                  value={outputUnits[v.id] || "0"}
+                                  onChange={(e) =>
+                                    setOutputUnits((old) => ({
+                                      ...old,
+                                      [v.id]: e.target.value,
+                                    }))
+                                  }
+                                />
+                              </td>
+                            </tr>
+                          ))}
+                      </tbody>
+                    </ResponsiveTable>
+                  </div>
                   <div className="settings-grid">
                     <label>
                       Unidades dañadas (opcional)
@@ -627,17 +516,6 @@ function ProductionBatches({
                         min="0"
                         step="1"
                         defaultValue="0"
-                      />
-                    </label>
-                    <label>
-                      Peso total real del lote (g, opcional)
-                      <input
-                        name="weight"
-                        readOnly={variableWeight}
-                        value={variableWeight ? realWeight || "" : undefined}
-                        type="number"
-                        min="0.0001"
-                        step="any"
                       />
                     </label>
                   </div>
@@ -808,9 +686,6 @@ function ProductionBatches({
                           setSelected(b);
                           setConsumed({});
                           setOutputUnits({});
-                          setOutputWeights({});
-                          setWeighedUnits([]);
-                          setPendingUnitWeight(false);
                           setDirty(false);
                           setMode("finish");
                         }}
