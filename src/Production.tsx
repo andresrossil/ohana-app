@@ -64,6 +64,8 @@ function ProductionBatches({
     [traceId, setTraceId] = useState<string | null>(null),
     [dirty, setDirty] = useState(false),
     [draftScale, setDraftScale] = useState("1"),
+    [quantityMode, setQuantityMode] = useState("preparations"),
+    [targetUnits, setTargetUnits] = useState(""),
     [consumed, setConsumed] = useState<Record<string, string>>({}),
     [outputUnits, setOutputUnits] = useState<Record<string, string>>({});
   async function load() {
@@ -109,10 +111,18 @@ function ProductionBatches({
   const estimating = formulas.find(
     (f) => f.id === (mode === "start" ? draftFormula : selected?.formula_id),
   );
-  const draftUnits = plannedProductionUnits(
-    estimating?.estimated_units,
-    draftScale,
-  );
+  const effectiveScale =
+    quantityMode === "units"
+      ? Number(estimating?.estimated_units) > 0 && Number(targetUnits) > 0
+        ? Number(targetUnits) / Number(estimating?.estimated_units)
+        : null
+      : Number(draftScale);
+  const draftUnits =
+    quantityMode === "units"
+      ? Number(targetUnits) > 0 && effectiveScale != null
+        ? Number(targetUnits)
+        : null
+      : plannedProductionUnits(estimating?.estimated_units, draftScale);
   const plannedAvailable = (() => {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return "";
     const d = new Date(date + "T12:00:00Z");
@@ -124,7 +134,7 @@ function ProductionBatches({
   })();
   const factor =
     mode === "start"
-      ? Number(draftScale)
+      ? Number(effectiveScale)
       : Number(selected?.formula_scale || 1);
   const producedUnits = Object.values(outputUnits).reduce(
     (sum, n) => sum + Number(n || 0),
@@ -164,6 +174,8 @@ function ProductionBatches({
               onClick={() => {
                 setSelected(null);
                 setDraftScale("1");
+                setQuantityMode("preparations");
+                setTargetUnits("");
                 setDate(today());
                 setDraftProduct("");
                 setDraftFormula("");
@@ -242,6 +254,7 @@ function ProductionBatches({
                     id: selected?.id,
                     product: draftProduct,
                     formula: draftFormula,
+                    formula_scale: effectiveScale,
                     quantity: draftUnits,
                   };
                 } else if (mode === "finish") {
@@ -381,15 +394,43 @@ function ProductionBatches({
                     </SearchSelect>
                   </label>
                   <label>
-                    Preparaciones a realizar
+                    Planificar por
+                    <SearchSelect
+                      value={quantityMode}
+                      onChange={(e) => {
+                        const next = e.target.value;
+                        if (next === "units")
+                          setTargetUnits(
+                            draftUnits == null ? "" : String(draftUnits),
+                          );
+                        else if (effectiveScale != null)
+                          setDraftScale(String(effectiveScale));
+                        setQuantityMode(next);
+                      }}
+                    >
+                      <option value="preparations">
+                        Preparaciones de la fórmula
+                      </option>
+                      <option value="units">Unidades a producir</option>
+                    </SearchSelect>
+                  </label>
+                  <label>
+                    {quantityMode === "units"
+                      ? "Unidades a producir"
+                      : "Preparaciones a realizar"}
                     <input
-                      name="formula_scale"
                       type="number"
-                      min="0.00000001"
-                      step="any"
+                      min={quantityMode === "units" ? "1" : "0.00000001"}
+                      step={quantityMode === "units" ? "1" : "any"}
                       required
-                      value={draftScale}
-                      onChange={(e) => setDraftScale(e.target.value)}
+                      value={
+                        quantityMode === "units" ? targetUnits : draftScale
+                      }
+                      onChange={(e) =>
+                        quantityMode === "units"
+                          ? setTargetUnits(e.target.value)
+                          : setDraftScale(e.target.value)
+                      }
                     />
                   </label>
                   <label>
@@ -409,7 +450,9 @@ function ProductionBatches({
                         ? "Define las Unidades estimadas en la fórmula para calcularlas aquí."
                         : !Number.isInteger(draftUnits)
                           ? "El resultado debe ser un número entero de unidades."
-                          : `${estimating?.estimated_units} unidades por preparación × ${draftScale} preparaciones`}
+                          : quantityMode === "units"
+                            ? `${draftUnits} unidades de una fórmula de ${estimating?.estimated_units}. Los materiales se ajustan proporcionalmente.`
+                            : `${estimating?.estimated_units} unidades por preparación × ${draftScale} preparaciones`}
                     </small>
                   </label>
                   <label>
@@ -705,6 +748,8 @@ function ProductionBatches({
                           onClick={() => {
                             setSelected(b);
                             setDraftScale(String(b.formula_scale || 1));
+                            setQuantityMode("preparations");
+                            setTargetUnits(String(b.planned_quantity || ""));
                             setDate(b.production_date);
                             setDraftProduct(b.product_id);
                             setDraftFormula(b.formula_id || "");
