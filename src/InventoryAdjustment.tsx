@@ -1,21 +1,13 @@
 import { useEffect, useState } from "react";
 import { request } from "./commerce";
-import {
-  keyedRequest,
-  money,
-  today,
-  useOperation,
-  type Row,
-} from "./operations";
+import { keyedRequest, today, useOperation, type Row } from "./operations";
 import SearchSelect from "./SearchSelect";
 import ResponsiveTable from "./ResponsiveTable";
-import MoneyInput from "./MoneyInput";
 import AutoTextarea from "./AutoTextarea";
 import { AppButton, AppIcon } from "./AppIcon";
 import { confirmAction } from "./ConfirmDialog";
 import { parseTSV, formatTSV, parseNumber } from "./sheet-model";
 import { priceCost } from "./price-cost";
-import { weightMatches } from "./variant-weights";
 import "./inventory-documents.css";
 
 export const inventoryRequest = (
@@ -46,7 +38,6 @@ const columns: readonly (readonly [string, string])[] = [
   ["article", "Artículo (SKU o nombre)"],
   ["quantity", "Cantidad"],
   ["unit", "Unidad"],
-  ["unit_cost", "Monto total"],
   ["notes", "Observaciones"],
 ] as const;
 const empty = (): Row => ({
@@ -69,7 +60,6 @@ const norm = (s: any) =>
     .toLowerCase();
 export default function InventoryAdjustment({
   company,
-  currency,
   onClose,
   onSaved,
   reversal,
@@ -103,14 +93,7 @@ export default function InventoryAdjustment({
   useEffect(() => {
     state.run(async () => {
       const c = await inventoryRequest(company, "catalog");
-      const [math, formulas] = await Promise.all([
-        request("formula_catalog", { p_company: company }).catch(() => null),
-        request("formula_command", {
-          p_company: company,
-          p_action: "list",
-        }).catch(() => []),
-      ]);
-      setCat({ ...c, math, formulas });
+      setCat(c);
     });
   }, [company]);
   const articles: Row[] = [
@@ -151,18 +134,12 @@ export default function InventoryAdjustment({
           cat.units.find(
             (u: Row) => u.dimension === "count" && Number(u.base_factor) === 1,
           )?.id;
-    const estimate =
-      a?.item_kind === "variant" && cat.math
-        ? priceCost(a, cat.formulas, cat.math).manufacturingCost
-        : null;
     return {
       ...r,
       article: key,
       item_kind: a?.item_kind,
       item_id: a?.id,
       unit_id: unit || "",
-      unit_cost: outgoing ? "" : (estimate ?? a?.suggested_cost ?? ""),
-      cost_manual: false,
       lot_id: "",
       individual_unit_id: "",
       external_code: "",
@@ -195,10 +172,10 @@ export default function InventoryAdjustment({
       cantidad: "quantity",
       unidad: "unit",
       um: "unit",
-      "costo unitario": "unit_cost",
-      costo: "unit_cost",
-      "monto total": "unit_cost",
-      valor: "unit_cost",
+      "costo unitario": "ignore",
+      costo: "ignore",
+      "monto total": "ignore",
+      valor: "ignore",
       observaciones: "notes",
       "identificador individual": "ignore",
     };
@@ -265,50 +242,13 @@ export default function InventoryAdjustment({
           if (field === "unit_cost") r.cost_manual = true;
         } else if (field !== "ignore") r[field] = value;
       });
-      r = resolveWeight(r);
       next[idx] = r;
     });
     changed();
     setRows(next);
     state.setError(errors.join("\n"));
   }
-  function resolveWeight(r: Row): Row {
-    if (outgoing || r.item_kind !== "variant" || !r.weight) return r;
-    const selected = cat.variants.find((v: Row) => v.id === r.item_id);
-    if (!selected) return r;
-    const matches = weightMatches(
-      cat.variants.filter(
-        (v: Row) => v.product_id === selected.product_id && v.active,
-      ),
-      selected.attributes || {},
-      Number(r.weight),
-    );
-    if (matches.length !== 1) return r;
-    const match = matches[0];
-    const a = articles.find((a) => a.id === match.id);
-    const estimate =
-      a && cat.math
-        ? priceCost(
-            {
-              ...a,
-              weight_min: Number(r.weight),
-              weight_max: Number(r.weight),
-            },
-            cat.formulas,
-            cat.math,
-          ).manufacturingCost
-        : null;
-    return {
-      ...r,
-      item_id: match.id,
-      article: "v:" + match.id,
-      quantity: "1",
-      ...(!r.cost_manual
-        ? { unit_cost: estimate ?? a?.suggested_cost ?? "" }
-        : {}),
-    };
-  }
-  function payload() {
+  function payload(catalog = cat) {
     return {
       kind,
       ...(correction ? { corrects_id: correction } : {}),
@@ -324,7 +264,16 @@ export default function InventoryAdjustment({
               item_id: r.item_id,
               quantity: r.quantity,
               unit_id: r.unit_id || null,
-              unit_cost: inputUnitCost(r),
+              cost_mode: "current",
+              unit_cost:
+                r.item_kind === "variant" && catalog.math
+                  ? (priceCost(
+                      catalog.variants.find((v: Row) => v.id === r.item_id) ||
+                        {},
+                      catalog.formulas,
+                      catalog.math,
+                    ).manufacturingCost ?? null)
+                  : null,
               weight: r.weight || null,
               lot_id: r.lot_id || null,
               lot_label: r.lot_label,
@@ -335,21 +284,15 @@ export default function InventoryAdjustment({
           }),
     };
   }
-  function inputAmount(r: Row): number | null {
-    const value = parseNumber(String(r.unit_cost));
-    const qty = parseNumber(String(r.quantity));
-    return value == null
-      ? null
-      : r.cost_manual
-        ? value
-        : qty == null
-          ? null
-          : value * qty;
-  }
-  function inputUnitCost(r: Row): number | null {
-    const amount = inputAmount(r);
-    const qty = parseNumber(String(r.quantity));
-    return amount == null || qty == null || qty <= 0 ? null : amount / qty;
+  async function currentPayload() {
+    if (reversal) return payload();
+    const c = await inventoryRequest(company, "catalog");
+    if (!rows.some((r) => r.item_kind === "variant")) return payload(c);
+    const [math, formulas] = await Promise.all([
+      request("formula_catalog", { p_company: company }),
+      request("formula_command", { p_company: company, p_action: "list" }),
+    ]);
+    return payload({ ...c, math, formulas });
   }
   async function close() {
     if (state.busy) return;
@@ -363,7 +306,9 @@ export default function InventoryAdjustment({
     await state.run(async () => {
       if (rows.some((r) => !r.item_id) && !reversal)
         throw Error("Selecciona un artículo válido en todas las filas.");
-      setReview(await inventoryRequest(company, "review", payload()));
+      setReview(
+        await inventoryRequest(company, "review", await currentPayload()),
+      );
       setAck(false);
     });
   }
@@ -496,10 +441,9 @@ export default function InventoryAdjustment({
                 </label>
                 <small>
                   Pega aquí sin crear filas. Usa SKU, nombre exacto o código de
-                  barras existente. Ingresa la cantidad y el monto total; el
-                  costo unitario se calcula dividiendo el monto entre la
-                  cantidad. Las cantidades siempre son positivas; el tipo
-                  determina entrada o salida.
+                  barras existente. Ingresa únicamente cantidades. El costo
+                  vigente se asigna automáticamente al confirmar. Las cantidades
+                  siempre son positivas; el tipo determina entrada o salida.
                 </small>
               </section>
               <div className="actions">
@@ -535,9 +479,7 @@ export default function InventoryAdjustment({
                                     ? outgoing
                                       ? r.lot_id
                                       : r.lot_label
-                                    : key === "unit_cost"
-                                      ? String(inputAmount(r) ?? "")
-                                      : String(r[key] ?? ""),
+                                    : String(r[key] ?? ""),
                             ),
                           ),
                         ]),
@@ -563,32 +505,13 @@ export default function InventoryAdjustment({
                       {columns.map((c) => (
                         <th key={c[0]}>{c[1]}</th>
                       ))}
-                      <th>Costo unitario</th>
                       <th>Acciones</th>
                     </tr>
                   </thead>
                   <tbody>
                     {rows.map((r, i) => {
                       const a = articles.find((a) => a.key === r.article),
-                        bu = cat.units.find((u: Row) => u.id === a?.unit_id),
-                        u = cat.units.find((u: Row) => u.id === r.unit_id),
-                        lot = cat.lots.find((l: Row) => l.id === r.lot_id),
-                        physical = cat.physical.find(
-                          (p: Row) => p.id === r.individual_unit_id,
-                        ),
-                        historic =
-                          physical?.cost_snapshot?.manufacturing_cost ??
-                          lot?.unit_cost,
-                        cost = outgoing
-                          ? historic == null
-                            ? null
-                            : Number(historic) *
-                              (a?.item_kind === "material"
-                                ? Number(u?.base_factor) /
-                                  Number(bu?.base_factor)
-                                : 1)
-                          : inputUnitCost(r),
-                        qty = parseNumber(String(r.quantity));
+                        bu = cat.units.find((u: Row) => u.id === a?.unit_id);
                       return (
                         <tr key={r.line_key}>
                           <td>{i + 1}</td>
@@ -644,21 +567,8 @@ export default function InventoryAdjustment({
                                 <SearchSelect
                                   value={r.unit_id}
                                   onChange={(e) => {
-                                    const unit = cat.units.find(
-                                      (u: Row) => u.id === e.target.value,
-                                    );
                                     update(i, {
                                       unit_id: e.target.value,
-                                      ...(!r.cost_manual && !outgoing && a
-                                        ? {
-                                            unit_cost:
-                                              a.suggested_cost == null
-                                                ? ""
-                                                : (Number(a.suggested_cost) *
-                                                    Number(unit?.base_factor)) /
-                                                  Number(bu?.base_factor),
-                                          }
-                                        : {}),
                                     });
                                   }}
                                 >
@@ -676,101 +586,6 @@ export default function InventoryAdjustment({
                                       </option>
                                     ))}
                                 </SearchSelect>
-                              ) : key === "lot" ? (
-                                outgoing ? (
-                                  <SearchSelect
-                                    value={r.lot_id}
-                                    onChange={(e) =>
-                                      update(i, {
-                                        lot_id: e.target.value,
-                                        individual_unit_id: "",
-                                      })
-                                    }
-                                  >
-                                    <option value="">Seleccionar lote</option>
-                                    {cat.lots
-                                      .filter(
-                                        (l: Row) =>
-                                          l.item_id === r.item_id &&
-                                          l.item_kind === r.item_kind &&
-                                          Number(l.remaining) > 0 &&
-                                          !l.blocked,
-                                      )
-                                      .map((l: Row) => (
-                                        <option key={l.id} value={l.id}>
-                                          {l.label || l.id} · Disponible:{" "}
-                                          {l.remaining}
-                                        </option>
-                                      ))}
-                                  </SearchSelect>
-                                ) : (
-                                  <input
-                                    value={r.lot_label}
-                                    maxLength={120}
-                                    onChange={(e) =>
-                                      update(i, { lot_label: e.target.value })
-                                    }
-                                  />
-                                )
-                              ) : key === "external_code" &&
-                                outgoing &&
-                                a?.item_kind === "variant" ? (
-                                <SearchSelect
-                                  value={r.individual_unit_id || ""}
-                                  onChange={(e) => {
-                                    const p = cat.physical.find(
-                                      (p: Row) => p.id === e.target.value,
-                                    );
-                                    update(i, {
-                                      individual_unit_id: p?.id || "",
-                                      lot_id: p?.lot_id || r.lot_id,
-                                      quantity: p ? "1" : r.quantity,
-                                      weight: p?.weight || "",
-                                      external_code: "",
-                                    });
-                                  }}
-                                >
-                                  <option value="">
-                                    Seleccionar unidad física
-                                  </option>
-                                  {cat.physical
-                                    .filter(
-                                      (p: Row) =>
-                                        p.variant_id === r.item_id &&
-                                        (!r.lot_id || p.lot_id === r.lot_id),
-                                    )
-                                    .map((p: Row) => (
-                                      <option key={p.id} value={p.id}>
-                                        {p.external_code || "U-" + p.id} ·{" "}
-                                        {p.weight == null
-                                          ? "Sin peso real"
-                                          : p.weight + " g"}
-                                      </option>
-                                    ))}
-                                </SearchSelect>
-                              ) : key === "unit_cost" ? (
-                                outgoing ? (
-                                  <span>
-                                    {money(
-                                      cost == null || qty == null
-                                        ? null
-                                        : cost * qty,
-                                      currency,
-                                    )}
-                                  </span>
-                                ) : (
-                                  <MoneyInput
-                                    currency={currency}
-                                    value={inputAmount(r) ?? ""}
-                                    min={0}
-                                    onChange={(e) =>
-                                      update(i, {
-                                        unit_cost: e.target.value,
-                                        cost_manual: true,
-                                      })
-                                    }
-                                  />
-                                )
                               ) : key === "notes" ? (
                                 <AutoTextarea
                                   value={r.notes}
@@ -786,31 +601,18 @@ export default function InventoryAdjustment({
                                       ? "number"
                                       : "text"
                                   }
-                                  disabled={
-                                    key === "external_code" &&
-                                    (r.item_kind !== "variant" ||
-                                      a?.weight_min == null)
-                                  }
                                   step="any"
                                   min="0"
                                   readOnly={outgoing && key === "weight"}
                                   value={r[key] ?? ""}
                                   onChange={(e) =>
-                                    update(
-                                      i,
-                                      key === "weight"
-                                        ? resolveWeight({
-                                            ...r,
-                                            weight: e.target.value,
-                                          })
-                                        : { [key]: e.target.value },
-                                    )
+                                    update(i, { [key]: e.target.value })
                                   }
                                 />
                               )}
                             </td>
                           ))}
-                          <td>{money(cost, currency)}</td>
+
                           <td>
                             <AppButton
                               className="danger"
@@ -841,21 +643,12 @@ export default function InventoryAdjustment({
                 {review.quantity_totals
                   ?.map((x: Row) => `${x.quantity} ${x.unit}`)
                   .join(" · ")}{" "}
-                · Valor conocido: {money(review.known_total, currency)}
-                {Number(review.pending_costs) > 0 &&
-                  ` · ${review.pending_costs} costos pendientes`}
               </p>
               <div className="table-wrap">
                 <ResponsiveTable>
                   <thead>
                     <tr>
-                      {[
-                        "Artículo",
-                        "Cantidad",
-                        "Unidad",
-                        "Costo unitario",
-                        "Valor",
-                      ].map((h) => (
+                      {["Artículo", "Cantidad", "Unidad"].map((h) => (
                         <th key={h}>{h}</th>
                       ))}
                     </tr>
@@ -869,8 +662,6 @@ export default function InventoryAdjustment({
                         </td>
                         <td>{r.quantity}</td>
                         <td>{r.snapshot.input_unit}</td>
-                        <td>{money(r.unit_cost, currency)}</td>
-                        <td>{money(r.total_value, currency)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -913,7 +704,11 @@ export default function InventoryAdjustment({
                     await keyedRequest(
                       company,
                       "inventory_command",
-                      { ...payload(), proof: review.proof, acknowledged: ack },
+                      {
+                        ...(await currentPayload()),
+                        proof: review.proof,
+                        acknowledged: ack,
+                      },
                       "confirm",
                     );
                     setDirty(false);
