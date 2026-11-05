@@ -1,7 +1,7 @@
 import {
   defaultMaterialTypes,
   type MaterialType,
-} from "./material-types-model";
+} from "./material-types-model.ts";
 import { normalize } from "./sheet-model.ts";
 import type { CatalogRow } from "./sheet-model";
 export function matchesCatalog(row: CatalogRow, query: string) {
