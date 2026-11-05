@@ -328,7 +328,7 @@ export default function Kardex({
             </tbody>
           </ResponsiveTable>
         </div>
-        {!result.rows.length && (
+        {!state.busy && !state.error && !result.rows.length && (
           <p className="empty">No hay movimientos con estos filtros.</p>
         )}
         <div className="actions">

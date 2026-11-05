@@ -1,17 +1,37 @@
 import MaterialRequirements from "./MaterialRequirements";
+import Kardex from "./Kardex";
+import PhysicalUnits from "./PhysicalUnits";
 import { AppButton, AppIcon } from "./AppIcon";
 import { useEffect, useState } from "react";
 import { request } from "./commerce";
 import { useOperation, money, type Row } from "./operations";
-export default function Reports({ company }: { company: string }) {
+export default function Reports({
+  company,
+  currency = "GTQ",
+  inventoryAllowed = false,
+}: {
+  company: string;
+  currency?: string;
+  inventoryAllowed?: boolean;
+}) {
   const state = useOperation(company, "reports"),
-    [data, setData] = useState<Row | null>(null);
+    [data, setData] = useState<Row | null>(null),
+    [view, setView] = useState<"summary" | "kardex">("summary"),
+    [revision, setRevision] = useState(0),
+    [physical, setPhysical] = useState<Row>({ units: [], history: [] });
   async function load() {
+    if (view === "kardex") {
+      setPhysical(
+        await request("physical_unit_catalog", { p_company: company }),
+      );
+      setRevision((v) => v + 1);
+      return;
+    }
     setData(await request("report_summary", { p_company: company }));
   }
   useEffect(() => {
     state.run(load);
-  }, [company]);
+  }, [company, view]);
   return (
     <>
       <section className="intro">
@@ -22,21 +42,61 @@ export default function Reports({ company }: { company: string }) {
             Reportes
           </h1>
           <p>
-            Resumen de la empresa seleccionada. Los importes se mantienen
-            separados por moneda.
+            {view === "kardex" ? (
+              "Kardex, valor de existencias y unidades físicas de la empresa seleccionada."
+            ) : (
+              <>
+                Resumen de la empresa seleccionada. Los importes se mantienen
+                separados por moneda.
+              </>
+            )}
           </p>
         </div>
         <AppButton disabled={state.busy} onClick={() => state.run(load)}>
           Actualizar
         </AppButton>
       </section>
+      <div className="actions" role="group" aria-label="Seleccionar reporte">
+        <AppButton
+          disabled={state.busy}
+          className={view === "summary" ? "" : "secondary"}
+          iconKey="module.reports"
+          aria-pressed={view === "summary"}
+          onClick={() => setView("summary")}
+        >
+          Resumen
+        </AppButton>
+        {inventoryAllowed && (
+          <AppButton
+            disabled={state.busy}
+            className={view === "kardex" ? "" : "secondary"}
+            iconKey="module.inventory"
+            aria-pressed={view === "kardex"}
+            onClick={() => setView("kardex")}
+          >
+            Kardex
+          </AppButton>
+        )}
+      </div>
       {state.error && (
         <p className="error" role="alert">
           <AppIcon name="status.error" />
           {state.error}
         </p>
       )}
-      {data && (
+      {view === "kardex" && inventoryAllowed && (
+        <>
+          <Kardex
+            key={company}
+            company={company}
+            currency={currency}
+            revision={revision}
+            onSaved={load}
+          />
+          <PhysicalUnits units={physical.units} history={physical.history} />
+        </>
+      )}
+      {view === "summary" && data && (
         <>
           <section className="stats">
             {[

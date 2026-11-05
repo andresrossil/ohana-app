@@ -979,7 +979,7 @@ function App() {
                 />
               )}
               {section === "reports" && (
-                <Reports key={company} company={company} />
+                <Reports key={company} company={company} currency={activeCompany?.currency} inventoryAllowed={activeCompany?.inventory_read === true} />
               )}
               {![
                 "dashboard",

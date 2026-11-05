@@ -1,12 +1,9 @@
 import MoneyInput from "./MoneyInput";
 import InventoryAdjustment from "./InventoryAdjustment";
-import Kardex from "./Kardex";
 import { useMaterialTypes, MaterialTypeLabel } from "./MaterialTypesContext";
 import { materialTypeName } from "./material-types-model";
 import SearchSelect from "./SearchSelect";
 import ResponsiveTable from "./ResponsiveTable";
-import PhysicalUnits from "./PhysicalUnits";
-import { request } from "./commerce";
 import { SearchField } from "./PoolControls";
 import { AppButton, AppIcon } from "./AppIcon";
 import { useEffect, useState } from "react";
@@ -28,7 +25,6 @@ export default function Inventory({
   currency?: string;
 }) {
   const types = useMaterialTypes();
-  const [revision, setRevision] = useState(0);
   const [paymentCurrency, setPaymentCurrency] = useState(currency);
   const state = useOperation(company, "inventory"),
     [data, setData] = useState<Row>({
@@ -39,22 +35,18 @@ export default function Inventory({
       suppliers: [],
       movements: [],
     }),
-    [physical, setPhysical] = useState<Row>({ units: [], history: [] }),
     [receipts, setReceipts] = useState<Row[]>([]),
     [form, setForm] = useState<"receive" | "adjust" | null>(null),
     [material, setMaterial] = useState(""),
     [query, setQuery] = useState("");
   useEffect(() => setPaymentCurrency(currency), [company, currency, form]);
   async function load() {
-    const [d, r, p] = await Promise.all([
+    const [d, r] = await Promise.all([
       operation(company, "inventory"),
       operation(company, "receipts"),
-      request("physical_unit_catalog", { p_company: company }),
     ]);
     setData(d);
     setReceipts(r);
-    setPhysical(p);
-    setRevision((v) => v + 1);
   }
   useEffect(() => {
     state.run(load);
@@ -380,18 +372,6 @@ export default function Inventory({
               )}
             </div>
           </section>
-          <Kardex
-            key={company}
-            company={company}
-            currency={currency}
-            revision={revision}
-            onSaved={load}
-          />
-          <PhysicalUnits
-            units={physical.units}
-            query={query}
-            history={physical.history}
-          />
         </>
       )}
     </>
