@@ -30,10 +30,12 @@ export default function BatchTrace({
   company,
   id,
   onClose,
+  showCosts = true,
 }: {
   company: string;
   id: string;
   onClose: () => void;
+  showCosts?: boolean;
 }) {
   const [data, setData] = useState<Row | null>(null),
     [error, setError] = useState("");
@@ -86,7 +88,61 @@ export default function BatchTrace({
         {data && (
           <>
             <h3>Fórmula utilizada</h3>
-            {snapshot ? (
+            {snapshot && !showCosts ? (
+              <>
+                <p>
+                  {snapshot.product.name} · {snapshot.formula.code} · v
+                  {snapshot.formula.version}
+                </p>
+                <p>
+                  {data.batch.actual_quantity} unidades buenas ·{" "}
+                  {data.batch.scrap_quantity || 0} unidades dañadas
+                </p>
+                <p>
+                  {snapshot.curing?.required === false
+                    ? "Sin curado"
+                    : `Disponibilidad: ${data.batch.available_on}`}
+                </p>
+                <div className="table-wrap">
+                  <ResponsiveTable>
+                    <thead>
+                      <tr>
+                        <th>Material / Insumo</th>
+                        <th>Planificado</th>
+                        <th>Consumo real</th>
+                        <th>Observaciones</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {snapshot.lines.map((line: Row) => (
+                        <tr key={line.material_id}>
+                          <td>
+                            {line.material_sku} · {line.material_name}
+                            <small>
+                              {
+                                recipeLineKinds[
+                                  (line.line_kind ||
+                                    "ingredient") as keyof typeof recipeLineKinds
+                                ]
+                              }
+                            </small>
+                          </td>
+                          <td>
+                            {num(line.planned_quantity)}{" "}
+                            {line.planned_unit.symbol}
+                          </td>
+                          <td>
+                            {num(line.actual_quantity)}{" "}
+                            {line.actual_unit.symbol}
+                          </td>
+                          <td>{line.reference_notes}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </ResponsiveTable>
+                </div>
+              </>
+            ) : snapshot ? (
               <>
                 <p>
                   <strong>
@@ -301,17 +357,19 @@ export default function BatchTrace({
                       guardada. No se reconstruyen nombres, cantidades
                       planificadas ni precios a partir del catálogo actual.
                     </p>
-                    <p>
-                      Costo registrado:{" "}
-                      {money(data.batch.total_cost, data.batch.currency)}
-                    </p>
+                    {showCosts && (
+                      <p>
+                        Costo registrado:{" "}
+                        {money(data.batch.total_cost, data.batch.currency)}
+                      </p>
+                    )}
                     <div className="formula-table-scroll">
                       <ResponsiveTable>
                         <thead>
                           <tr>
                             <th>ID de materia prima</th>
                             <th>Consumo en unidad base registrada</th>
-                            <th>Costo registrado</th>
+                            {showCosts && <th>Costo registrado</th>}
                           </tr>
                         </thead>
                         <tbody>
@@ -319,7 +377,9 @@ export default function BatchTrace({
                             <tr key={line.material_id}>
                               <td>{line.material_id}</td>
                               <td>{num(line.base_quantity)}</td>
-                              <td>{money(line.cost, data.batch.currency)}</td>
+                              {showCosts && (
+                                <td>{money(line.cost, data.batch.currency)}</td>
+                              )}
                             </tr>
                           ))}
                         </tbody>

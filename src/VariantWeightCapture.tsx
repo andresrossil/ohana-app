@@ -33,6 +33,7 @@ export default function VariantWeightCapture({
   costFor,
   currency = "GTQ",
   unitMaterials = [],
+  showCosts = true,
 }: {
   variants: WeightVariant[];
   units: WeighedUnit[];
@@ -48,6 +49,7 @@ export default function VariantWeightCapture({
   ) => Row;
   currency?: string;
   unitMaterials?: Row[];
+  showCosts?: boolean;
 }) {
   const groups = [
     ...new Map(
@@ -231,8 +233,12 @@ export default function VariantWeightCapture({
                     {m.name} ({m.unit})
                   </th>
                 ))}
-                <th>Costo estimado</th>
-                <th>Margen aprox.</th>
+                {showCosts && (
+                  <>
+                    <th>Costo estimado</th>
+                    <th>Margen aprox.</th>
+                  </>
+                )}
                 <th>Acciones</th>
               </tr>
             </thead>
@@ -342,48 +348,55 @@ export default function VariantWeightCapture({
                         />
                       </td>
                     ))}
-                    <td>
-                      {cost ? money(cost.total_cost, currency) : "Pendiente"}
-                      {cost && (
-                        <small>
-                          Fabricación:{" "}
-                          {money(cost.manufacturing_cost, currency)} · Mano de
-                          obra y Publicidad:{" "}
-                          {money(cost.commercial_cost, currency)}
-                          {cost.overhead_cost !== undefined && (
+                    {showCosts && (
+                      <>
+                        <td>
+                          {cost
+                            ? money(cost.total_cost, currency)
+                            : "Pendiente"}
+                          {cost && (
+                            <small>
+                              Fabricación:{" "}
+                              {money(cost.manufacturing_cost, currency)} · Mano
+                              de obra y Publicidad:{" "}
+                              {money(cost.commercial_cost, currency)}
+                              {cost.overhead_cost !== undefined && (
+                                <>
+                                  {" "}
+                                  · Otros gastos:{" "}
+                                  {money(cost.overhead_cost, currency)}
+                                </>
+                              )}
+                            </small>
+                          )}
+                        </td>
+                        <td>
+                          {cost ? money(cost.margin, currency) : "Pendiente"}
+                          {cost?.margin != null && (
                             <>
-                              {" "}
-                              · Otros gastos:{" "}
-                              {money(cost.overhead_cost, currency)}
+                              <small>
+                                Margen / venta:{" "}
+                                {Number(cost.sale_price) > 0
+                                  ? (
+                                      (cost.margin / Number(cost.sale_price)) *
+                                      100
+                                    ).toFixed(2) + " %"
+                                  : "Pendiente"}
+                              </small>
+                              <small>
+                                Recargo / costo:{" "}
+                                {cost.total_cost > 0
+                                  ? (
+                                      (cost.margin / cost.total_cost) *
+                                      100
+                                    ).toFixed(2) + " %"
+                                  : "Pendiente"}
+                              </small>
                             </>
                           )}
-                        </small>
-                      )}
-                    </td>
-                    <td>
-                      {cost ? money(cost.margin, currency) : "Pendiente"}
-                      {cost?.margin != null && (
-                        <>
-                          <small>
-                            Margen / venta:{" "}
-                            {Number(cost.sale_price) > 0
-                              ? (
-                                  (cost.margin / Number(cost.sale_price)) *
-                                  100
-                                ).toFixed(2) + " %"
-                              : "Pendiente"}
-                          </small>
-                          <small>
-                            Recargo / costo:{" "}
-                            {cost.total_cost > 0
-                              ? ((cost.margin / cost.total_cost) * 100).toFixed(
-                                  2,
-                                ) + " %"
-                              : "Pendiente"}
-                          </small>
-                        </>
-                      )}
-                    </td>
+                        </td>
+                      </>
+                    )}
                     <td>
                       <AppButton
                         type="button"

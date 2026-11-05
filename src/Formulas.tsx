@@ -72,6 +72,8 @@ const initial = (): Row => ({
   state: "testing",
   own_reference: "",
   estimated_units: "",
+  requires_curing: false,
+  curing_days: 0,
   estimate_unit_id: "",
   estimate_variant_id: "",
   quantity_per_unit: "",
@@ -1010,9 +1012,10 @@ export default function Formulas({
                   price != null && estimate.cost != null
                     ? price - estimate.cost
                     : null;
-                const marginPercent = margin != null && price != null && price > 0
-                  ? (margin / price) * 100
-                  : null;
+                const marginPercent =
+                  margin != null && price != null && price > 0
+                    ? (margin / price) * 100
+                    : null;
                 return (
                   <tr key={f.id}>
                     <td>{f.code}</td>
@@ -1322,6 +1325,35 @@ export default function Formulas({
                     <option value="percentage">Por porcentajes</option>
                   </SearchSelect>
                 </label>
+                <label className="check">
+                  <input
+                    type="checkbox"
+                    checked={!!draft.requires_curing}
+                    onChange={(e) => {
+                      field("requires_curing", e.target.checked);
+                      if (!e.target.checked) field("curing_days", 0);
+                    }}
+                  />
+                  Requiere curado
+                </label>
+                {draft.requires_curing ? (
+                  <label>
+                    Días de curado
+                    <input
+                      type="number"
+                      min="1"
+                      max="3650"
+                      step="1"
+                      required
+                      value={draft.curing_days || ""}
+                      onChange={(e) => field("curing_days", e.target.value)}
+                    />
+                  </label>
+                ) : (
+                  <p className="muted">
+                    Sin curado: la producción queda disponible al confirmarla.
+                  </p>
+                )}
                 <label>
                   Estado
                   <SearchSelect

@@ -1,24 +1,15 @@
-import {plannedProductionUnits} from "./formula-model";
+import { plannedProductionUnits } from "./formula-model";
 import SearchSelect from "./SearchSelect";
 import MaterialRequirements from "./MaterialRequirements";
 import VariantWeightCapture, { type WeighedUnit } from "./VariantWeightCapture";
 import { weightMatches } from "./variant-weights";
 import { IconDetails } from "./PoolControls";
-import AdditionalCostsPanel from "./AdditionalCostsPanel";
-import CostSummary from "./CostSummary";
-import { materialCosts, mergeCostLines } from "./financial-summary";
-import { additionalCosts } from "./additional-costs";
-import {
-  recipeMath,
-  plannedLineQuantity,
-  recipeLineKinds,
-} from "./formula-model";
+import { plannedLineQuantity, recipeLineKinds } from "./formula-model";
 import ResponsiveTable from "./ResponsiveTable";
 import { confirmAction } from "./ConfirmDialog";
 import { AppButton, AppIcon } from "./AppIcon";
 import Formulas from "./Formulas";
 import { request } from "./commerce";
-import { usePriceRefresh } from "./price-events";
 import BatchTrace, { lotCode } from "./BatchTrace";
 import { useEffect, useState } from "react";
 import {
@@ -26,7 +17,6 @@ import {
   operation,
   mutate,
   useOperation,
-  money,
   today,
   type Row,
 } from "./operations";
@@ -72,13 +62,6 @@ function ProductionBatches({
     [draftFormula, setDraftFormula] = useState(""),
     [traceId, setTraceId] = useState<string | null>(null),
     [dirty, setDirty] = useState(false),
-    [costCatalog, setCostCatalog] = useState<Row>({
-      materials: [],
-      units: [],
-      presentations: [],
-      additional_costs: [],
-      currency: "GTQ",
-    }),
     [draftScale, setDraftScale] = useState("1"),
     [consumed, setConsumed] = useState<Record<string, string>>({}),
     [outputUnits, setOutputUnits] = useState<Record<string, string>>({}),
@@ -86,25 +69,18 @@ function ProductionBatches({
     [weighedUnits, setWeighedUnits] = useState<WeighedUnit[]>([]),
     [pendingUnitWeight, setPendingUnitWeight] = useState(false);
   async function load() {
-    const [c, f, b, costs] = await Promise.all([
+    const [c, f, b] = await Promise.all([
       operation(company, "production_catalog"),
       request("formula_command", { p_company: company, p_action: "list" }),
       request("production_command", { p_company: company, p_action: "list" }),
-      request("formula_catalog", { p_company: company }),
     ]);
     setCatalog(c);
-    setCostCatalog(costs);
     setFormulas(f);
     setBatches(b);
   }
   useEffect(() => {
     state.run(load);
   }, [company]);
-  usePriceRefresh(company, () => {
-    request("formula_catalog", { p_company: company })
-      .then(setCostCatalog)
-      .catch((e) => state.setError(e.message));
-  });
   useEffect(() => {
     onDirty(dirty);
     return () => onDirty(false);
@@ -133,10 +109,24 @@ function ProductionBatches({
     setDirty(false);
   }
   const formula = formulas.find((f) => f.id === selected?.formula_id);
+  const requiresCuring =
+    formula?.requires_curing ?? selected?.requires_curing ?? true;
   const estimating = formulas.find(
     (f) => f.id === (mode === "start" ? draftFormula : selected?.formula_id),
   );
-  const draftUnits = plannedProductionUnits(estimating?.estimated_units,draftScale);
+  const draftUnits = plannedProductionUnits(
+    estimating?.estimated_units,
+    draftScale,
+  );
+  const plannedAvailable = (() => {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return "";
+    const d = new Date(date + "T12:00:00Z");
+    d.setUTCDate(
+      d.getUTCDate() +
+        (estimating?.requires_curing ? Number(estimating.curing_days) || 0 : 0),
+    );
+    return Number.isFinite(d.getTime()) ? d.toISOString().slice(0, 10) : "";
+  })();
   const factor =
     mode === "start"
       ? Number(draftScale)
@@ -165,103 +155,6 @@ function ProductionBatches({
       factor,
       neededUnits,
     );
-  const baseMath = estimating
-    ? recipeMath(
-        estimating.ingredients.map((i: Row) => ({
-          key: i.material_id,
-          material: i.material_id,
-          unit: i.unit_id,
-          quantity:
-            mode === "finish"
-              ? (consumed[i.material_id] ?? suggested(i))
-              : suggested(i),
-          percentage: i.percentage,
-          line_kind: i.line_kind || "ingredient",
-          density_g_ml: i.density_g_ml,
-        })),
-        costCatalog.units,
-        costCatalog.materials,
-        "quantity",
-        "",
-        "",
-      )
-    : null;
-  const extraQuote = additionalCosts(
-    costCatalog.additional_costs,
-    costCatalog.currency,
-    neededUnits > 0 ? neededUnits : null,
-    variableWeight
-      ? undefined
-      : costCatalog.presentations.find(
-          (v: Row) => v.id === estimating?.estimate_variant_id,
-        ),
-    estimating?.labor_level_id,
-    estimating?.advertising_level_id,
-    estimating?.overhead_lines || [],
-  );
-  const fixedPreview = additionalCosts(
-    costCatalog.additional_costs,
-    costCatalog.currency,
-    neededUnits > 0 ? neededUnits : null,
-    undefined,
-    "",
-    "",
-    (estimating?.overhead_lines || []).filter(
-      (line: Row) =>
-        costCatalog.additional_costs.find((c: Row) => c.id === line.cost_id)
-          ?.kind === "overhead",
-    ),
-  );
-  const perUnitPreview =
-    baseMath?.rows
-      .filter((r) =>
-        perUnitMaterials.some((m: Row) => m.material_id === r.material?.id),
-      )
-      .reduce((sum, r) => sum + (r.cost ?? 0), 0) ?? 0;
-  const commonPreview =
-    baseMath?.totalCost != null ? baseMath.totalCost - perUnitPreview : null;
-  const summaryQuote = (() => {
-    if (!variableWeight || mode !== "finish" || producedUnits <= 0)
-      return { ...extraQuote, variable_weight: variableWeight };
-    const selectedCosts: Row[] = estimating?.overhead_lines || [];
-    const commercialSelection = selectedCosts.filter(
-      (l) =>
-        costCatalog.additional_costs.find((c: Row) => c.id === l.cost_id)
-          ?.kind !== "overhead",
-    );
-    const quotes = Object.entries(outputUnits)
-      .filter(([, n]) => Number(n) > 0)
-      .map(([id, count]) => ({
-        count: Number(count),
-        quote: additionalCosts(
-          costCatalog.additional_costs,
-          costCatalog.currency,
-          Number(count),
-          costCatalog.presentations.find((v: Row) => v.id === id),
-          "",
-          "",
-          commercialSelection,
-        ),
-      }));
-    const lines = mergeCostLines([
-      ...(fixedPreview.cost_lines || []),
-      ...quotes.flatMap((x) => x.quote.cost_lines),
-    ]);
-    const revenue = quotes.every((x) => x.quote.sale_price != null)
-      ? quotes.reduce((sum, x) => sum + x.count * Number(x.quote.sale_price), 0)
-      : null;
-    return {
-      ...extraQuote,
-      unit_basis_count: producedUnits,
-      sale_price: revenue != null ? revenue / producedUnits : null,
-      cost_lines: lines,
-      additional_total: lines.every((l) => l.total != null)
-        ? lines.reduce((sum, l) => sum + Number(l.total), 0)
-        : null,
-      average: true,
-      variable_weight: true,
-    };
-  })();
   return (
     <>
       <section className="intro">
@@ -272,8 +165,9 @@ function ProductionBatches({
             Producción
           </h1>
           <p>
-            Finaliza con consumos reales y reparte el lote entre variantes.
-            Libera el producto manualmente al terminar el curado.
+            Finaliza con consumos reales y reparte el lote entre variantes. Sin
+            curado, el producto queda disponible al confirmar. Si requiere
+            curado, se conserva su fecha de disponibilidad.
           </p>
         </div>
         <div className="actions">
@@ -342,14 +236,25 @@ function ProductionBatches({
                 let payload: Row = Object.fromEntries(f);
                 let action = "";
                 if (mode === "start") {
-                  if(draftUnits==null || !Number.isInteger(draftUnits) || draftUnits>2147483647){state.setError(draftUnits==null?"Selecciona una fórmula con Unidades estimadas y un número válido de lotes a producir.":"La multiplicación debe dar un número entero de unidades. Ajusta los lotes a producir.");return;}
+                  if (
+                    draftUnits == null ||
+                    !Number.isInteger(draftUnits) ||
+                    draftUnits > 2147483647
+                  ) {
+                    state.setError(
+                      draftUnits == null
+                        ? "Selecciona una fórmula con Unidades estimadas y un número válido de lotes a producir."
+                        : "La multiplicación debe dar un número entero de unidades. Ajusta los lotes a producir.",
+                    );
+                    return;
+                  }
                   action = "draft_save";
                   payload = {
                     ...payload,
                     id: selected?.id,
                     product: draftProduct,
                     formula: draftFormula,
-                    quantity:draftUnits,
+                    quantity: draftUnits,
                   };
                 } else if (mode === "finish") {
                   if (pendingUnitWeight) {
@@ -508,7 +413,13 @@ function ProductionBatches({
                       step="1"
                       required
                     />
-                    <small>{draftUnits==null?"Define las Unidades estimadas en la fórmula para calcularlas aquí.":!Number.isInteger(draftUnits)?"El resultado debe ser un número entero de unidades.":`${estimating?.estimated_units} unidades por lote × ${draftScale} lotes a producir`}</small>
+                    <small>
+                      {draftUnits == null
+                        ? "Define las Unidades estimadas en la fórmula para calcularlas aquí."
+                        : !Number.isInteger(draftUnits)
+                          ? "El resultado debe ser un número entero de unidades."
+                          : `${estimating?.estimated_units} unidades por lote × ${draftScale} lotes a producir`}
+                    </small>
                   </label>
                   <label>
                     Fecha de producción
@@ -526,9 +437,15 @@ function ProductionBatches({
                       name="available_on"
                       type="date"
                       required
-                      min={date}
-                      defaultValue={selected?.available_on || date}
+                      readOnly
+                      value={plannedAvailable}
+                      aria-label="Disponibilidad calculada según el curado de la fórmula"
                     />
+                    <small>
+                      {estimating?.requires_curing
+                        ? `${estimating.curing_days} días de curado según la fórmula`
+                        : "Sin curado: disponible al confirmar la fabricación"}
+                    </small>
                   </label>
                   <label>
                     Notas
@@ -543,8 +460,9 @@ function ProductionBatches({
                 <>
                   <h3>Consumo real de materiales</h3>
                   <p>
-                    Las cantidades sugeridas provienen de la versión y del
-                    lotes a producir. Corrige con lo que realmente utilizaste.
+                    Las cantidades sugeridas provienen de la fórmula y los lotes
+                    a producir. Registra el total utilizado, incluyendo derrames
+                    o material dañado. No se descontará otra merma adicional.
                   </p>
                   {formula?.ingredients.map((r: Row) => (
                     <label key={r.material_id}>
@@ -584,11 +502,6 @@ function ProductionBatches({
                       />
                     </label>
                   ))}
-                  <label>
-                    <input type="checkbox" required />
-                    Confirmo las cantidades reales. Se descontarán del
-                    inventario una sola vez y se conservará la receta histórica.
-                  </label>
                   <h3>Variantes obtenidas</h3>
                   <VariantWeightCapture
                     variants={catalog.variants.filter(
@@ -597,7 +510,7 @@ function ProductionBatches({
                     units={weighedUnits}
                     busy={state.busy}
                     onPending={setPendingUnitWeight}
-                    currency={costCatalog.currency}
+                    showCosts={false}
                     unitMaterials={
                       variableWeight
                         ? perUnitMaterials.map((m: Row) => ({
@@ -642,97 +555,6 @@ function ProductionBatches({
                       setOutputUnits((old) => ({ ...old, ...amounts }));
                       setOutputWeights((old) => ({ ...old, ...weights }));
                       setDirty(true);
-                    }}
-                    costFor={(v, w, n, totalWeight, quantities) => {
-                      const perUnitCost =
-                        baseMath?.rows
-                          .filter((r) =>
-                            perUnitMaterials.some(
-                              (m: Row) => m.material_id === r.material?.id,
-                            ),
-                          )
-                          .reduce((s, r) => s + (r.cost ?? 0), 0) ?? 0;
-                      const fixed = additionalCosts(
-                        costCatalog.additional_costs,
-                        costCatalog.currency,
-                        n,
-                        undefined,
-                        "",
-                        "",
-                        (estimating?.overhead_lines || []).filter(
-                          (line: Row) =>
-                            costCatalog.additional_costs.find(
-                              (c: Row) => c.id === line.cost_id,
-                            )?.kind === "overhead",
-                        ),
-                      );
-                      const assigned = perUnitMaterials.reduce(
-                        (sum: number, m: Row) => {
-                          const totalQuantity = Number(
-                            consumed[m.material_id] ?? suggested(m),
-                          );
-                          const quantity =
-                            quantities[m.material_id] !== undefined &&
-                            quantities[m.material_id] !== ""
-                              ? Number(quantities[m.material_id])
-                              : totalQuantity / n;
-                          const cost = baseMath?.rows.find(
-                            (r) => r.material?.id === m.material_id,
-                          )?.cost;
-                          return (
-                            sum +
-                            (totalQuantity > 0 && cost != null
-                              ? (cost * quantity) / totalQuantity
-                              : 0)
-                          );
-                        },
-                        0,
-                      );
-                      const manufacturing =
-                        baseMath?.totalCost != null && totalWeight > 0
-                          ? ((baseMath.totalCost - perUnitCost) * w) /
-                              totalWeight +
-                            assigned
-                          : null;
-                      const ref = costCatalog.presentations.find(
-                        (p: Row) => p.id === v.id,
-                      );
-                      const commercial = additionalCosts(
-                        costCatalog.additional_costs,
-                        costCatalog.currency,
-                        1,
-                        ref,
-                        "",
-                        "",
-                        (estimating?.overhead_lines || []).filter(
-                          (line: Row) =>
-                            costCatalog.additional_costs.find(
-                              (c: Row) => c.id === line.cost_id,
-                            )?.kind !== "overhead",
-                        ),
-                      );
-                      const total =
-                        manufacturing != null &&
-                        commercial.additional_total != null &&
-                        fixed.additional_total != null
-                          ? manufacturing +
-                            commercial.additional_total +
-                            fixed.additional_total / n
-                          : null;
-                      return {
-                        manufacturing_cost: manufacturing,
-                        commercial_cost: commercial.additional_total,
-                        overhead_cost:
-                          fixed.additional_total == null
-                            ? null
-                            : fixed.additional_total / n,
-                        total_cost: total,
-                        sale_price: ref?.price ?? null,
-                        margin:
-                          ref?.price != null && total != null
-                            ? Number(ref.price) - total
-                            : null,
-                      };
                     }}
                   />
                   <p>
@@ -798,7 +620,7 @@ function ProductionBatches({
                   )}
                   <div className="settings-grid">
                     <label>
-                      Unidades de merma
+                      Unidades dañadas (opcional)
                       <input
                         name="scrap"
                         type="number"
@@ -820,9 +642,9 @@ function ProductionBatches({
                     </label>
                   </div>
                   <p>
-                    {variableWeight
-                      ? "La fabricación común se reparte por el peso real. Empaque e insumos por unidad usan el consumo registrado. Mano de obra y publicidad se calculan con el precio base de cada variante. Los valores previos a confirmar son estimaciones."
-                      : "El costo se reparte según el rendimiento obtenido. Si faltan pesos o costos de materiales, quedará pendiente."}
+                    Solo las unidades buenas ingresan al inventario. Las
+                    unidades dañadas son informativas; los materiales se
+                    descuentan según el consumo real registrado.
                   </p>
                 </>
               ) : (
@@ -857,41 +679,12 @@ function ProductionBatches({
                   units={Number(draftUnits)}
                 />
               )}
-              {estimating && mode !== "release" && (
-                <>
-                  <AdditionalCostsPanel
-                    quote={summaryQuote}
-                    baseCost={baseMath?.totalCost ?? null}
-                    hideTotals
-                  />
-                  {variableWeight && (
-                    <p className="muted">
-                      {weighedUnits.length} unidades ·{" "}
-                      {realWeight.toLocaleString("es-GT", {
-                        maximumFractionDigits: 4,
-                      })}{" "}
-                      g. Fabricación común por gramo:{" "}
-                      {commonPreview != null && realWeight > 0
-                        ? money(
-                            commonPreview / realWeight,
-                            costCatalog.currency,
-                          )
-                        : "Pendiente"}{" "}
-                      (estimación).
-                    </p>
-                  )}
-                  <CostSummary
-                    product={estimating.product_name || estimating.name}
-                    materials={materialCosts(baseMath?.rows || [])}
-                    quote={summaryQuote}
-                    variable={variableWeight}
-                  />
-                </>
-              )}
               <div className="form-actions">
                 <AppButton disabled={state.busy}>
                   {mode === "finish"
-                    ? "Confirmar producción y enviar a curación"
+                    ? !requiresCuring
+                      ? "Confirmar producción y dejar disponible"
+                      : "Confirmar producción y enviar a curado"
                     : mode === "release"
                       ? "Liberar existencias"
                       : "Guardar borrador"}
@@ -918,7 +711,6 @@ function ProductionBatches({
                 <th>Estado</th>
                 <th>Rendimiento</th>
                 <th>Disponibilidad estimada</th>
-                <th>Costo real</th>
                 <th>Variantes / acciones</th>
               </tr>
             </thead>
@@ -960,53 +752,6 @@ function ProductionBatches({
                     <small>Merma: {b.scrap_quantity}</small>
                   </td>
                   <td>{b.available_on}</td>
-                  <td>
-                    {money(
-                      b.recipe_snapshot?.weight_costs?.manufacturing_total ??
-                        b.total_cost,
-                      b.currency,
-                    )}
-                    {b.recipe_snapshot?.weight_costs && (
-                      <>
-                        <small>
-                          Comerciales:{" "}
-                          {money(
-                            b.recipe_snapshot.weight_costs.commercial_total,
-                            b.currency,
-                          )}
-                        </small>
-                        <small>
-                          Total con comerciales:{" "}
-                          {money(
-                            b.recipe_snapshot.weight_costs.total_cost,
-                            b.currency,
-                          )}
-                        </small>
-                        <small>
-                          Fabricación común / g:{" "}
-                          {money(
-                            b.recipe_snapshot.weight_costs.cost_per_gram,
-                            b.currency,
-                          )}
-                        </small>
-                      </>
-                    )}
-                    {b.recipe_snapshot?.additional_costs && (
-                      <small>
-                        Total estimado con adicionales:{" "}
-                        {money(
-                          b.recipe_snapshot.estimated_total_cost,
-                          b.currency,
-                        )}
-                      </small>
-                    )}
-                    {b.outputs?.map((o: Row) => (
-                      <small key={o.id}>
-                        {o.variant_name}: {money(o.unit_cost, b.currency)} / ud{" "}
-                        {o.estimated_cost ? "(estimado por rango)" : ""}
-                      </small>
-                    ))}
-                  </td>
                   <td className="actions">
                     <AppButton
                       className="secondary"
@@ -1100,6 +845,7 @@ function ProductionBatches({
         <BatchTrace
           company={company}
           id={traceId}
+          showCosts={false}
           onClose={() => setTraceId(null)}
         />
       )}
