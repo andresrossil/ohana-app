@@ -297,6 +297,9 @@ export default function Kardex({
                   <td>{r.unit}</td>
                   <td data-sort-value={r.unit_cost ?? ""}>
                     {money(r.unit_cost, r.currency)}
+                    {r.cost_basis === "catalog_purchase" && (
+                      <small>Precio de compra al confirmar</small>
+                    )}
                     {r.cost_basis === "historical_reference" && (
                       <small>Referencia histórica simplificada</small>
                     )}
