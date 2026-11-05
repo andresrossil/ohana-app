@@ -19,7 +19,7 @@ const money = (v: any, c = "GTQ") =>
         maximumFractionDigits: 2,
       }).format(Number(v));
 export const lotCode = (n: number | string | undefined) =>
-  n == null ? "Lote sin número" : `LOT-${String(n).padStart(4, "0")}`;
+  n == null ? "Producción sin número" : `PROD-${n}`;
 const num = (n: any) =>
   n == null
     ? "—"
@@ -71,7 +71,7 @@ export default function BatchTrace({
       >
         <div className="hierarchy-toolbar">
           <h2 id="trace-title">
-            Detalle de lote{" "}
+            Documento de producción{" "}
             {data ? `· ${lotCode(data.batch.batch_number)}` : ""}
           </h2>
           <AppButton className="secondary" onClick={onClose}>

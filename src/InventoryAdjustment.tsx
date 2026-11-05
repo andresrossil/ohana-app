@@ -42,10 +42,9 @@ export const inventoryKinds: Record<string, string> = {
   release: "Liberación",
   adjustment: "Ajuste anterior",
 };
-const columns = [
+const columns: readonly (readonly [string, string])[] = [
   ["article", "Artículo (SKU o nombre)"],
   ["weight", "Peso real (g)"],
-  ["lot", "Lote"],
   ["external_code", "Identificador individual"],
   ["quantity", "Cantidad"],
   ["unit", "Unidad"],
@@ -194,7 +193,7 @@ export default function InventoryAdjustment({
       producto: "article",
       "peso real (g)": "weight",
       peso: "weight",
-      lote: "lot",
+      lote: "ignore",
       cantidad: "quantity",
       unidad: "unit",
       um: "unit",
@@ -835,7 +834,7 @@ export default function InventoryAdjustment({
                         "Unidad",
                         "Costo unitario",
                         "Valor",
-                        "Lote / Unidad",
+                        "Unidad individual",
                       ].map((h) => (
                         <th key={h}>{h}</th>
                       ))}
@@ -853,7 +852,6 @@ export default function InventoryAdjustment({
                         <td>{money(r.unit_cost, currency)}</td>
                         <td>{money(r.total_value, currency)}</td>
                         <td>
-                          {r.lot_label || r.lot_id}
                           {r.weight && (
                             <small>
                               {r.weight} g ·{" "}

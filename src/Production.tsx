@@ -8,6 +8,7 @@ import { confirmAction } from "./ConfirmDialog";
 import { AppButton, AppIcon } from "./AppIcon";
 import Formulas from "./Formulas";
 import { request } from "./commerce";
+import AutoTextarea from "./AutoTextarea";
 import BatchTrace, { lotCode } from "./BatchTrace";
 import { useEffect, useState } from "react";
 import {
@@ -44,6 +45,8 @@ function ProductionBatches({
   manager?: boolean;
   onDirty: (dirty: boolean) => void;
 }) {
+  const [cancelId, setCancelId] = useState(""),
+    [cancelReason, setCancelReason] = useState("");
   const state = useOperation(company, "production"),
     [catalog, setCatalog] = useState<Row>({
       products: [],
@@ -150,8 +153,8 @@ function ProductionBatches({
             Producción
           </h1>
           <p>
-            Finaliza con consumos reales y reparte el lote entre variantes. Sin
-            curado, el producto queda disponible al confirmar. Si requiere
+            Finaliza con consumos reales y registra las unidades por variante.
+            Sin curado, el producto queda disponible al confirmar. Si requiere
             curado, se conserva su fecha de disponibilidad.
           </p>
         </div>
@@ -168,7 +171,7 @@ function ProductionBatches({
                 setMode("start");
               }}
             >
-              Nuevo lote
+              Nueva producción
             </AppButton>
           )}
           <AppButton
@@ -198,7 +201,7 @@ function ProductionBatches({
             <h2>
               {
                 {
-                  start: "Lote borrador",
+                  start: "Producción en preparación",
                   finish: "Confirmar producción",
                   release: "Liberación manual",
                 }[mode]
@@ -228,8 +231,8 @@ function ProductionBatches({
                   ) {
                     state.setError(
                       draftUnits == null
-                        ? "Selecciona una fórmula con Unidades estimadas y un número válido de lotes a producir."
-                        : "La multiplicación debe dar un número entero de unidades. Ajusta los lotes a producir.",
+                        ? "Selecciona una fórmula con Unidades estimadas y un número válido de preparaciones."
+                        : "La multiplicación debe dar un número entero de unidades. Ajusta las preparaciones a realizar.",
                     );
                     return;
                   }
@@ -378,7 +381,7 @@ function ProductionBatches({
                     </SearchSelect>
                   </label>
                   <label>
-                    Lotes a producir
+                    Preparaciones a realizar
                     <input
                       name="formula_scale"
                       type="number"
@@ -406,7 +409,7 @@ function ProductionBatches({
                         ? "Define las Unidades estimadas en la fórmula para calcularlas aquí."
                         : !Number.isInteger(draftUnits)
                           ? "El resultado debe ser un número entero de unidades."
-                          : `${estimating?.estimated_units} unidades por lote × ${draftScale} lotes a producir`}
+                          : `${estimating?.estimated_units} unidades por preparación × ${draftScale} preparaciones`}
                     </small>
                   </label>
                   <label>
@@ -448,9 +451,10 @@ function ProductionBatches({
                 <>
                   <h3>Consumo real de materiales</h3>
                   <p>
-                    Las cantidades sugeridas provienen de la fórmula y los lotes
-                    a producir. Registra el total utilizado, incluyendo derrames
-                    o material dañado. No se descontará otra merma adicional.
+                    Las cantidades sugeridas provienen de la fórmula y las
+                    preparaciones a producir. Registra el total utilizado,
+                    incluyendo derrames o material dañado. No se descontará otra
+                    merma adicional.
                   </p>
                   {formula?.ingredients.map((r: Row) => (
                     <label key={r.material_id}>
@@ -465,7 +469,7 @@ function ProductionBatches({
                         {r.line_kind === "auxiliary"
                           ? r.quantity_basis === "unit"
                             ? " · por unidad producida"
-                            : " · fija por lote"
+                            : " · fija por preparación"
                           : " · escalado de receta"}
                       </small>
                       {r.reference_notes && (
@@ -572,7 +576,7 @@ function ProductionBatches({
               ) : (
                 <>
                   <p>
-                    Confirma que este lote está listo para vender. Fecha
+                    Confirma que esta producción está listo para vender. Fecha
                     estimada: {selected?.available_on}.
                   </p>
                   <label>
@@ -629,7 +633,7 @@ function ProductionBatches({
           <ResponsiveTable>
             <thead>
               <tr>
-                <th>Lote / producto</th>
+                <th>Documento / producto</th>
                 <th>Estado</th>
                 <th>Rendimiento</th>
                 <th>Disponibilidad estimada</th>
@@ -679,8 +683,20 @@ function ProductionBatches({
                       className="secondary"
                       onClick={() => setTraceId(b.id)}
                     >
-                      Ver lote
+                      Ver documento
                     </AppButton>
+                    {state.canWrite && b.state !== "cancelled" && (
+                      <AppButton
+                        className="danger"
+                        disabled={state.busy}
+                        onClick={() => {
+                          setCancelId(b.id);
+                          setCancelReason("");
+                        }}
+                      >
+                        Cancelar documento
+                      </AppButton>
+                    )}
                     {state.canWrite && b.state === "draft" && (
                       <>
                         <AppButton
@@ -710,12 +726,12 @@ function ProductionBatches({
                               );
                               await load();
                               state.setNotice(
-                                "Lote en preparación. Registra los consumos reales antes de confirmar.",
+                                "Producción en preparación. Registra los consumos reales antes de confirmar.",
                               );
                             })
                           }
                         >
-                          Preparar lote
+                          Preparar producción
                         </AppButton>
                       </>
                     )}
@@ -746,7 +762,7 @@ function ProductionBatches({
                           setMode("release");
                         }}
                       >
-                        Liberar lote
+                        Liberar producción
                       </AppButton>
                     )}
                   </td>
@@ -756,7 +772,7 @@ function ProductionBatches({
           </ResponsiveTable>
 
           {!batches.length && (
-            <p className="empty">No hay lotes de producción.</p>
+            <p className="empty">No hay documentos de producción.</p>
           )}
         </div>
       </section>
@@ -767,6 +783,68 @@ function ProductionBatches({
           showCosts={false}
           onClose={() => setTraceId(null)}
         />
+      )}
+      {cancelId && (
+        <div className="overlay">
+          <section
+            className="modal operations-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Cancelar producción"
+            data-navigation-dirty={!!cancelReason}
+          >
+            <h2>Cancelar documento de producción</h2>
+            <p>
+              Se conserva el original. Si ya está confirmado, se retira lo
+              fabricado y se devuelven los materiales consumidos. Primero deben
+              revertirse las ventas o reservas que utilicen esas unidades.
+            </p>
+            <label>
+              Motivo
+              <AutoTextarea
+                value={cancelReason}
+                maxLength={500}
+                onChange={(e) => setCancelReason(e.target.value)}
+              />
+            </label>
+            {state.error && (
+              <p className="error" role="alert">
+                {state.error}
+              </p>
+            )}
+            <div className="actions">
+              <AppButton
+                className="danger"
+                disabled={state.busy || cancelReason.trim().length < 5}
+                onClick={() =>
+                  state.run(async () => {
+                    await keyedRequest(
+                      company,
+                      "production_command",
+                      { id: cancelId, reason: cancelReason },
+                      "cancel",
+                    );
+                    setCancelId("");
+                    setCancelReason("");
+                    await load();
+                  })
+                }
+              >
+                Revertir documento
+              </AppButton>
+              <AppButton
+                className="secondary"
+                disabled={state.busy}
+                onClick={() => {
+                  setCancelId("");
+                  setCancelReason("");
+                }}
+              >
+                Volver
+              </AppButton>
+            </div>
+          </section>
+        </div>
       )}
     </>
   );

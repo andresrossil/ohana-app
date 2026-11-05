@@ -152,7 +152,12 @@ export default function Sales({
                         delivery: "pickup",
                         payment: f.get("payment"),
                       }
-                    : { order: order!.id };
+                    : {
+                        order: order!.id,
+                        ...(mode === "cancel"
+                          ? { reason: f.get("reason") }
+                          : {}),
+                      };
                 state.run(async () => {
                   await keyedRequest(company, "sales", payload, mode);
                   setMode(null);
@@ -350,6 +355,17 @@ export default function Sales({
                         ? "Confirma que entregarás las unidades de este pedido. Se descontarán las existencias físicas."
                         : "Se liberarán las unidades reservadas. Si el pedido ya fue pagado, el reembolso quedará pendiente de gestionar."}
                   </p>
+                  {mode === "cancel" && (
+                    <label>
+                      Motivo de cancelación
+                      <input
+                        name="reason"
+                        required
+                        minLength={5}
+                        maxLength={500}
+                      />
+                    </label>
+                  )}
                   <label>
                     <input type="checkbox" required /> Confirmo esta operación
                   </label>

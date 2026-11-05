@@ -293,6 +293,7 @@ export default function Inventory({
                   <th>Cantidad</th>
                   <th>Importe real</th>
                   <th>Referencia</th>
+                  <th>Estado</th>
                 </tr>
               </thead>
               <tbody>
@@ -306,6 +307,7 @@ export default function Inventory({
                     </td>
                     <td>{money(r.amount, r.currency)}</td>
                     <td>{r.reference || "—"}</td>
+                    <td>{r.cancelled_at ? "Cancelada" : "Confirmada"}</td>
                   </tr>
                 ))}
               </tbody>

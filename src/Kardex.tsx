@@ -2,7 +2,9 @@ import { useEffect, useState } from "react";
 import { AppButton, AppIcon } from "./AppIcon";
 import SearchSelect from "./SearchSelect";
 import ResponsiveTable from "./ResponsiveTable";
-import { money, useOperation, type Row } from "./operations";
+import { money, keyedRequest, useOperation, type Row } from "./operations";
+import { confirmAction } from "./ConfirmDialog";
+import AutoTextarea from "./AutoTextarea";
 import InventoryAdjustment, {
   inventoryRequest,
   inventoryKinds,
@@ -19,6 +21,7 @@ export default function Kardex({
   revision: number;
   onSaved: () => Promise<void>;
 }) {
+  const [cancelReason, setCancelReason] = useState("");
   const state = useOperation(company, "inventory"),
     [filters, setFilters] = useState<Row>({ page: 0 }),
     [draft, setDraft] = useState<Row>({}),
@@ -62,6 +65,7 @@ export default function Kardex({
     order_cancel: "Cancelación",
     release: "Liberación",
     adjustment: "Ajuste anterior",
+    document_reversal: "Reversión de documento",
   };
   const products = new Map<string, Row>();
   for (const b of result.stock) {
@@ -154,22 +158,6 @@ export default function Kardex({
             </SearchSelect>
           </label>
           <label>
-            Lote
-            <SearchSelect
-              value={draft.lot || ""}
-              onChange={(e) => field("lot", e.target.value)}
-            >
-              <option value="">Todos</option>
-              {cat.lots
-                .filter((l: Row) => !draft.item || l.item_id === draft.item)
-                .map((l: Row) => (
-                  <option key={l.id} value={l.id}>
-                    {l.label || l.id}
-                  </option>
-                ))}
-            </SearchSelect>
-          </label>
-          <label>
             Tipo de movimiento
             <SearchSelect
               value={draft.type || ""}
@@ -240,7 +228,7 @@ export default function Kardex({
                   "Unidad",
                   "Costo unitario",
                   "Valor",
-                  "Lote / Unidades",
+                  "Unidades",
                   "Usuario / Registro",
                   "Observaciones",
                 ].map((h) => (
@@ -308,11 +296,6 @@ export default function Kardex({
                     {money(r.value, r.currency)}
                   </td>
                   <td>
-                    {r.lots?.map((id: string) => (
-                      <small key={id}>
-                        {cat.lots.find((l: Row) => l.id === id)?.label || id}
-                      </small>
-                    ))}
                     {r.units?.map((u: Row) => (
                       <small key={u.id}>
                         {u.code} ·{" "}
@@ -479,7 +462,7 @@ export default function Kardex({
                       "Unidad",
                       "Costo unitario",
                       "Valor",
-                      "Lote / Unidad",
+                      "Unidad individual",
                       "Observaciones",
                     ].map((h) => (
                       <th key={h}>{h}</th>
@@ -498,7 +481,6 @@ export default function Kardex({
                       <td>{money(l.unit_cost, l.currency)}</td>
                       <td>{money(l.total_value, l.currency)}</td>
                       <td>
-                        {l.lot_id}
                         {l.individual_unit_id && (
                           <small>
                             {l.external_code || l.individual_unit_id} ·{" "}
@@ -600,6 +582,7 @@ export default function Kardex({
             role="dialog"
             aria-modal="true"
             aria-label="Documento origen"
+            data-navigation-dirty={!!cancelReason}
           >
             <header className="catalog-head">
               <h2>{source.movement?.document_number}</h2>
@@ -653,10 +636,88 @@ export default function Kardex({
                 </tbody>
               </ResponsiveTable>
             </div>
-            <p>
-              Las correcciones de compras, producción y ventas se realizan desde
-              su módulo de origen.
-            </p>
+            {(source.cancellation?.reversal_id ||
+              source.cancellation?.status === "cancelled") && (
+              <p role="status">
+                Documento cancelado / revertido.{" "}
+                {source.cancellation.reason &&
+                  "Motivo: " + source.cancellation.reason}
+              </p>
+            )}
+            {source.reversal?.original_movement_id && (
+              <AppButton
+                className="secondary"
+                onClick={() =>
+                  state.run(async () =>
+                    setSource(
+                      await inventoryRequest(company, "source", {
+                        id: source.reversal.original_movement_id,
+                      }),
+                    ),
+                  )
+                }
+              >
+                Ver documento original
+              </AppButton>
+            )}
+            {source.cancellation?.can_cancel && (
+              <div className="inventory-review">
+                <label>
+                  Motivo de cancelación
+                  <AutoTextarea
+                    value={cancelReason}
+                    maxLength={500}
+                    onChange={(e) => setCancelReason(e.target.value)}
+                  />
+                </label>
+                <AppButton
+                  className="danger"
+                  disabled={state.busy || cancelReason.trim().length < 5}
+                  onClick={() =>
+                    state.run(async () => {
+                      if (
+                        !(await confirmAction(
+                          "Se conservará el documento original y se registrarán movimientos inversos. Si hay una venta pagada, su reembolso quedará pendiente de gestionar.",
+                          {
+                            title: "Revertir documento",
+                            confirmText: "Revertir documento",
+                            iconKey: "status.warning",
+                          },
+                        ))
+                      )
+                        return;
+                      await keyedRequest(
+                        company,
+                        "inventory_command",
+                        {
+                          movement_id: source.movement.id,
+                          reason: cancelReason,
+                        },
+                        "cancel_document",
+                      );
+                      setSource(
+                        await inventoryRequest(company, "source", {
+                          id: source.movement.id,
+                        }),
+                      );
+                      setCancelReason("");
+                      await onSaved();
+                      setResult(
+                        await inventoryRequest(company, "ledger", filters),
+                      );
+                      setCat(await inventoryRequest(company, "catalog"));
+                    })
+                  }
+                >
+                  Cancelar / Revertir documento
+                </AppButton>
+              </div>
+            )}
+            {state.error && (
+              <p className="error" role="alert">
+                {state.error}
+              </p>
+            )}
           </section>
         </div>
       )}

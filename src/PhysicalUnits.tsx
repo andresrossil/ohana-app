@@ -68,7 +68,7 @@ export default function PhysicalUnits({
   }
   return (
     <section className="catalog physical-units">
-      <h2>Unidades físicas por peso</h2>
+      <h2>Unidades físicas</h2>
       <p className="muted">
         Cada unidad conserva peso, lote y variante originales. Las existencias
         generales incluyen también registros anteriores y productos sin
@@ -80,7 +80,6 @@ export default function PhysicalUnits({
             <tr>
               <th>Identificador</th>
               <th>Producto / variante original</th>
-              <th>Lote</th>
               <th>Peso real</th>
               <th>Costos históricos / unidad</th>
               <th>Margen estimado al producir</th>
@@ -111,11 +110,7 @@ export default function PhysicalUnits({
                     {u.variant_snapshot.name} · {u.variant_snapshot.sku}
                   </small>
                 </td>
-                <td>
-                  {u.variant_snapshot.batch_number
-                    ? String(u.variant_snapshot.batch_number).padStart(6, "0")
-                    : u.batch_id || "Ajuste · " + u.lot_id}
-                </td>
+
                 <td>
                   {weightLabel(u.weight)}
                   {u.weight == null &&
