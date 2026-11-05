@@ -118,17 +118,20 @@ export default function MaterialRequirements({
                         <td>
                           {num(r.available)} {r.unit}
                         </td>
-                        <td>
-                          <AppIcon
-                            name={
-                              r.shortage == null
-                                ? "status.pending"
-                                : Number(r.shortage) > 0
-                                  ? "status.error"
-                                  : "status.success"
-                            }
-                          />
-                          {num(r.shortage)} {r.unit}
+                        <td data-sort-value={r.shortage}>
+                          {r.shortage == null ? (
+                            <>
+                              <AppIcon name="status.pending" />
+                              {num(r.shortage)}
+                            </>
+                          ) : Number(r.shortage) > 0 ? (
+                            <span className="material-shortage">
+                              <AppIcon name="status.error" />
+                              {num(r.shortage)} {r.unit}
+                            </span>
+                          ) : (
+                            "-"
+                          )}
                         </td>
                       </tr>
                     ))}
