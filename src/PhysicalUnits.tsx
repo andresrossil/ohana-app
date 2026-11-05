@@ -40,6 +40,7 @@ export default function PhysicalUnits({
   const rows = units.filter((u) =>
     [
       u.id,
+      u.external_code,
       u.batch_id,
       u.lot_id,
       u.variant_snapshot?.batch_number,
@@ -86,7 +87,7 @@ export default function PhysicalUnits({
               <tr key={u.id}>
                 <td className="unit-id" title={u.id}>
                   <IconDetails>
-                    <summary>{unitLabel(u.id)}</summary>
+                    <summary>{u.external_code || unitLabel(u.id)}</summary>
                     <ul>
                       {(unitHistory.get(u.id) || []).map((h) => (
                         <li key={h.movement_id}>
@@ -117,7 +118,19 @@ export default function PhysicalUnits({
                   g
                 </td>
                 <td>
-                  {u.cost_snapshot ? (
+                  {u.cost_snapshot?.cost_basis === "inventory_document" ? (
+                    <>
+                      <strong>
+                        {money(
+                          u.cost_snapshot.manufacturing_cost,
+                          u.cost_snapshot.currency,
+                        )}
+                      </strong>
+                      <small>
+                        Costo confirmado en ajuste / inventario inicial
+                      </small>
+                    </>
+                  ) : u.cost_snapshot ? (
                     <>
                       <strong>
                         {money(

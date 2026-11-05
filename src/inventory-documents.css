@@ -1,0 +1,121 @@
+.inventory-adjustment {
+  width: min(1540px, calc(100vw - 24px));
+  max-width: calc(100vw - 24px);
+  padding: clamp(12px, 2vw, 28px);
+}
+.inventory-adjustment .catalog-head {
+  padding: 0;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.inventory-adjustment .settings-grid {
+  margin: 16px 0;
+}
+.inventory-paste,
+.inventory-hint,
+.inventory-review {
+  padding: 16px;
+  border: 1px solid var(--admin-border);
+  border-radius: 12px;
+  background: var(--admin-secondary);
+  margin: 16px 0;
+}
+.inventory-paste textarea {
+  width: 100%;
+  min-width: 0;
+  resize: vertical;
+}
+.inventory-adjustment .actions,
+.kardex .actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 14px 0;
+}
+.inventory-edit-table td {
+  min-width: 150px;
+  vertical-align: top;
+}
+.inventory-edit-table td:nth-child(3) {
+  min-width: 300px;
+}
+.inventory-edit-table input,
+.inventory-edit-table textarea,
+.inventory-edit-table select {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+.inventory-adjustment .error {
+  white-space: pre-wrap;
+}
+.inventory-filters {
+  padding: 16px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 210px), 1fr));
+  gap: 12px;
+}
+.inventory-filters label {
+  min-width: 0;
+}
+.inventory-filters .actions {
+  align-self: end;
+}
+.inventory-adjustment fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.kardex td {
+  overflow-wrap: anywhere;
+}
+.kardex td small {
+  display: block;
+}
+.inventory-review {
+  max-width: 100%;
+  min-width: 0;
+}
+.inventory-review .check {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.inventory-review .check input {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
+}
+@media (max-width: 600px) {
+  .inventory-adjustment {
+    padding: 12px;
+    max-height: calc(100dvh - 16px);
+    margin: 8px auto;
+  }
+  .inventory-paste,
+  .inventory-review {
+    padding: 12px;
+  }
+  .inventory-edit-table td {
+    min-width: 0;
+  }
+  .inventory-adjustment .actions button,
+  .kardex .actions button {
+    min-height: 42px;
+  }
+  .inventory-adjustment .settings-grid {
+    grid-template-columns: 1fr;
+  }
+  .inventory-adjustment .catalog-head h2 {
+    font-size: 1.35rem;
+  }
+  .inventory-filters {
+    padding: 12px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .inventory-filters label:has(input[placeholder]) {
+    grid-column: 1/-1;
+  }
+}

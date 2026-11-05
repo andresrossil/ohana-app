@@ -1,13 +1,12 @@
 import MoneyInput from "./MoneyInput";
+import InventoryAdjustment from "./InventoryAdjustment";
+import Kardex from "./Kardex";
 import { useMaterialTypes, MaterialTypeLabel } from "./MaterialTypesContext";
 import { materialTypeName } from "./material-types-model";
 import SearchSelect from "./SearchSelect";
 import ResponsiveTable from "./ResponsiveTable";
-import PhysicalUnits, { MovementUnits } from "./PhysicalUnits";
+import PhysicalUnits from "./PhysicalUnits";
 import { request } from "./commerce";
-import AutoTextarea from "./AutoTextarea";
-import { parseNumber } from "./sheet-model";
-import { weightMatches } from "./variant-weights";
 import { SearchField } from "./PoolControls";
 import { AppButton, AppIcon } from "./AppIcon";
 import { useEffect, useState } from "react";
@@ -29,6 +28,7 @@ export default function Inventory({
   currency?: string;
 }) {
   const types = useMaterialTypes();
+  const [revision, setRevision] = useState(0);
   const [paymentCurrency, setPaymentCurrency] = useState(currency);
   const state = useOperation(company, "inventory"),
     [data, setData] = useState<Row>({
@@ -43,11 +43,7 @@ export default function Inventory({
     [receipts, setReceipts] = useState<Row[]>([]),
     [form, setForm] = useState<"receive" | "adjust" | null>(null),
     [material, setMaterial] = useState(""),
-    [kind, setKind] = useState("material"),
-    [query, setQuery] = useState(""),
-    [adjustItem, setAdjustItem] = useState(""),
-    [adjustQuantity, setAdjustQuantity] = useState(""),
-    [adjustWeights, setAdjustWeights] = useState("");
+    [query, setQuery] = useState("");
   useEffect(() => setPaymentCurrency(currency), [company, currency, form]);
   async function load() {
     const [d, r, p] = await Promise.all([
@@ -58,6 +54,7 @@ export default function Inventory({
     setData(d);
     setReceipts(r);
     setPhysical(p);
+    setRevision((v) => v + 1);
   }
   useEffect(() => {
     state.run(load);
@@ -65,32 +62,6 @@ export default function Inventory({
   const baseUnit = data.units.find(
     (u: Row) =>
       u.id === data.materials.find((m: Row) => m.id === material)?.unit_id,
-  );
-  const selectedVariant =
-    kind === "variant"
-      ? data.variants.find((v: Row) => v.id === adjustItem)
-      : null;
-  const weightValues = adjustWeights.trim()
-    ? adjustWeights.trim().split(/[\n;]/).filter(Boolean).map(parseNumber)
-    : [];
-  const weightPreviews = weightValues.map((weight: number | null) => ({
-    weight,
-    matches: weightMatches(
-      data.variants.filter(
-        (v: Row) => v.product_id === selectedVariant?.product_id,
-      ),
-      selectedVariant?.attributes || {},
-      weight,
-    ),
-  }));
-  const unitById = new Map<string, Row>(
-    physical.units.map((u: Row) => [u.id, u]),
-  );
-  const movementNames = new Map<string, string>(
-    physical.history.map((h: Row) => [
-      h.movement_id,
-      unitById.get(h.unit_id)?.variant_snapshot?.name,
-    ]),
   );
   const balances = data.balances.filter((r: Row) =>
     [r.name, r.sku, r.barcode, materialTypeName(r.classification, types)]
@@ -124,9 +95,6 @@ export default function Inventory({
               <AppButton
                 className="secondary"
                 onClick={() => {
-                  setAdjustItem("");
-                  setAdjustQuantity("");
-                  setAdjustWeights("");
                   setForm("adjust");
                 }}
               >
@@ -150,7 +118,16 @@ export default function Inventory({
         </p>
       )}
       {state.notice && <p role="status">{state.notice}</p>}
-      {form && (
+      {form === "adjust" && (
+        <InventoryAdjustment
+          key={company}
+          company={company}
+          currency={currency}
+          onClose={() => setForm(null)}
+          onSaved={load}
+        />
+      )}
+      {form && form !== "adjust" && (
         <div className="overlay">
           <section
             className="modal operations-dialog"
@@ -176,34 +153,6 @@ export default function Inventory({
                 const values: Row = Object.fromEntries(
                   new FormData(e.currentTarget),
                 );
-                if (
-                  form === "adjust" &&
-                  selectedVariant?.weight_min != null &&
-                  adjustWeights.trim()
-                ) {
-                  if (
-                    !weightPreviews.length ||
-                    weightPreviews.some((p) => p.matches.length !== 1)
-                  ) {
-                    state.setError(
-                      "Hay pesos sin rango válido o ambiguos. Revisa cada unidad antes de guardar.",
-                    );
-                    return;
-                  }
-                  values.quantity = weightValues.length;
-                  values.unit_weights = weightValues;
-                }
-                if (
-                  form === "adjust" &&
-                  selectedVariant?.weight_min != null &&
-                  Number(values.quantity) > 0 &&
-                  !adjustWeights.trim()
-                ) {
-                  state.setError(
-                    "Registra un peso real por cada unidad que agregas.",
-                  );
-                  return;
-                }
                 state.run(async () => {
                   await mutate(company, form, values);
                   setForm(null);
@@ -214,7 +163,7 @@ export default function Inventory({
                 });
               }}
             >
-              {form === "receive" ? (
+              {
                 <>
                   <label>
                     Material
@@ -324,125 +273,7 @@ export default function Inventory({
                     <input name="reference" maxLength={250} />
                   </label>
                 </>
-              ) : (
-                <>
-                  <label>
-                    Tipo
-                    <SearchSelect
-                      name="kind"
-                      value={kind}
-                      onChange={(e) => {
-                        setKind(e.target.value);
-                        setAdjustItem("");
-                        setAdjustWeights("");
-                        setAdjustQuantity("");
-                      }}
-                    >
-                      <option value="material">Material</option>
-                      <option value="variant">Variante de producto</option>
-                    </SearchSelect>
-                  </label>
-                  <label>
-                    Artículo
-                    <SearchSelect
-                      name="item"
-                      required
-                      key={kind}
-                      value={adjustItem}
-                      onChange={(e) => {
-                        setAdjustItem(e.target.value);
-                        setAdjustWeights("");
-                      }}
-                    >
-                      <option value="">Seleccionar</option>
-                      {data[kind === "material" ? "materials" : "variants"].map(
-                        (r: Row) => (
-                          <option key={r.id} value={r.id}>
-                            {r.sku ? `${r.sku} · ` : ""}
-                            {r.name}
-                          </option>
-                        ),
-                      )}
-                    </SearchSelect>
-                  </label>
-                  <label>
-                    Cantidad que se agrega o retira
-                    <input
-                      type="number"
-                      name="quantity"
-                      step={kind === "variant" ? "1" : "any"}
-                      value={
-                        adjustWeights.trim()
-                          ? String(weightValues.length)
-                          : adjustQuantity
-                      }
-                      readOnly={!!adjustWeights.trim()}
-                      onChange={(e) => setAdjustQuantity(e.target.value)}
-                      required
-                    />
-                    <small>
-                      Utiliza un número negativo para retirar. Materiales:
-                      unidad base; variantes: unidades.
-                    </small>
-                  </label>
-                  {selectedVariant?.weight_min != null && (
-                    <label className="form-wide">
-                      Pesos individuales de entrada (g)
-                      <AutoTextarea
-                        value={adjustWeights}
-                        onChange={(e) => setAdjustWeights(e.target.value)}
-                        placeholder={"89.99\n90.00"}
-                      />
-                      <small>
-                        Un peso por línea, hasta cuatro decimales. Se asigna la
-                        variante automáticamente dentro del producto y atributos
-                        seleccionados. Para retirar, deja los pesos vacíos y usa
-                        cantidad negativa.
-                      </small>
-                      {weightPreviews.length > 0 && (
-                        <ul>
-                          {weightPreviews.map((p, i) => (
-                            <li
-                              key={i}
-                              className={
-                                p.matches.length === 1 ? "" : "sheet-warning"
-                              }
-                            >
-                              {p.weight ?? "Peso inválido"} g ·{" "}
-                              {p.matches.length === 1
-                                ? p.matches[0].name
-                                : "Sin rango válido o ambiguo"}
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                    </label>
-                  )}
-                  <label>
-                    Costo por unidad base ({currency}, opcional)
-                    <MoneyInput
-                      currency={currency}
-                      name="unit_cost"
-                      type="number"
-                      min="0"
-                      step="any"
-                    />
-                    <small>
-                      Solo aplica a entradas. Si no se conoce, el costo queda
-                      pendiente.
-                    </small>
-                  </label>
-                  <label>
-                    Motivo
-                    <input
-                      name="reason"
-                      minLength={3}
-                      maxLength={500}
-                      required
-                    />
-                  </label>
-                </>
-              )}
+              }
               <div className="form-actions">
                 <AppButton disabled={state.busy}>Guardar movimiento</AppButton>
                 <AppButton
@@ -549,58 +380,13 @@ export default function Inventory({
               )}
             </div>
           </section>
-          <section className="catalog">
-            <h2>Últimos movimientos</h2>
-            <div className="table-wrap">
-              <ResponsiveTable>
-                <thead>
-                  <tr>
-                    <th>Fecha</th>
-                    <th>Artículo</th>
-                    <th>Cantidad</th>
-                    <th>Origen</th>
-                    <th>Nota</th>
-                    <th>Unidades físicas</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.movements.map((r: Row) => (
-                    <tr key={r.id}>
-                      <td>{new Date(r.created_at).toLocaleString("es-GT")}</td>
-                      <td>
-                        {movementNames.get(r.id) ||
-                          data.balances.find(
-                            (b: Row) => b.item_id === r.item_id,
-                          )?.name ||
-                          r.item_id}
-                      </td>
-                      <td>{Number(r.quantity)}</td>
-                      <td>
-                        {{
-                          receipt: "Compra",
-                          adjustment: "Ajuste",
-                          production_consumption: "Consumo",
-                          production_output: "Producción",
-                          release: "Liberación",
-                          order_reservation: "Reserva",
-                          order_dispatch: "Venta",
-                          order_cancel: "Cancelación",
-                        }[r.source_kind as string] || r.source_kind}
-                      </td>
-                      <td>{r.notes}</td>
-                      <td>
-                        <MovementUnits
-                          movement={r.id}
-                          units={physical.units}
-                          history={physical.history}
-                        />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </ResponsiveTable>
-            </div>
-          </section>
+          <Kardex
+            key={company}
+            company={company}
+            currency={currency}
+            revision={revision}
+            onSaved={load}
+          />
           <PhysicalUnits
             units={physical.units}
             query={query}
