@@ -44,11 +44,9 @@ export const inventoryKinds: Record<string, string> = {
 };
 const columns: readonly (readonly [string, string])[] = [
   ["article", "Artículo (SKU o nombre)"],
-  ["weight", "Peso real (g)"],
-  ["external_code", "Identificador individual"],
   ["quantity", "Cantidad"],
   ["unit", "Unidad"],
-  ["unit_cost", "Costo unitario"],
+  ["unit_cost", "Monto total"],
   ["notes", "Observaciones"],
 ] as const;
 const empty = (): Row => ({
@@ -169,7 +167,7 @@ export default function InventoryAdjustment({
       individual_unit_id: "",
       external_code: "",
       unresolved: "",
-      quantity: a?.weight_min != null ? "1" : r.quantity,
+      quantity: r.quantity,
     };
   }
   function findArticle(value: string) {
@@ -191,16 +189,18 @@ export default function InventoryAdjustment({
       material: "article",
       nombre: "article",
       producto: "article",
-      "peso real (g)": "weight",
-      peso: "weight",
+      "peso real (g)": "ignore",
+      peso: "ignore",
       lote: "ignore",
       cantidad: "quantity",
       unidad: "unit",
       um: "unit",
       "costo unitario": "unit_cost",
       costo: "unit_cost",
+      "monto total": "unit_cost",
+      valor: "unit_cost",
       observaciones: "notes",
-      "identificador individual": "external_code",
+      "identificador individual": "ignore",
     };
     const header = matrix[0].map(
       (v) =>
@@ -324,7 +324,7 @@ export default function InventoryAdjustment({
               item_id: r.item_id,
               quantity: r.quantity,
               unit_id: r.unit_id || null,
-              unit_cost: r.unit_cost === "" ? null : r.unit_cost,
+              unit_cost: inputUnitCost(r),
               weight: r.weight || null,
               lot_id: r.lot_id || null,
               lot_label: r.lot_label,
@@ -334,6 +334,22 @@ export default function InventoryAdjustment({
             })),
           }),
     };
+  }
+  function inputAmount(r: Row): number | null {
+    const value = parseNumber(String(r.unit_cost));
+    const qty = parseNumber(String(r.quantity));
+    return value == null
+      ? null
+      : r.cost_manual
+        ? value
+        : qty == null
+          ? null
+          : value * qty;
+  }
+  function inputUnitCost(r: Row): number | null {
+    const amount = inputAmount(r);
+    const qty = parseNumber(String(r.quantity));
+    return amount == null || qty == null || qty <= 0 ? null : amount / qty;
   }
   async function close() {
     if (state.busy) return;
@@ -480,9 +496,10 @@ export default function InventoryAdjustment({
                 </label>
                 <small>
                   Pega aquí sin crear filas. Usa SKU, nombre exacto o código de
-                  barras existente. Una fila por barra con su peso real. Las
-                  cantidades siempre son positivas; el tipo determina entrada o
-                  salida.
+                  barras existente. Ingresa la cantidad y el monto total; el
+                  costo unitario se calcula dividiendo el monto entre la
+                  cantidad. Las cantidades siempre son positivas; el tipo
+                  determina entrada o salida.
                 </small>
               </section>
               <div className="actions">
@@ -518,7 +535,9 @@ export default function InventoryAdjustment({
                                     ? outgoing
                                       ? r.lot_id
                                       : r.lot_label
-                                    : String(r[key] ?? ""),
+                                    : key === "unit_cost"
+                                      ? String(inputAmount(r) ?? "")
+                                      : String(r[key] ?? ""),
                             ),
                           ),
                         ]),
@@ -544,7 +563,7 @@ export default function InventoryAdjustment({
                       {columns.map((c) => (
                         <th key={c[0]}>{c[1]}</th>
                       ))}
-                      <th>Valor</th>
+                      <th>Costo unitario</th>
                       <th>Acciones</th>
                     </tr>
                   </thead>
@@ -568,7 +587,7 @@ export default function InventoryAdjustment({
                                 ? Number(u?.base_factor) /
                                   Number(bu?.base_factor)
                                 : 1)
-                          : parseNumber(String(r.unit_cost)),
+                          : inputUnitCost(r),
                         qty = parseNumber(String(r.quantity));
                       return (
                         <tr key={r.line_key}>
@@ -731,11 +750,18 @@ export default function InventoryAdjustment({
                                 </SearchSelect>
                               ) : key === "unit_cost" ? (
                                 outgoing ? (
-                                  <span>{money(cost, currency)}</span>
+                                  <span>
+                                    {money(
+                                      cost == null || qty == null
+                                        ? null
+                                        : cost * qty,
+                                      currency,
+                                    )}
+                                  </span>
                                 ) : (
                                   <MoneyInput
                                     currency={currency}
-                                    value={r.unit_cost}
+                                    value={inputAmount(r) ?? ""}
                                     min={0}
                                     onChange={(e) =>
                                       update(i, {
@@ -784,12 +810,7 @@ export default function InventoryAdjustment({
                               )}
                             </td>
                           ))}
-                          <td>
-                            {money(
-                              qty == null || cost == null ? null : qty * cost,
-                              currency,
-                            )}
-                          </td>
+                          <td>{money(cost, currency)}</td>
                           <td>
                             <AppButton
                               className="danger"
@@ -834,7 +855,6 @@ export default function InventoryAdjustment({
                         "Unidad",
                         "Costo unitario",
                         "Valor",
-                        "Unidad individual",
                       ].map((h) => (
                         <th key={h}>{h}</th>
                       ))}
@@ -851,16 +871,6 @@ export default function InventoryAdjustment({
                         <td>{r.snapshot.input_unit}</td>
                         <td>{money(r.unit_cost, currency)}</td>
                         <td>{money(r.total_value, currency)}</td>
-                        <td>
-                          {r.weight && (
-                            <small>
-                              {r.weight} g ·{" "}
-                              {r.external_code ||
-                                r.individual_unit_id ||
-                                "ID automático"}
-                            </small>
-                          )}
-                        </td>
                       </tr>
                     ))}
                   </tbody>
