@@ -262,7 +262,7 @@ function ProductionBatches({
                   payload = {
                     batch: selected!.id,
                     expected_revision: formula!.edit_revision,
-                    scrap: f.get("scrap"),
+                    scrap: Number(f.get("scrap") || 0),
                     capture_mode: "variant_units",
                     consumptions: formula!.ingredients.map((r: Row) => ({
                       material: r.material_id,
@@ -585,8 +585,8 @@ function ProductionBatches({
                                   min="0"
                                   max="10000"
                                   step="1"
-                                  required
-                                  value={outputUnits[v.id] || "0"}
+                                  placeholder="0"
+                                  value={outputUnits[v.id] ?? ""}
                                   onChange={(e) =>
                                     setOutputUnits((old) => ({
                                       ...old,
