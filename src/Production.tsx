@@ -273,6 +273,50 @@ function ProductionBatches({
                   };
                 }
                 state.run(async () => {
+                  if (mode === "start" || mode === "finish") {
+                    const stock = await request("production_command", {
+                      p_company: company,
+                      p_action: "stock_review",
+                      p_data: {
+                        ...payload,
+                        stage: mode === "start" ? "draft" : "confirm",
+                      },
+                    });
+                    if (stock.shortages.length) {
+                      const n = (v: any) =>
+                        Number(v).toLocaleString("es-GT", {
+                          maximumFractionDigits: 8,
+                        });
+                      const message = stock.shortages
+                        .map(
+                          (r: Row) =>
+                            `• ${r.sku || "Sin SKU"} · ${r.name}\nNecesario: ${n(r.required)} ${r.unit} · Disponible: ${n(r.available)} ${r.unit} · Faltante: ${n(r.shortage)} ${r.unit}`,
+                        )
+                        .join("\n\n");
+                      const proceed = await confirmAction(
+                        message +
+                          "\n\n" +
+                          (mode === "start"
+                            ? "Puedes guardar el borrador sin mover inventario. Se volverá a revisar al confirmar la producción."
+                            : "Si continúas, se descontará el consumo real y podrán quedar existencias negativas de estos materiales."),
+                        {
+                          title: "Materiales insuficientes",
+                          iconKey: "status.warning",
+                          confirmText:
+                            mode === "start"
+                              ? "Guardar borrador"
+                              : "Continuar con negativos",
+                          cancelText: "Volver a revisar",
+                        },
+                      );
+                      if (!proceed) return;
+                    }
+                    payload = {
+                      ...payload,
+                      acknowledge_shortages: stock.shortages.length > 0,
+                      stock_proof: stock.proof,
+                    };
+                  }
                   if (mode === "start")
                     await keyedRequest(
                       company,

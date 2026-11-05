@@ -103,6 +103,21 @@ export default function BatchTrace({
                     ? "Sin curado"
                     : `Disponibilidad: ${data.batch.available_on}`}
                 </p>
+                {!!data.batch.stock_warnings?.confirmation?.shortages
+                  ?.length && (
+                  <IconDetails>
+                    <summary>Faltantes aceptados al confirmar</summary>
+                    <ul>
+                      {data.batch.stock_warnings.confirmation.shortages.map(
+                        (r: Row) => (
+                          <li key={r.material_id}>
+                            {r.sku} · {r.name}: {num(r.shortage)} {r.unit}
+                          </li>
+                        ),
+                      )}
+                    </ul>
+                  </IconDetails>
+                )}
                 <div className="table-wrap">
                   <ResponsiveTable>
                     <thead>
