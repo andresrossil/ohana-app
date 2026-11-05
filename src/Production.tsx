@@ -1,3 +1,4 @@
+import {plannedProductionUnits} from "./formula-model";
 import SearchSelect from "./SearchSelect";
 import MaterialRequirements from "./MaterialRequirements";
 import VariantWeightCapture, { type WeighedUnit } from "./VariantWeightCapture";
@@ -80,7 +81,6 @@ function ProductionBatches({
     }),
     [draftScale, setDraftScale] = useState("1"),
     [consumed, setConsumed] = useState<Record<string, string>>({}),
-    [draftUnits, setDraftUnits] = useState("1"),
     [outputUnits, setOutputUnits] = useState<Record<string, string>>({}),
     [outputWeights, setOutputWeights] = useState<Record<string, string>>({}),
     [weighedUnits, setWeighedUnits] = useState<WeighedUnit[]>([]),
@@ -136,6 +136,7 @@ function ProductionBatches({
   const estimating = formulas.find(
     (f) => f.id === (mode === "start" ? draftFormula : selected?.formula_id),
   );
+  const draftUnits = plannedProductionUnits(estimating?.estimated_units,draftScale);
   const factor =
     mode === "start"
       ? Number(draftScale)
@@ -281,7 +282,6 @@ function ProductionBatches({
               onClick={() => {
                 setSelected(null);
                 setDraftScale("1");
-                setDraftUnits("1");
                 setDate(today());
                 setDraftProduct("");
                 setDraftFormula("");
@@ -342,12 +342,14 @@ function ProductionBatches({
                 let payload: Row = Object.fromEntries(f);
                 let action = "";
                 if (mode === "start") {
+                  if(draftUnits==null || !Number.isInteger(draftUnits) || draftUnits>2147483647){state.setError(draftUnits==null?"Selecciona una fórmula con Unidades estimadas y un número válido de lotes a producir.":"La multiplicación debe dar un número entero de unidades. Ajusta los lotes a producir.");return;}
                   action = "draft_save";
                   payload = {
                     ...payload,
                     id: selected?.id,
                     product: draftProduct,
                     formula: draftFormula,
+                    quantity:draftUnits,
                   };
                 } else if (mode === "finish") {
                   if (pendingUnitWeight) {
@@ -461,6 +463,7 @@ function ProductionBatches({
                     Fórmula
                     <SearchSelect
                       name="formula"
+                      required
                       value={draftFormula}
                       onChange={(e) => setDraftFormula(e.target.value)}
                     >
@@ -482,7 +485,7 @@ function ProductionBatches({
                     </SearchSelect>
                   </label>
                   <label>
-                    Factor de escala de fórmula
+                    Lotes a producir
                     <input
                       name="formula_scale"
                       type="number"
@@ -494,16 +497,18 @@ function ProductionBatches({
                     />
                   </label>
                   <label>
-                    Unidades previstas
+                    Unidades previstas · automático
                     <input
                       name="quantity"
-                      value={draftUnits}
-                      onChange={(e) => setDraftUnits(e.target.value)}
+                      value={draftUnits ?? ""}
+                      readOnly
+                      placeholder="Pendiente de fórmula y unidades estimadas"
                       type="number"
                       min="1"
                       step="1"
                       required
                     />
+                    <small>{draftUnits==null?"Define las Unidades estimadas en la fórmula para calcularlas aquí.":!Number.isInteger(draftUnits)?"El resultado debe ser un número entero de unidades.":`${estimating?.estimated_units} unidades por lote × ${draftScale} lotes a producir`}</small>
                   </label>
                   <label>
                     Fecha de producción
@@ -539,7 +544,7 @@ function ProductionBatches({
                   <h3>Consumo real de materiales</h3>
                   <p>
                     Las cantidades sugeridas provienen de la versión y del
-                    factor de escala. Corrige con lo que realmente utilizaste.
+                    lotes a producir. Corrige con lo que realmente utilizaste.
                   </p>
                   {formula?.ingredients.map((r: Row) => (
                     <label key={r.material_id}>
@@ -1017,7 +1022,6 @@ function ProductionBatches({
                           onClick={() => {
                             setSelected(b);
                             setDraftScale(String(b.formula_scale || 1));
-                            setDraftUnits(String(b.planned_quantity || 1));
                             setDate(b.production_date);
                             setDraftProduct(b.product_id);
                             setDraftFormula(b.formula_id || "");

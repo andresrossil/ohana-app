@@ -287,3 +287,5 @@ export function recipeMath(
     errors: [...new Set(errors)],
   };
 }
+
+export function plannedProductionUnits(units: unknown, lots: unknown): number | null {const n=recipeNumber(units),factor=recipeNumber(lots);if(n==null||factor==null||n<=0||factor<=0)return null;const result=roundQuantity(n*factor);return Number.isFinite(result)&&result>0?result:null;}

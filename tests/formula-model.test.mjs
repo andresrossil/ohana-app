@@ -259,3 +259,14 @@ test('formula costs keep overhead and percentage expenses separate without doubl
  const changed={...catalog,materials:catalog.materials.map(m=>m.id==='raw'?{...m,unit_cost:.3}:m)};
  assert.equal(formulaCost(formula,changed,variant,variant).costPerGram,.3);
 });
+
+import {plannedProductionUnits} from '../src/formula-model.ts';
+test('planned production units follow formula units times lots without guessing',()=>{
+ assert.equal(plannedProductionUnits(12,2),24);
+ assert.equal(plannedProductionUnits(12,1.5),18);
+ assert.equal(plannedProductionUnits(10,.3),3);
+ assert.equal(plannedProductionUnits(3,.5),1.5);
+ assert.equal(plannedProductionUnits(null,1),null);
+ assert.equal(plannedProductionUnits(12,''),null);
+ assert.equal(plannedProductionUnits(12,0),null);
+});
