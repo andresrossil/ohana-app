@@ -475,12 +475,14 @@ function ProductionBatches({
                       value={plannedAvailable}
                       aria-label="Disponibilidad calculada según el curado de la fórmula"
                     />
-                    <small>
-                      {estimating?.requires_curing
+                  </label>
+                  {estimating && (
+                    <p className="production-curing-notice" role="status">
+                      {estimating.requires_curing
                         ? `${estimating.curing_days} días de curado según la fórmula`
                         : "Sin curado: disponible al confirmar la fabricación"}
-                    </small>
-                  </label>
+                    </p>
+                  )}
                   <label>
                     Notas
                     <textarea

@@ -198,3 +198,17 @@
     max-width: none;
   }
 }
+.shell .operations-dialog .production-curing-notice {
+  grid-column: 1 / -1;
+  margin: 4px 0;
+  padding: 16px;
+  border: 1px solid var(--admin-border);
+  border-radius: 10px;
+  background: var(--admin-secondary);
+  color: var(--admin-heading);
+  font-size: clamp(1.05rem, 2vw, 1.3rem);
+  font-weight: 700;
+  line-height: 1.5;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
