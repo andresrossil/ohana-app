@@ -1,3 +1,4 @@
+import {financialSummary} from '../src/financial-summary.ts';
 import test from "node:test";
 import assert from "node:assert/strict";
 import { recipeMath, estimatedUnitCost } from "../src/formula-model.ts";
@@ -254,6 +255,9 @@ test('formula costs keep overhead and percentage expenses separate without doubl
  assert.equal(result.manufacturingCost,15.75);
  assert.equal(result.expenses,4.5);
  assert.equal(result.cost,20.25);
+ const reference=financialSummary(result.referenceMaterials,result.unitQuote);
+ assert.equal(reference.totalCost,result.cost);
+ assert.equal(reference.profit,50-result.cost);
  assert.equal(formulaCost({...formula,estimated_final_weight_g:null},catalog,variant,variant).cost,null);
  assert.equal(formulaCost({...formula,estimated_final_weight_g:1200},catalog,variant,variant).costPerGram,.125);
  const changed={...catalog,materials:catalog.materials.map(m=>m.id==='raw'?{...m,unit_cost:.3}:m)};

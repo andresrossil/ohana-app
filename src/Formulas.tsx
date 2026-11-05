@@ -1,3 +1,5 @@
+import { centralVariant } from "./central-variant";
+import { variantLabel } from "./variant-label";
 import { MarginBadge } from "./MarginBadge";
 import SearchSelect, { SortedDatalist } from "./SearchSelect";
 import ProductImage from "./ProductImage";
@@ -158,15 +160,33 @@ export default function Formulas({
       Number(draft.loss_percent),
       draft.estimated_units,
     );
+  const referenceVariant = centralVariant(
+    catalog.presentations || [],
+    draft.product,
+  );
+  const referenceEstimate = referenceVariant
+    ? formulaCost(
+        {
+          ...draft,
+          total_unit_id: draft.total_unit,
+          ingredients: lines.map((line) => ({
+            ...line,
+            material_id: line.material,
+            unit_id: line.unit,
+          })),
+        },
+        catalog,
+        referenceVariant,
+        referenceVariant,
+      )
+    : null;
   const extraQuote = additionalCosts(
     catalog.additional_costs || [],
     catalog.currency,
     Number(draft.estimated_units) > 0
       ? Number(draft.estimated_units) * (readOnly ? Number(scale) : 1)
       : null,
-    (catalog.presentations || []).find(
-      (v: Row) => v.id === draft.estimate_variant_id,
-    ),
+    referenceVariant,
     draft.labor_level_id,
     draft.advertising_level_id,
     draft.overhead_lines || [],
@@ -958,7 +978,7 @@ export default function Formulas({
                 <th>Producto / fórmula</th>
                 <th>Versión</th>
                 <th>Estado</th>
-                <th>Precio de venta / unidad</th>
+                <th>Precio BASE / unidad</th>
                 <th>Costo estimado / unidad</th>
                 <th>
                   Margen aprox.<small>Precio − costo</small>
@@ -968,18 +988,23 @@ export default function Formulas({
             </thead>
             <tbody>
               {filtered.map((f) => {
-                const presentation = (catalog.presentations || []).find(
-                  (v: Row) =>
-                    v.id === f.estimate_variant_id &&
-                    v.product_id === f.product_id,
+                const presentation = centralVariant(
+                  catalog.presentations || [],
+                  f.product_id,
                 );
                 const price =
-                  presentation?.currency === catalog.currency &&
+                  presentation &&
+                  presentation.currency === catalog.currency &&
                   presentation.price != null &&
                   Number.isFinite(Number(presentation.price))
                     ? Number(presentation.price)
                     : null;
-                const estimate = formulaCost(f, catalog, presentation);
+                const estimate = formulaCost(
+                  f,
+                  catalog,
+                  presentation,
+                  presentation,
+                );
                 const margin =
                   price != null && estimate.cost != null
                     ? price - estimate.cost
@@ -1045,16 +1070,21 @@ export default function Formulas({
                     >
                       {price == null
                         ? f.production_mode === "variable_weight"
-                          ? "Según variante"
+                          ? "Pendiente"
                           : "Pendiente"
                         : money(price, catalog.currency)}
+                      {presentation && (
+                        <small>
+                          Variante central: {variantLabel(presentation)}
+                        </small>
+                      )}
                       {price == null && (
                         <small>
                           {presentation
                             ? "Sin precio base vigente"
                             : f.production_mode === "variable_weight"
-                              ? "Precio según variante y peso"
-                              : "Sin presentación vinculada"}
+                              ? "Completa los rangos de peso de las variantes"
+                              : "No hay una variante central válida; revisa sus rangos"}
                         </small>
                       )}
                     </td>
@@ -1064,7 +1094,7 @@ export default function Formulas({
                     >
                       {estimate.cost == null
                         ? f.production_mode === "variable_weight"
-                          ? "Según peso real"
+                          ? "Pendiente"
                           : "Pendiente"
                         : money(estimate.cost, catalog.currency)}
                       {estimate.costPerGram != null && (
@@ -1420,7 +1450,7 @@ export default function Formulas({
                           (v: Row) =>
                             v.product_id === draft.product && v.active,
                         )
-                          ? "Selecciona el formato comercial del producto. Su contenido exacto se completa cuando está definido."
+                          ? "Selecciona el formato para producción. La rentabilidad usa automáticamente la variante central; esta selección no la reemplaza."
                           : "Este producto aún no tiene presentaciones comerciales. Configúralas en Productos → Variantes y existencias."}
                       </small>
                     </label>
@@ -1695,6 +1725,33 @@ export default function Formulas({
                   draft.name ||
                   "Producto sin seleccionar"
                 }
+                referenceLabel={
+                  referenceVariant
+                    ? "Variante central de referencia: " +
+                      variantLabel(referenceVariant) +
+                      " · Precio BASE: " +
+                      money(
+                        referenceVariant.currency === catalog.currency
+                          ? referenceVariant.price
+                          : null,
+                        catalog.currency,
+                      )
+                    : "Variante central pendiente: agrega una variante o completa sus rangos de peso."
+                }
+                unitReference={{
+                  materials: referenceEstimate?.referenceMaterials || {
+                    ingredients: null,
+                    packaging: null,
+                    supplies: null,
+                  },
+                  quote: referenceEstimate?.unitQuote || {
+                    currency: catalog.currency,
+                    unit_basis_count: 1,
+                    sale_price: null,
+                    additional_total: null,
+                    cost_lines: [],
+                  },
+                }}
                 materials={{
                   ingredients: math.ingredientCost,
                   packaging: math.packagingCost,

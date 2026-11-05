@@ -1,3 +1,4 @@
+import { pricesChanged } from "./price-events";
 import SearchSelect from "./SearchSelect";
 import { useEffect, useState, useRef } from "react";
 import { AppButton, AppIcon } from "./AppIcon";
@@ -272,6 +273,7 @@ export default function VariantSheet({
       onDirty(false);
       try {
         await onSaved();
+        pricesChanged(company);
       } catch {
         throw Error(
           "Las variantes se guardaron. Cierra la tabla y vuelve a abrirla para actualizar el listado.",

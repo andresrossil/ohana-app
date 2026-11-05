@@ -118,8 +118,14 @@ export function formulaCost(
       .reduce((sum, row) => sum + (row.cost ?? 0), 0);
     const units = Number(formula.estimated_units),
       validUnits = Number.isFinite(units) && units > 0;
-    const perUnit = (amount: number) =>
-      amount === 0 ? 0 : validUnits ? amount / units : null;
+    const perUnit = (amount: number | null) =>
+      amount == null
+        ? null
+        : amount === 0
+          ? 0
+          : validUnits
+            ? amount / units
+            : null;
     const commonMaterials = math.totalCost - packagingTotal - suppliesTotal;
     const estimate = estimatedWeightCost(
       commonMaterials,
@@ -141,6 +147,38 @@ export function formulaCost(
     return {
       ...estimate,
       commonMaterials,
+      referenceMaterials: {
+        ingredients:
+          estimate.costPerGram != null &&
+          estimate.midpoint != null &&
+          math.ingredientCost != null
+            ? (math.ingredientCost * estimate.midpoint) /
+              Number(formula.estimated_final_weight_g)
+            : null,
+        packaging: estimate.packagingUnit,
+        supplies:
+          estimate.costPerGram != null &&
+          estimate.midpoint != null &&
+          estimate.suppliesUnit != null &&
+          math.suppliesCost != null
+            ? ((math.suppliesCost - suppliesTotal) * estimate.midpoint) /
+                Number(formula.estimated_final_weight_g) +
+              estimate.suppliesUnit
+            : null,
+      },
+      unitQuote: {
+        currency: catalog.currency,
+        unit_basis_count: 1,
+        sale_price: commercial.sale_price,
+        cost_lines: [
+          ...fixed.cost_lines.map((line) => ({
+            ...line,
+            total: perUnit(line.total),
+          })),
+          ...commercial.cost_lines,
+        ],
+        additional_total: expenses,
+      },
       cost,
       expenses,
       source,
@@ -160,14 +198,32 @@ export function formulaCost(
     formula.advertising_level_id,
     formula.overhead_lines || [],
   );
-  if (extra.additional_total == null)
-    return { cost: null, reason: "Costos adicionales pendientes", source };
-  const cost = estimatedUnitCost(
-    math.totalCost + extra.additional_total,
-    formula.estimated_units,
-  );
+  const cost =
+    extra.additional_total == null
+      ? null
+      : estimatedUnitCost(
+          math.totalCost + extra.additional_total,
+          formula.estimated_units,
+        );
   return {
     cost,
+    referenceMaterials: {
+      ingredients: estimatedUnitCost(
+        math.ingredientCost,
+        formula.estimated_units,
+      ),
+      packaging: estimatedUnitCost(math.packagingCost, formula.estimated_units),
+      supplies: estimatedUnitCost(math.suppliesCost, formula.estimated_units),
+    },
+    unitQuote: {
+      ...extra,
+      unit_basis_count: 1,
+      cost_lines: extra.cost_lines.map((line) => ({
+        ...line,
+        total: estimatedUnitCost(line.total, formula.estimated_units),
+      })),
+      additional_total: extra.additional_unit,
+    },
     manufacturingCost: estimatedUnitCost(
       math.totalCost,
       formula.estimated_units,

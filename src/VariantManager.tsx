@@ -7,7 +7,7 @@ import { AppButton, AppIcon } from "./AppIcon";
 import { useEffect, useState, lazy, Suspense } from "react";
 import { operation, mutate, useOperation, money, type Row } from "./operations";
 import { request } from "./commerce";
-import { usePriceRefresh } from "./price-events";
+import { usePriceRefresh, pricesChanged } from "./price-events";
 import VariantSheet from "./VariantSheet";
 import { variantLabel } from "./variant-label";
 const BarcodeDialog = lazy(() => import("./BarcodeDialog"));
@@ -134,6 +134,7 @@ export default function VariantManager({
             onSaved={async () => {
               await load();
               await onChanged?.();
+              pricesChanged(company);
               state.setNotice("Variantes guardadas");
             }}
           />
@@ -187,6 +188,7 @@ export default function VariantManager({
                 setEdit(undefined);
                 await load();
                 await onChanged?.();
+                pricesChanged(company);
                 state.setNotice("Variante guardada");
               });
             }}
@@ -409,7 +411,12 @@ function VariantEstimate({ variant, data }: { variant: Row; data: Row }) {
           g × {money(estimate.costPerGram, variant.currency)} / g
         </small>
       )}
-      {estimate.packagingUnit != null && <small>Empaque por unidad: {money(estimate.packagingUnit,variant.currency)} · Insumos por unidad: {money(estimate.suppliesUnit,variant.currency)}</small>}
+      {estimate.packagingUnit != null && (
+        <small>
+          Empaque por unidad: {money(estimate.packagingUnit, variant.currency)}{" "}
+          · Insumos por unidad: {money(estimate.suppliesUnit, variant.currency)}
+        </small>
+      )}
       {estimate.manufacturingCost != null && (
         <small>
           Costo total con gastos: {money(estimate.cost, variant.currency)}

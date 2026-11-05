@@ -8,12 +8,16 @@ export default function CostSummary({
   quote,
   variable = false,
   historical = false,
+  unitReference,
+  referenceLabel,
 }: {
   product: string;
   materials: Row;
   quote: Row;
   variable?: boolean;
   historical?: boolean;
+  unitReference?: { materials: Row; quote: Row };
+  referenceLabel?: string;
 }) {
   const s = financialSummary(materials, quote),
     currency = quote.currency || "GTQ";
@@ -43,6 +47,26 @@ export default function CostSummary({
     ],
     ["Margen estimado sobre venta", s.margin, s.margin, "percent"],
   ];
+  if (unitReference) {
+    const u = financialSummary(unitReference.materials, unitReference.quote);
+    const values = [
+      unitReference.materials.packaging,
+      unitReference.materials.ingredients,
+      unitReference.materials.supplies,
+      u.materialTotal,
+      u.price,
+      u.before,
+      u.groups.overhead,
+      u.groups.labor,
+      u.groups.advertising,
+      u.totalCost,
+      u.profit,
+      u.margin,
+    ];
+    rows.forEach((row, index) => {
+      row[1] = values[index] ?? null;
+    });
+  }
   return (
     <section className="cost-summary" aria-label="Resumen de costos y utilidad">
       <header className="cost-summary-heading">
@@ -57,13 +81,20 @@ export default function CostSummary({
           </span>
         </div>
       </header>
+      {referenceLabel && <p className="cost-basis-panel">{referenceLabel}</p>}
       <div className="table-wrap">
         <ResponsiveTable>
           <thead>
             <tr>
               <th>Concepto</th>
-              <th>{variable ? "Unidad · promedio" : "Unidad"}</th>
-              <th>Lote</th>
+              <th>
+                {unitReference
+                  ? "Unidad · variante central"
+                  : variable
+                    ? "Unidad · promedio"
+                    : "Unidad"}
+              </th>
+              <th>{unitReference ? "Lote · receta completa" : "Lote"}</th>
             </tr>
           </thead>
           <tbody>
@@ -99,10 +130,12 @@ export default function CostSummary({
       </div>
       <p className="muted">
         Margen sobre venta = utilidad ÷ ventas.{" "}
-        {variable
-          ? "La columna Unidad muestra un promedio; cada barra conserva su propio peso y costo. "
-          : ""}
-        {!historical && variable
+        {unitReference
+          ? "La columna Unidad usa el peso promedio de la variante central. Lote conserva las cantidades completas de la receta y sus unidades previstas. "
+          : variable
+            ? "La columna Unidad muestra un promedio; cada barra conserva su propio peso y costo. "
+            : ""}
+        {!unitReference && !historical && variable
           ? "Sin pesos y precios de las variantes obtenidas, las ventas y la utilidad permanecen pendientes. "
           : ""}
         Otros gastos se calculan con las unidades del lote; el total no se
