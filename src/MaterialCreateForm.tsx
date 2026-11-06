@@ -1,5 +1,6 @@
 import { pricesChanged } from "./price-events";
 import MoneyInput from "./MoneyInput";
+import MaterialPhoto, { uploadMaterialPhoto } from "./MaterialPhoto";
 import { useMaterialTypes } from "./MaterialTypesContext";
 import SearchSelect, { SortedDatalist } from "./SearchSelect";
 import { useEffect, useRef, useState } from "react";
@@ -173,8 +174,11 @@ export default function MaterialCreateForm({
       return;
     }
     await state.run(async () => {
+      const file = data.get("photo");
+      const photoPath = file instanceof File && file.size ? await uploadMaterialPhoto(file, company) : null;
       const payload = [
         {
+          photoPath,
           createOnly: true,
           id: "",
           mode: "add",
@@ -210,7 +214,10 @@ export default function MaterialCreateForm({
         p_batch: batch.current!.id,
         p_rows: payload,
       });
-      if (result.error) throw result.error;
+      if (result.error) {
+        if (photoPath) await db.storage.from("catalog-images").remove([photoPath]);
+        throw result.error;
+      }
       setSaved(true);
       setDirty(false);
       onDirty(false);
@@ -284,6 +291,7 @@ export default function MaterialCreateForm({
               />
             </label>
             {textField(1, "Otro nombre")}
+            <MaterialPhoto />
             <CatalogFields
               company={company}
               kind="material"

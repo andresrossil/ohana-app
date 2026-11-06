@@ -1,4 +1,6 @@
 import MoneyInput from "./MoneyInput";
+import MaterialPhoto, { uploadMaterialPhoto } from "./MaterialPhoto";
+import ProductImage from "./ProductImage";
 import { MaterialTypesProvider, MaterialTypeLabel } from "./MaterialTypesContext";
 const MaterialTypeSettings = lazy(() => import("./MaterialTypeSettings"));
 import { MarginProvider } from "./MarginBadge";
@@ -362,8 +364,20 @@ function App() {
     const f = new FormData(e.currentTarget);
     const payload: Record<string, unknown> = { company_id: company };
     for (const [k, v] of f.entries())
-      payload[k] =
+      if (k !== "photo" && k !== "remove_photo") payload[k] =
         v === "" && (k === "website_url" || k === "product_url") ? null : v;
+    let uploadedPhoto: string | null = null;
+    if (tab === "raw_materials") {
+      try {
+        const file = f.get("photo");
+        if (file instanceof File && file.size) uploadedPhoto = await uploadMaterialPhoto(file, company);
+        payload.photo_path = uploadedPhoto || (f.has("remove_photo") ? null : edit?.photo_path || null);
+      } catch (error: any) {
+        setError(error.message || "No se pudo cargar la imagen");
+        setBusy(false);
+        return;
+      }
+    }
     if (tab === "raw_materials") Object.assign(payload, identityPayload(f));
     if (tab === "units") payload.base_factor = Number(payload.base_factor);
     if (tab === "presentations") {
@@ -381,7 +395,10 @@ function App() {
           .eq("company_id", company)
           .eq("id", edit.id)
       : await db.from(tab).insert(payload);
-    if (result.error) setError(result.error.message);
+    if (result.error) {
+      if (uploadedPhoto) await db.storage.from("catalog-images").remove([uploadedPhoto]);
+      setError(result.error.message);
+    }
     else {
       setEdit(undefined);
       await load();
@@ -1277,6 +1294,7 @@ function App() {
                                       </>
                                     )}
                                     <td>
+                                      {tab === "raw_materials" && r.photo_path && <ProductImage path={r.photo_path} name={r.name} />}
                                       <strong className="admin-name">
                                         {r.name}
                                       </strong>
@@ -1501,6 +1519,7 @@ function App() {
                       origins={data.catalog_origins}
                     />
                     {select("unit_id", "Unidad base", data.units, !!edit)}
+                    <MaterialPhoto path={edit?.photo_path} name={edit?.name} />
                   </>
                 )}
                 {tab === "suppliers" && (
