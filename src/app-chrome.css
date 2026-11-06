@@ -1,0 +1,218 @@
+.shell.chrome-shell {
+  display: block;
+  --chrome-height: calc(76px + env(safe-area-inset-top, 0px));
+}
+.shell.chrome-shell.chrome-collapsed {
+  --chrome-height: calc(32px + env(safe-area-inset-top, 0px));
+}
+.shell.chrome-shell > main {
+  width: 100%;
+  max-width: none;
+  margin-left: 0;
+  min-width: 0;
+  padding: calc(var(--chrome-height) + 14px) clamp(12px, 3vw, 40px) 32px;
+}
+.shell .app-topbar {
+  position: fixed;
+  inset: 0 0 auto;
+  height: var(--chrome-height);
+  z-index: 70;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: env(safe-area-inset-top, 0px)
+    max(12px, env(safe-area-inset-right, 0px)) 0
+    max(12px, env(safe-area-inset-left, 0px));
+  background: var(--admin-surface);
+  color: var(--admin-text);
+  border-bottom: 1px solid var(--admin-border);
+  box-shadow: 0 2px 10px #0000000a;
+}
+.shell .chrome-left,
+.shell .chrome-user {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  max-width: calc(50% - 24px);
+}
+.shell .chrome-user > span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.shell .app-topbar button {
+  margin: 0;
+  min-height: 40px;
+  padding: 8px 12px;
+  flex-shrink: 0;
+}
+.shell .app-topbar .chrome-brand {
+  padding: 0;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+.shell .chrome-brand .company-logo,
+.shell .chrome-brand > img {
+  width: 108px;
+  height: 48px;
+  min-height: 0;
+  min-width: 0;
+  object-fit: contain;
+}
+.shell .chrome-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex: 0 0 34px;
+}
+.shell .chrome-avatar-empty {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--admin-secondary);
+  font-weight: 700;
+}
+.shell .app-topbar .chrome-collapse {
+  position: absolute;
+  left: 50%;
+  top: calc(50% + env(safe-area-inset-top, 0px) / 2);
+  transform: translate(-50%, -50%);
+  padding: 5px 10px;
+  min-height: 28px;
+}
+.shell .chrome-collapse .app-icon {
+  transform: rotate(180deg);
+}
+.shell .chrome-collapse.is-collapsed .app-icon {
+  transform: none;
+}
+.shell .app-topbar.is-collapsed .chrome-user,
+.shell .app-topbar.is-collapsed .chrome-brand {
+  display: none;
+}
+.shell .app-topbar.is-collapsed .chrome-menu-toggle {
+  min-height: 26px;
+  padding: 2px 10px;
+}
+.shell.chrome-shell .app-sidebar {
+  position: fixed;
+  inset: var(--chrome-height) auto 0 0;
+  z-index: 65;
+  width: min(300px, 88vw);
+  height: calc(100dvh - var(--chrome-height));
+  overflow-y: auto;
+  background: var(--admin-surface);
+  border-right: 1px solid var(--admin-border);
+  padding: 18px 16px max(18px, env(safe-area-inset-bottom, 0px));
+  transform: translateX(-105%);
+  visibility: hidden;
+  transition:
+    transform 0.18s ease,
+    visibility 0.18s;
+}
+.shell.chrome-shell .app-sidebar.menu-open {
+  transform: translateX(0);
+  visibility: visible;
+}
+.shell.chrome-shell .app-sidebar .sidebar-content {
+  display: block;
+}
+.shell.chrome-shell .sidebar-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.shell.chrome-shell .drawer-close {
+  min-width: 40px;
+  padding: 8px;
+}
+.shell .drawer-backdrop {
+  position: fixed;
+  inset: var(--chrome-height) 0 0;
+  border: 0;
+  border-radius: 0;
+  background: #0005;
+  z-index: 60;
+  width: 100%;
+  height: calc(100dvh - var(--chrome-height));
+  padding: 0;
+}
+@media (max-width: 600px) {
+  .shell.chrome-shell {
+    --chrome-height: calc(88px + env(safe-area-inset-top, 0px));
+  }
+  .shell.chrome-shell.chrome-collapsed {
+    --chrome-height: calc(44px + env(safe-area-inset-top, 0px));
+  }
+  .shell .app-topbar .chrome-collapse {
+    top: auto;
+    bottom: 0;
+    transform: translateX(-50%);
+    min-height: 32px;
+    padding: 0 10px;
+  }
+  .shell .app-topbar:not(.is-collapsed) .chrome-left,
+  .shell .app-topbar:not(.is-collapsed) .chrome-user {
+    margin-bottom: 24px;
+  }
+  .shell .chrome-brand .company-logo,
+  .shell .chrome-brand > img {
+    width: 72px;
+    height: 40px;
+  }
+  .shell .chrome-left,
+  .shell .chrome-user {
+    gap: 6px;
+  }
+  .shell .chrome-user {
+    max-width: calc(60% - 22px);
+  }
+  .shell .chrome-user > span:first-child {
+    max-width: 85px;
+    font-size: 12px;
+    white-space: normal;
+    line-height: 1.25;
+  }
+  .shell .chrome-user button {
+    font-size: 12px;
+    padding: 7px;
+    max-width: 70px;
+    white-space: normal;
+    line-height: 1.2;
+  }
+  .shell .chrome-avatar {
+    width: 28px;
+    height: 28px;
+    flex-basis: 28px;
+  }
+  .shell .app-topbar .chrome-menu-toggle {
+    padding: 8px;
+  }
+  .shell .app-topbar.is-collapsed .chrome-menu-toggle {
+    min-height: 40px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .shell.chrome-shell .app-sidebar {
+    transition: none;
+  }
+}
+.shell.chrome-shell .overlay:not(.confirm-overlay) {
+  top: var(--chrome-height);
+  height: calc(100dvh - var(--chrome-height));
+}
+.shell.chrome-shell .overlay:not(.confirm-overlay) > .modal {
+  max-height: calc(100dvh - var(--chrome-height) - 16px);
+}
+.shell .report-selectors,
+.shell .report-export .actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 14px 0;
+}

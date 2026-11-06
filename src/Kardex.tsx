@@ -15,13 +15,16 @@ export default function Kardex({
   currency,
   revision,
   onSaved,
+  view = "movements",
 }: {
   company: string;
   currency: string;
   revision: number;
   onSaved: () => Promise<void>;
+  view?: "movements" | "valuation";
 }) {
-  const [cancelReason, setCancelReason] = useState("");
+  const [cancelReason, setCancelReason] = useState(""),
+    [requested, setRequested] = useState(false);
   const state = useOperation(company, "inventory"),
     [filters, setFilters] = useState<Row>({ page: 0 }),
     [draft, setDraft] = useState<Row>({}),
@@ -33,14 +36,21 @@ export default function Kardex({
     [correction, setCorrection] = useState("");
   useEffect(() => {
     state.run(async () => {
-      const [r, c] = await Promise.all([
-        inventoryRequest(company, "ledger", filters),
-        inventoryRequest(company, "catalog"),
-      ]);
-      setResult(r);
-      setCat(c);
+      setCat(await inventoryRequest(company, "kardex_options"));
+      if (view === "valuation")
+        setResult({
+          rows: [],
+          total: 0,
+          ...(await inventoryRequest(company, "stock_valuation")),
+        });
     });
-  }, [company, revision, filters]);
+  }, [company, view]);
+  useEffect(() => {
+    if (!requested || view !== "movements") return;
+    state.run(async () =>
+      setResult(await inventoryRequest(company, "ledger", filters)),
+    );
+  }, [company, revision, filters, requested, view]);
   const articles: Row[] = [
     ...cat.materials.map((m: Row) => ({
       ...m,
@@ -95,395 +105,430 @@ export default function Kardex({
   }
   return (
     <>
-      <section className="catalog kardex">
-        <header className="catalog-head">
-          <h2>Kardex histórico</h2>
-          <small>
-            El saldo se calcula con todos los movimientos confirmados del
-            artículo, antes de aplicar los filtros.
-          </small>
-        </header>
-        <form
-          className="inventory-filters"
-          onSubmit={(e) => {
-            e.preventDefault();
-            setFilters({ ...draft, page: 0 });
-          }}
-        >
-          <label>
-            Desde
-            <input
-              type="date"
-              value={draft.from || ""}
-              onChange={(e) => field("from", e.target.value)}
-            />
-          </label>
-          <label>
-            Hasta
-            <input
-              type="date"
-              value={draft.to || ""}
-              onChange={(e) => field("to", e.target.value)}
-            />
-          </label>
-          <label>
-            Tipo de artículo
-            <SearchSelect
-              value={draft.kind || ""}
-              onChange={(e) => {
-                setDraft({ ...draft, kind: e.target.value, item: "", lot: "" });
-              }}
-            >
-              <option value="">Todos</option>
-              <option value="material">Materiales</option>
-              <option value="variant">Productos terminados</option>
-            </SearchSelect>
-          </label>
-          <label>
-            Artículo / Variante
-            <SearchSelect
-              value={draft.item || ""}
-              onChange={(e) =>
-                setDraft({ ...draft, item: e.target.value, lot: "" })
-              }
-            >
-              <option value="">Todos</option>
-              {articles
-                .filter((a) => !draft.kind || a.kind === draft.kind)
-                .map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.label}
-                  </option>
-                ))}
-            </SearchSelect>
-          </label>
-          <label>
-            Tipo de movimiento
-            <SearchSelect
-              value={draft.type || ""}
-              onChange={(e) => field("type", e.target.value)}
-            >
-              <option value="">Todos</option>
-              {Object.entries({
-                ...inventoryKinds,
-                production_consumption: "Salida de materiales",
-                production_output: "Ingreso de producto",
-              })
-                .filter(([k]) => !["production", "release"].includes(k))
-                .map(([k, v]) => (
-                  <option key={k} value={k}>
-                    {v}
-                  </option>
-                ))}
-            </SearchSelect>
-          </label>
-          <label>
-            Documento origen
-            <SearchSelect
-              value={draft.source || ""}
-              onChange={(e) => field("source", e.target.value)}
-            >
-              <option value="">Todos</option>
-              {Object.entries(names)
-                .filter(([k]) => k !== "release")
-                .map(([k, v]) => (
-                  <option key={k} value={k}>
-                    {v}
-                  </option>
-                ))}
-            </SearchSelect>
-          </label>
-          <label>
-            Buscar
-            <input
-              value={draft.query || ""}
-              placeholder="SKU, nombre, documento, unidad física…"
-              onChange={(e) => field("query", e.target.value)}
-            />
-          </label>
-          <div className="actions">
-            <AppButton disabled={state.busy}>Filtrar</AppButton>
-            <AppButton
-              type="button"
-              className="secondary"
-              onClick={() => {
-                setDraft({});
-                setFilters({ page: 0 });
-              }}
-            >
-              Limpiar
-            </AppButton>
-          </div>
-        </form>
-        {state.error && (
-          <p className="error" role="alert">
-            <AppIcon name="status.error" />
-            {state.error}
-          </p>
-        )}
-        <div className="table-wrap">
-          <ResponsiveTable>
-            <thead>
-              <tr>
-                {[
-                  "Fecha",
-                  "Documento",
-                  "Tipo",
-                  "Entrada / Salida",
-                  "SKU / Artículo / Variante",
-                  "Entrada",
-                  "Salida",
-                  "Saldo",
-                  "Unidad",
-                  "Costo unitario",
-                  "Valor",
-                  "Unidades",
-                  "Usuario / Registro",
-                  "Observaciones",
-                ].map((h) => (
-                  <th key={h}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {result.rows.map((r: Row) => (
-                <tr key={r.id}>
-                  <td data-sort-value={r.date}>{r.date}</td>
-                  <td>
-                    <AppButton
-                      className="secondary"
-                      onClick={() =>
-                        state.run(async () => {
-                          if (r.document_id)
-                            setDetail(
-                              await inventoryRequest(company, "detail", {
-                                id: r.document_id,
-                              }),
-                            );
-                          else
-                            setSource(
-                              await inventoryRequest(company, "source", {
-                                id: r.id,
-                              }),
-                            );
-                        })
-                      }
-                    >
-                      {r.document_number}
-                    </AppButton>
-                  </td>
-                  <td>
-                    {(["production_consumption", "production_output"].includes(
-                      r.source_kind,
-                    )
-                      ? names[r.source_kind]
-                      : inventoryKinds[r.movement_type]) ||
-                      names[r.source_kind] ||
-                      r.movement_type}
-                  </td>
-                  <td>
-                    <span
-                      className={
-                        Number(r.entry) > 0
-                          ? "kardex-entry-quantity"
+      {view === "movements" && (
+        <section className="catalog kardex" aria-busy={state.busy}>
+          <header className="catalog-head">
+            <h2>Kardex histórico</h2>
+            <small>
+              El saldo se calcula con todos los movimientos confirmados del
+              artículo, antes de aplicar los filtros.
+            </small>
+          </header>
+          <form
+            className="inventory-filters"
+            onSubmit={(e) => {
+              e.preventDefault();
+              setRequested(true);
+              setFilters({ ...draft, page: 0 });
+            }}
+          >
+            <label>
+              Desde
+              <input
+                type="date"
+                value={draft.from || ""}
+                onChange={(e) => field("from", e.target.value)}
+              />
+            </label>
+            <label>
+              Hasta
+              <input
+                type="date"
+                value={draft.to || ""}
+                onChange={(e) => field("to", e.target.value)}
+              />
+            </label>
+            <label>
+              Tipo de artículo
+              <SearchSelect
+                value={draft.kind || ""}
+                onChange={(e) => {
+                  setDraft({
+                    ...draft,
+                    kind: e.target.value,
+                    item: "",
+                    lot: "",
+                  });
+                }}
+              >
+                <option value="">Todos</option>
+                <option value="material">Materiales</option>
+                <option value="variant">Productos terminados</option>
+              </SearchSelect>
+            </label>
+            <label>
+              Artículo / Variante
+              <SearchSelect
+                value={draft.item || ""}
+                onChange={(e) =>
+                  setDraft({ ...draft, item: e.target.value, lot: "" })
+                }
+              >
+                <option value="">Todos</option>
+                {articles
+                  .filter((a) => !draft.kind || a.kind === draft.kind)
+                  .map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.label}
+                    </option>
+                  ))}
+              </SearchSelect>
+            </label>
+            <label>
+              Tipo de movimiento
+              <SearchSelect
+                value={draft.type || ""}
+                onChange={(e) => field("type", e.target.value)}
+              >
+                <option value="">Todos</option>
+                {Object.entries({
+                  ...inventoryKinds,
+                  production_consumption: "Salida de materiales",
+                  production_output: "Ingreso de producto",
+                })
+                  .filter(([k]) => !["production", "release"].includes(k))
+                  .map(([k, v]) => (
+                    <option key={k} value={k}>
+                      {v}
+                    </option>
+                  ))}
+              </SearchSelect>
+            </label>
+            <label>
+              Documento origen
+              <SearchSelect
+                value={draft.source || ""}
+                onChange={(e) => field("source", e.target.value)}
+              >
+                <option value="">Todos</option>
+                {Object.entries(names)
+                  .filter(([k]) => k !== "release")
+                  .map(([k, v]) => (
+                    <option key={k} value={k}>
+                      {v}
+                    </option>
+                  ))}
+              </SearchSelect>
+            </label>
+            <label>
+              Buscar
+              <input
+                value={draft.query || ""}
+                placeholder="SKU, nombre, documento, unidad física…"
+                onChange={(e) => field("query", e.target.value)}
+              />
+            </label>
+            <div className="actions">
+              <AppButton disabled={state.busy}>Filtrar</AppButton>
+              <AppButton
+                type="button"
+                className="secondary"
+                onClick={() => {
+                  setDraft({});
+                  setRequested(false);
+                  setResult({ rows: [], stock: [], total: 0 });
+                  setFilters({ page: 0 });
+                }}
+              >
+                Limpiar
+              </AppButton>
+            </div>
+          </form>
+          {state.error && (
+            <p className="error" role="alert">
+              <AppIcon name="status.error" />
+              {state.error}
+            </p>
+          )}
+          <div className="table-wrap">
+            <ResponsiveTable>
+              <thead>
+                <tr>
+                  {[
+                    "Fecha",
+                    "Documento",
+                    "Tipo",
+                    "Entrada / Salida",
+                    "SKU / Artículo / Variante",
+                    "Entrada",
+                    "Salida",
+                    "Saldo",
+                    "Unidad",
+                    "Costo unitario",
+                    "Valor",
+                    "Unidades",
+                    "Usuario / Registro",
+                    "Observaciones",
+                  ].map((h) => (
+                    <th key={h}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {result.rows.map((r: Row) => (
+                  <tr key={r.id}>
+                    <td data-sort-value={r.date}>{r.date}</td>
+                    <td>
+                      <AppButton
+                        className="secondary"
+                        onClick={() =>
+                          state.run(async () => {
+                            if (r.document_id)
+                              setDetail(
+                                await inventoryRequest(company, "detail", {
+                                  id: r.document_id,
+                                }),
+                              );
+                            else
+                              setSource(
+                                await inventoryRequest(company, "source", {
+                                  id: r.id,
+                                }),
+                              );
+                          })
+                        }
+                      >
+                        {r.document_number}
+                      </AppButton>
+                    </td>
+                    <td>
+                      {([
+                        "production_consumption",
+                        "production_output",
+                      ].includes(r.source_kind)
+                        ? names[r.source_kind]
+                        : inventoryKinds[r.movement_type]) ||
+                        names[r.source_kind] ||
+                        r.movement_type}
+                    </td>
+                    <td>
+                      <span
+                        className={
+                          Number(r.entry) > 0
+                            ? "kardex-entry-quantity"
+                            : Number(r.exit) > 0
+                              ? "kardex-exit-quantity"
+                              : undefined
+                        }
+                      >
+                        {Number(r.entry) > 0
+                          ? "Entrada"
                           : Number(r.exit) > 0
-                            ? "kardex-exit-quantity"
-                            : undefined
-                      }
-                    >
-                      {Number(r.entry) > 0
-                        ? "Entrada"
-                        : Number(r.exit) > 0
-                          ? "Salida"
-                          : "-"}
-                    </span>
-                  </td>
-                  <td>
-                    {r.sku} · {r.name}
-                    <small>{r.variant}</small>
-                    {r.legacy && (
-                      <small>
-                        Movimiento previo · referencia histórica disponible
-                      </small>
-                    )}
-                  </td>
-                  <td data-sort-value={r.entry}>
-                    <span
-                      className={
-                        Number(r.entry) > 0
-                          ? "kardex-entry-quantity"
-                          : undefined
-                      }
-                    >
-                      {Number(r.entry)}
-                    </span>
-                  </td>
-                  <td data-sort-value={r.exit}>
-                    <span
-                      className={
-                        Number(r.exit) > 0 ? "kardex-exit-quantity" : undefined
-                      }
-                    >
-                      {Number(r.exit)}
-                    </span>
-                  </td>
-                  <td data-sort-value={r.balance}>
-                    <strong>{Number(r.balance)}</strong>
-                  </td>
-                  <td>{r.unit}</td>
-                  <td data-sort-value={r.unit_cost ?? ""}>
-                    {money(r.unit_cost, r.currency)}
-                    {r.cost_basis === "catalog_purchase" && (
-                      <small>Precio de compra al confirmar</small>
-                    )}
-                    {r.cost_basis === "historical_reference" && (
-                      <small>Referencia histórica simplificada</small>
-                    )}
-                  </td>
-                  <td data-sort-value={r.value ?? ""}>
-                    <span
-                      className={
-                        Number(r.exit) > 0
-                          ? "kardex-exit-quantity"
-                          : Number(r.entry) > 0
+                            ? "Salida"
+                            : "-"}
+                      </span>
+                    </td>
+                    <td>
+                      {r.sku} · {r.name}
+                      <small>{r.variant}</small>
+                      {r.legacy && (
+                        <small>
+                          Movimiento previo · referencia histórica disponible
+                        </small>
+                      )}
+                    </td>
+                    <td data-sort-value={r.entry}>
+                      <span
+                        className={
+                          Number(r.entry) > 0
                             ? "kardex-entry-quantity"
                             : undefined
-                      }
-                    >
-                      {money(r.value, r.currency)}
-                    </span>
-                  </td>
-                  <td>
-                    {r.units?.map((u: Row) => (
-                      <small key={u.id}>
-                        {u.code} ·{" "}
-                        {u.weight == null ? "Sin peso real" : u.weight + " g"}
-                      </small>
-                    ))}
-                  </td>
-                  <td>
-                    {r.user_name || "Usuario sin nombre registrado"}
-                    <small>
-                      {new Date(r.created_at).toLocaleString("es-GT")}
-                    </small>
-                  </td>
-                  <td>{r.notes || "-"}</td>
-                </tr>
-              ))}
-            </tbody>
-          </ResponsiveTable>
-        </div>
-        {!state.busy && !state.error && !result.rows.length && (
-          <p className="empty">No hay movimientos con estos filtros.</p>
-        )}
-        <div className="actions">
-          <AppButton
-            className="secondary"
-            disabled={state.busy || !filters.page}
-            onClick={() => setFilters({ ...filters, page: filters.page - 1 })}
-          >
-            Anterior
-          </AppButton>
-          <span>
-            {result.total} movimientos · Página {Number(filters.page || 0) + 1}{" "}
-            · Ordenación dentro de esta página
-          </span>
-          <AppButton
-            className="secondary"
-            disabled={
-              state.busy ||
-              (Number(filters.page || 0) + 1) * 100 >= result.total
-            }
-            onClick={() =>
-              setFilters({ ...filters, page: Number(filters.page || 0) + 1 })
-            }
-          >
-            Siguiente
-          </AppButton>
-        </div>
-      </section>
-      <section className="catalog">
-        <h2>Valor de existencias</h2>
-        <p>
-          Valor simplificado con costos históricos conocidos. Los costos
-          pendientes no se interpretan como cero; no es una valoración contable.
-        </p>
-        <div className="table-wrap">
-          <ResponsiveTable>
-            <thead>
-              <tr>
-                {[
-                  "Artículo / Variante",
-                  "Físico",
-                  "Curación",
-                  "Reservado",
-                  "Disponible",
-                  "Valor conocido",
-                  "Cantidad sin costo",
-                ].map((h) => (
-                  <th key={h}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {result.stock.map((b: Row) => {
-                const a = articles.find((a) => a.id === b.item_id);
-                return (
-                  <tr key={b.item_kind + b.item_id}>
-                    <td>{a?.label || b.item_id}</td>
-                    <td>{Number(b.on_hand)}</td>
-                    <td>{Number(b.blocked)}</td>
-                    <td>{Number(b.reserved)}</td>
-                    <td>{Number(b.available)}</td>
-                    <td data-sort-value={b.known_value ?? ""}>
-                      {money(b.known_value, currency)}
+                        }
+                      >
+                        {Number(r.entry)}
+                      </span>
                     </td>
-                    <td>{Number(b.pending_cost)}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </ResponsiveTable>
-        </div>
-        {!!products.size && (
-          <details>
-            <summary>Totales por producto</summary>
-            <div className="table-wrap">
-              <ResponsiveTable>
-                <thead>
-                  <tr>
-                    {[
-                      "Producto",
-                      "Físico",
-                      "Curación",
-                      "Reservado",
-                      "Disponible",
-                      "Valor conocido",
-                      "Cantidad sin costo",
-                    ].map((h) => (
-                      <th key={h}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {[...products.values()].map((p) => (
-                    <tr key={p.id}>
-                      <td>{p.name}</td>
-                      {["on_hand", "blocked", "reserved", "available"].map(
-                        (k) => (
-                          <td key={k}>{p[k]}</td>
-                        ),
+                    <td data-sort-value={r.exit}>
+                      <span
+                        className={
+                          Number(r.exit) > 0
+                            ? "kardex-exit-quantity"
+                            : undefined
+                        }
+                      >
+                        {Number(r.exit)}
+                      </span>
+                    </td>
+                    <td data-sort-value={r.balance}>
+                      <strong>{Number(r.balance)}</strong>
+                    </td>
+                    <td>{r.unit}</td>
+                    <td data-sort-value={r.unit_cost ?? ""}>
+                      {money(r.unit_cost, r.currency)}
+                      {r.cost_basis === "catalog_purchase" && (
+                        <small>Precio de compra al confirmar</small>
                       )}
-                      <td>{money(p.known_value, currency)}</td>
-                      <td>{p.pending_cost}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </ResponsiveTable>
+                      {r.cost_basis === "historical_reference" && (
+                        <small>Referencia histórica simplificada</small>
+                      )}
+                    </td>
+                    <td data-sort-value={r.value ?? ""}>
+                      <span
+                        className={
+                          Number(r.exit) > 0
+                            ? "kardex-exit-quantity"
+                            : Number(r.entry) > 0
+                              ? "kardex-entry-quantity"
+                              : undefined
+                        }
+                      >
+                        {money(r.value, r.currency)}
+                      </span>
+                    </td>
+                    <td>
+                      {r.units?.map((u: Row) => (
+                        <small key={u.id}>
+                          {u.code} ·{" "}
+                          {u.weight == null ? "Sin peso real" : u.weight + " g"}
+                        </small>
+                      ))}
+                    </td>
+                    <td>
+                      {r.user_name || "Usuario sin nombre registrado"}
+                      <small>
+                        {new Date(r.created_at).toLocaleString("es-GT")}
+                      </small>
+                    </td>
+                    <td>{r.notes || "-"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </ResponsiveTable>
+          </div>
+          {!requested && (
+            <p className="empty">
+              Selecciona los filtros y presiona Filtrar para cargar los
+              movimientos.
+            </p>
+          )}
+          {requested && !state.busy && !state.error && !result.rows.length && (
+            <p className="empty">No hay movimientos con estos filtros.</p>
+          )}
+          {requested && (
+            <div className="actions">
+              <AppButton
+                className="secondary"
+                disabled={state.busy || !filters.page}
+                onClick={() =>
+                  setFilters({ ...filters, page: filters.page - 1 })
+                }
+              >
+                Anterior
+              </AppButton>
+              <span>
+                {result.total} movimientos · Página{" "}
+                {Number(filters.page || 0) + 1} · Ordenación dentro de esta
+                página
+              </span>
+              <AppButton
+                className="secondary"
+                disabled={
+                  state.busy ||
+                  (Number(filters.page || 0) + 1) * 100 >= result.total
+                }
+                onClick={() =>
+                  setFilters({
+                    ...filters,
+                    page: Number(filters.page || 0) + 1,
+                  })
+                }
+              >
+                Siguiente
+              </AppButton>
             </div>
-          </details>
-        )}
-      </section>
+          )}
+        </section>
+      )}
+      {view === "valuation" && (
+        <section className="catalog" aria-busy={state.busy}>
+          <h2>Valor de existencias</h2>
+          {state.error && (
+            <p className="error" role="alert">
+              {state.error}
+            </p>
+          )}
+          <p>
+            Valor simplificado con costos históricos conocidos. Los costos
+            pendientes no se interpretan como cero; no es una valoración
+            contable.
+          </p>
+          <div className="table-wrap">
+            <ResponsiveTable>
+              <thead>
+                <tr>
+                  {[
+                    "Artículo / Variante",
+                    "Físico",
+                    "Curación",
+                    "Reservado",
+                    "Disponible",
+                    "Valor conocido",
+                    "Cantidad sin costo",
+                  ].map((h) => (
+                    <th key={h}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {result.stock.map((b: Row) => {
+                  const a = articles.find((a) => a.id === b.item_id);
+                  return (
+                    <tr key={b.item_kind + b.item_id}>
+                      <td>{a?.label || b.item_id}</td>
+                      <td>{Number(b.on_hand)}</td>
+                      <td>{Number(b.blocked)}</td>
+                      <td>{Number(b.reserved)}</td>
+                      <td>{Number(b.available)}</td>
+                      <td data-sort-value={b.known_value ?? ""}>
+                        {money(b.known_value, currency)}
+                      </td>
+                      <td>{Number(b.pending_cost)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </ResponsiveTable>
+          </div>
+          {!!products.size && (
+            <details>
+              <summary>Totales por producto</summary>
+              <div className="table-wrap">
+                <ResponsiveTable>
+                  <thead>
+                    <tr>
+                      {[
+                        "Producto",
+                        "Físico",
+                        "Curación",
+                        "Reservado",
+                        "Disponible",
+                        "Valor conocido",
+                        "Cantidad sin costo",
+                      ].map((h) => (
+                        <th key={h}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[...products.values()].map((p) => (
+                      <tr key={p.id}>
+                        <td>{p.name}</td>
+                        {["on_hand", "blocked", "reserved", "available"].map(
+                          (k) => (
+                            <td key={k}>{p[k]}</td>
+                          ),
+                        )}
+                        <td>{money(p.known_value, currency)}</td>
+                        <td>{p.pending_cost}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </ResponsiveTable>
+              </div>
+            </details>
+          )}
+        </section>
+      )}
       {detail?.header && (
         <div className="overlay">
           <section
@@ -796,7 +841,7 @@ export default function Kardex({
                       setResult(
                         await inventoryRequest(company, "ledger", filters),
                       );
-                      setCat(await inventoryRequest(company, "catalog"));
+                      setCat(await inventoryRequest(company, "kardex_options"));
                     })
                   }
                 >

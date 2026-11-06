@@ -589,7 +589,7 @@ function App() {
     );
   return (
     <IconProvider company={company}><MarginProvider company={company}><MaterialTypesProvider company={company}>
-      <div className="shell">
+      <div className="shell chrome-shell">
         <Sidebar
           section={section}
           company={company}
@@ -629,6 +629,7 @@ function App() {
             setSection("dashboard");
           }}
           email={session.user.email}
+          userId={session.user.id}
           onCompany={async (value) => {
             if (value === company) return;
             if (await leaveSheet()) chooseCompany(value);
@@ -1751,3 +1752,4 @@ import "./configuration.css";
 import "./mobile.css";
 
 import "./layout-polish.css";
+import "./app-chrome.css";

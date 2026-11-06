@@ -10,13 +10,15 @@ export default function MaterialRequirements({
   formula,
   scale = 1,
   units = null,
+  initialOpen = false,
 }: {
   company: string;
   formula?: string;
   scale?: number;
   units?: number | null;
+  initialOpen?: boolean;
 }) {
-  const [open, setOpen] = useState(false),
+  const [open, setOpen] = useState(initialOpen),
     [rows, setRows] = useState<Row[]>([]),
     [error, setError] = useState(""),
     [loading, setLoading] = useState(false),
@@ -54,6 +56,7 @@ export default function MaterialRequirements({
       : Number(n).toLocaleString("es-GT", { maximumFractionDigits: 2 });
   return (
     <IconDetails
+      open={open}
       className="formula-disclosure material-requirements"
       onToggle={(e) => setOpen(e.currentTarget.open)}
     >

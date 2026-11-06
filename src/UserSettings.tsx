@@ -333,6 +333,7 @@ export default function UserSettings({
                   state.setNotice(
                     "Perfil actualizado. El nombre se reflejará en el Kardex.",
                   );
+                  window.dispatchEvent(new Event("ohana-user-profile-saved"));
                   await load();
                 });
               }}
