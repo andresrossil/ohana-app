@@ -114,9 +114,11 @@ function ModuleAccess({
 export function Members({
   company,
   corporation,
+  onChanged,
 }: {
   company?: string;
   corporation?: string;
+  onChanged?: () => Promise<unknown>;
 }) {
   const [members, setMembers] = useState<CatalogRow[]>([]),
     [busy, setBusy] = useState(false),
@@ -148,6 +150,7 @@ export function Members({
     else {
       setNotice("Acceso actualizado.");
       await load();
+      await onChanged?.();
     }
     setBusy(false);
   }

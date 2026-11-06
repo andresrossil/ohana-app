@@ -254,7 +254,7 @@ export default function UserSettings({
       </div>
       <IconDetails className="formula-disclosure">
         <summary>Accesos y permisos</summary>
-        <Members company={company} />
+        <Members company={company} onChanged={load} />
       </IconDetails>
       <IconDetails className="formula-disclosure">
         <summary>Cambiar mi contraseña</summary>
