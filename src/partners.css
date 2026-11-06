@@ -1,6 +1,6 @@
 .partner-filters {
   display: grid;
-  grid-template-columns: minmax(200px, 2fr) repeat(2, minmax(130px, 1fr));
+  grid-template-columns: minmax(200px, 2fr) minmax(130px, 1fr);
   gap: 14px;
   padding: 18px;
 }
@@ -52,6 +52,21 @@
   border-top: 1px solid var(--admin-border);
   padding-top: 18px;
 }
+.shell .partner-primary {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 9px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 1.05rem;
+  font-weight: 700;
+  text-align: center;
+  background: var(--admin-secondary);
+  border: 1px solid var(--admin-border);
+}
+.shell .partner-primary.is-primary { background: color-mix(in srgb, var(--admin-primary) 12%, var(--admin-surface)); border-color: var(--admin-primary); }
+.partner-matches { padding: 14px; margin-bottom: 14px; overflow-wrap: anywhere; }
 .partner-history li {
   margin: 8px 0;
   overflow-wrap: anywhere;

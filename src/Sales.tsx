@@ -1,4 +1,5 @@
 import SearchSelect from "./SearchSelect";
+import { paymentMethods } from "./payment-methods";
 import ResponsiveTable from "./ResponsiveTable";
 import { SaleUnits } from "./PhysicalUnits";
 import MoneyInput from "./MoneyInput";
@@ -28,7 +29,8 @@ export default function Sales({
       { key: crypto.randomUUID(), variant: "", quantity: 1 },
     ]),
     [query, setQuery] = useState(""),
-    [customerId, setCustomerId] = useState("");
+    [customerId, setCustomerId] = useState(""),
+    [payment, setPayment] = useState("");
   async function load() {
     setData(await sales(company));
   }
@@ -72,6 +74,7 @@ export default function Sales({
                   { key: crypto.randomUUID(), variant: "", quantity: 1 },
                 ]);
                 setCustomerId("");
+                setPayment("");
                 setMode("create");
               }}
             >
@@ -173,7 +176,10 @@ export default function Sales({
                       Cliente
                       <SearchSelect
                         value={customerId}
-                        onChange={(e) => setCustomerId(e.target.value)}
+                        onChange={(e) => {
+                          setCustomerId(e.target.value);
+                          setPayment(data.customers.find((c: Row) => c.id === e.target.value)?.payment_preference || "");
+                        }}
                       >
                         <option value="">Nuevo contacto</option>
                         {data.customers
@@ -215,15 +221,14 @@ export default function Sales({
                       <p className="form-wide">
                         {data.customers.find((c: Row) => c.id === customerId)
                           ?.phone ||
-                          "Este cliente no tiene teléfono. Completa sus datos en Socios de negocio antes de registrar la venta."}
+                          "Este cliente no tiene teléfono registrado."}
                       </p>
                     )}
                     <label>
                       Pago
-                      <SearchSelect name="payment">
-                        <option value="cash">Efectivo</option>
-                        <option value="transfer">Transferencia</option>
-                        <option value="cod">Contra entrega</option>
+                      <SearchSelect name="payment" required value={payment} onChange={(e) => setPayment(e.target.value)}>
+                        <option value="">Seleccionar forma de pago</option>
+                        {paymentMethods.map((method) => <option key={method.value} value={method.value}>{method.label}</option>)}
                       </SearchSelect>
                     </label>
                   </div>

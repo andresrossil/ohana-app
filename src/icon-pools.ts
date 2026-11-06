@@ -137,6 +137,10 @@ export const defaultIconPools: IconPools = {
     options: ["users", "users-round", "contact", "handshake", "user-round"],
     active: "users",
   },
+  "module.suppliers": {
+    options: ["truck", "handshake", "store", "package", "contact"],
+    active: "truck",
+  },
   "module.reports": {
     options: [
       "chart-column",

@@ -626,12 +626,10 @@ function App() {
               ? ["formulas", "production"]
               : []),
             ...(activeCompany?.sales_read ? ["sales"] : []),
-            ...(activeCompany?.manage ||
-            activeCompany?.catalog_read ||
-            activeCompany?.inventory_read ||
-            activeCompany?.sales_read
+            ...(activeCompany?.manage || activeCompany?.sales_read
               ? ["customers"]
               : []),
+            ...(activeCompany?.manage || activeCompany?.catalog_read || activeCompany?.inventory_read ? ["suppliers"] : []),
             ...(activeCompany?.reports_read ? ["reports"] : []),
             ...(activeCompany?.manage ? ["prices", "expenses"] : []),
             ...(activeCompany && (activeCompany.manage || canCreate)
@@ -998,9 +996,10 @@ function App() {
                   currency={activeCompany?.currency}
                 />
               )}
-              {section === "customers" && (
+              {(section === "customers" || section === "suppliers") && (
                 <BusinessPartners
-                  key={company}
+                  key={company + section}
+                  partnerType={section === "suppliers" ? "supplier" : "customer"}
                   company={company}
                   onDirty={setSettingsDirty}
                   onSaved={load}
@@ -1020,6 +1019,7 @@ function App() {
                 "production",
                 "sales",
                 "customers",
+                "suppliers",
                 "reports",
                 "prices",
                 "expenses",
@@ -1102,7 +1102,7 @@ function App() {
                         type="button"
                         className="stat-link"
                         onClick={async () => {
-                          if (await leaveSheet()) setSection("customers");
+                          if (await leaveSheet()) setSection("suppliers");
                         }}
                       >
                         <span>Proveedores activos</span>

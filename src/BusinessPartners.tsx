@@ -8,6 +8,7 @@ import { AppButton, AppIcon } from "./AppIcon";
 import { request } from "./commerce";
 import { money, type Row } from "./operations";
 import "./partners.css";
+import { paymentMethods } from "./payment-methods";
 
 const typeName = (type: string) =>
   type === "supplier" ? "Proveedor" : "Cliente";
@@ -35,10 +36,12 @@ const blank = (): Row => ({
 });
 export default function BusinessPartners({
   company,
+  partnerType,
   onDirty,
   onSaved,
 }: {
   company: string;
+  partnerType: "customer" | "supplier";
   onDirty: (dirty: boolean) => void;
   onSaved: () => Promise<void>;
 }) {
@@ -48,7 +51,6 @@ export default function BusinessPartners({
       canManage: false,
     }),
     [query, setQuery] = useState(""),
-    [type, setType] = useState(""),
     [status, setStatus] = useState(""),
     [page, setPage] = useState(1),
     [sort, setSort] = useState("name"),
@@ -60,11 +62,10 @@ export default function BusinessPartners({
     [mode, setMode] = useState<"view" | "edit" | null>(null),
     [draft, setDraft] = useState<Row>(blank),
     [related, setRelated] = useState<Row>({}),
-    [canChangeType, setCanChangeType] = useState(true),
+    [matches, setMatches] = useState<Row[]>([]),
     [dirty, setDirty] = useState(false),
     [refresh, setRefresh] = useState(0);
   const generation = useRef(0),
-    codeCustom = useRef(false),
     suggestion = useRef(0),
     heading = useRef<HTMLHeadingElement>(null);
   const api = (action: string, data: Row = {}) =>
@@ -74,7 +75,7 @@ export default function BusinessPartners({
     setLoading(true);
     setError("");
     const timer = setTimeout(() => {
-      api("list", { query, type, status, page, sort, direction })
+      api("list", { query, type: partnerType, status, page, sort, direction })
         .then((result) => {
           if (generation.current !== ticket) return;
           setData(result);
@@ -92,11 +93,20 @@ export default function BusinessPartners({
       generation.current++;
       clearTimeout(timer);
     };
-  }, [company, query, type, status, page, sort, direction, refresh]);
+  }, [company, query, partnerType, status, page, sort, direction, refresh]);
   useEffect(() => {
-    onDirty(dirty);
+    if (mode !== "edit" || !data.canManage) { setMatches([]); return; }
+    let live = true;
+    const timer = setTimeout(() => {
+      api("matches", { id: draft.id, name: draft.name, instagram: draft.instagram, facebook: draft.facebook, phone: draft.phone, phone_secondary: draft.phone_secondary, whatsapp: draft.whatsapp })
+        .then((rows) => { if (live) setMatches(rows); }).catch(() => { if (live) setMatches([]); });
+    }, 350);
+    return () => { live = false; clearTimeout(timer); };
+  }, [company, mode, data.canManage, draft.id, draft.name, draft.instagram, draft.facebook, draft.phone, draft.phone_secondary, draft.whatsapp]);
+  useEffect(() => {
+    onDirty(dirty || busy);
     return () => onDirty(false);
-  }, [dirty, onDirty]);
+  }, [dirty, busy, onDirty]);
   useEffect(() => {
     const leave = (e: BeforeUnloadEvent) => {
       if (dirty) {
@@ -111,7 +121,10 @@ export default function BusinessPartners({
     if (mode) heading.current?.focus();
   }, [mode]);
   function change(key: string, value: any) {
-    setDraft((old) => ({ ...old, [key]: value }));
+    setDraft((old) => ({ ...old, [key]: value,
+      ...(key === "phone" && old.whatsapp_same ? { whatsapp: value } : {}),
+      ...(key === "whatsapp_same" && value ? { whatsapp: old.phone } : {}),
+    }));
     setDirty(true);
   }
   async function close() {
@@ -126,7 +139,7 @@ export default function BusinessPartners({
     setError("");
     suggestion.current++;
   }
-  async function open(row?: Row, edit = false) {
+  async function open(row?: Row, edit = false, addRole = false) {
     setBusy(true);
     setError("");
     try {
@@ -136,35 +149,24 @@ export default function BusinessPartners({
           ...detail.partner,
           type: detail.partner.partner_type,
           addresses: detail.addresses,
+          ...(addRole ? { [partnerType === "customer" ? "is_customer" : "is_supplier"]: true } : {}),
         });
         setRelated(detail.related);
-        setCanChangeType(detail.canChangeType);
       } else {
         const initial = blank();
+        initial.type = partnerType;
+        initial.is_customer = partnerType === "customer";
+        initial.is_supplier = partnerType === "supplier";
         initial.code = (await api("suggest", { type: initial.type })).code;
         setDraft(initial);
         setRelated({});
-        setCanChangeType(true);
       }
-      setDirty(false);
-      codeCustom.current = !!row;
+      setDirty(addRole);
       setMode(row && !edit ? "view" : "edit");
     } catch (e: any) {
       setError(e.message);
     } finally {
       setBusy(false);
-    }
-  }
-  async function changeType(value: string) {
-    change("type", value);
-    if (draft.id || codeCustom.current) return;
-    const ticket = ++suggestion.current;
-    try {
-      const result = await api("suggest", { type: value });
-      if (ticket === suggestion.current && !codeCustom.current)
-        setDraft((old) => ({ ...old, code: result.code }));
-    } catch (e: any) {
-      setError(e.message);
     }
   }
   async function save(e: React.FormEvent) {
@@ -181,7 +183,7 @@ export default function BusinessPartners({
     } catch (e: any) {
       setError(
         e.code === "23505"
-          ? "El código o nombre de proveedor ya está registrado en esta empresa."
+          ? "El código alterno o nombre de proveedor ya está registrado en esta empresa. Puedes utilizar el socio existente."
           : e.message,
       );
     } finally {
@@ -245,19 +247,17 @@ export default function BusinessPartners({
             type={inputType}
             maxLength={max}
             required={required}
+            readOnly={key === "code"}
+            disabled={key === "whatsapp" && draft.whatsapp_same}
             pattern={
-              key === "code" ? "[A-Za-z0-9][A-Za-z0-9._/\\-]{0,39}" : undefined
+              key === "alternate_code" ? "[A-Za-z0-9\\-]{1,40}" : undefined
             }
             title={
-              key === "code"
-                ? "Usa letras, números, punto, guion, guion bajo o barra; máximo 40 caracteres."
+              key === "alternate_code"
+                ? "Usa letras, números o guiones; máximo 40 caracteres."
                 : undefined
             }
             onChange={(e) => {
-              if (key === "code") {
-                codeCustom.current = true;
-                suggestion.current++;
-              }
               change(key, e.target.value);
             }}
           />
@@ -272,11 +272,11 @@ export default function BusinessPartners({
         <div>
           <p className="eyebrow">RELACIONES DE TU EMPRESA</p>
           <h1 className="module-title">
-            <AppIcon name="module.customers" />
-            Socios de negocio
+            <AppIcon name={partnerType === "customer" ? "module.customers" : "module.suppliers"} />
+            {partnerType === "customer" ? "Clientes" : "Proveedores"}
           </h1>
           <p>
-            Clientes y proveedores, cada uno con su información e historial.
+            {partnerType === "customer" ? "Tus clientes, contactos y pedidos." : "Tus proveedores, materiales y compras."}
           </p>
         </div>
         {data.canManage && (
@@ -285,7 +285,7 @@ export default function BusinessPartners({
             iconKey="action.add"
             onClick={() => open()}
           >
-            Nuevo socio
+            {partnerType === "customer" ? "Nuevo cliente" : "Nuevo proveedor"}
           </AppButton>
         )}
       </section>
@@ -299,10 +299,10 @@ export default function BusinessPartners({
       <section className="catalog partner-catalog">
         <div className="partner-filters">
           <label>
-            Buscar socio
+            {partnerType === "customer" ? "Buscar cliente" : "Buscar proveedor"}
             <SearchField
               type="search"
-              placeholder="Código, nombre, teléfono o NIT…"
+              placeholder="Código, nombre, redes sociales o teléfonos…"
               value={query}
               maxLength={120}
               onChange={(e) => {
@@ -310,22 +310,6 @@ export default function BusinessPartners({
                 setPage(1);
               }}
             />
-          </label>
-          <label>
-            Tipo
-            <SearchSelect
-              value={type}
-              onChange={(e) => {
-                setType(e.target.value);
-                setPage(1);
-              }}
-            >
-              <option value="">Todos</option>
-              {data.customerRead && <option value="customer">Clientes</option>}
-              {data.supplierRead && (
-                <option value="supplier">Proveedores</option>
-              )}
-            </SearchSelect>
           </label>
           <label>
             Estado
@@ -348,6 +332,7 @@ export default function BusinessPartners({
               <tr>
                 {[
                   ["code", "Código"],
+                  ["alternate_code", "Código alterno"],
                   ["name", "Nombre"],
                   ["partner_type", "Tipo"],
                   ["phone", "Teléfono"],
@@ -384,6 +369,7 @@ export default function BusinessPartners({
               {data.rows.map((row: Row) => (
                 <tr key={row.id}>
                   <td>{row.code}</td>
+                  <td>{row.alternate_code || "—"}</td>
                   <td
                     className={
                       row.partner_type === "supplier" ? "admin-name" : ""
@@ -391,7 +377,7 @@ export default function BusinessPartners({
                   >
                     {row.name}
                   </td>
-                  <td>{typeName(row.partner_type)}</td>
+                  <td>{row.is_customer && row.is_supplier ? "Cliente y proveedor" : typeName(row.partner_type)}</td>
                   <td>{row.phone || "—"}</td>
                   <td>
                     <CatalogBadge
@@ -472,10 +458,10 @@ export default function BusinessPartners({
             <div className="hierarchy-toolbar">
               <h2 ref={heading} tabIndex={-1} id="partner-title">
                 {readOnly
-                  ? "Ver socio"
+                  ? `Ver ${typeName(partnerType).toLowerCase()}`
                   : draft.id
-                    ? "Editar socio"
-                    : "Nuevo socio"}
+                    ? `Editar ${typeName(partnerType).toLowerCase()}`
+                    : `Nuevo ${typeName(partnerType).toLowerCase()}`}
               </h2>
               <AppButton className="secondary" disabled={busy} onClick={close}>
                 Cerrar
@@ -488,33 +474,39 @@ export default function BusinessPartners({
               </p>
             )}
             <form onSubmit={save}>
+              {mode === "edit" && matches.length > 0 && <aside className="sheet-warning partner-matches" role="status">
+                <strong>Posibles coincidencias · puedes continuar guardando</strong>
+                <p>Revisa si ya existe este socio antes de crear otro. Las coincidencias de contacto no bloquean el registro.</p>
+                {matches.map((match) => <div className="form-actions" key={match.id}>
+                  <span>{match.code} · {match.name}</span>
+                  {!draft.id && <AppButton type="button" className="secondary" disabled={busy} onClick={async () => {
+                    if (dirty && !(await confirmAction("¿Usar este socio existente? Se descartarán los datos nuevos y se abrirá su ficha para agregar el tipo correspondiente, sin duplicarlo."))) return;
+                    await open(match, true, true);
+                  }}>Usar socio existente</AppButton>}
+                </div>)}
+              </aside>}
               <fieldset disabled={readOnly || busy}>
                 <legend>Datos generales</legend>
-                {field("code", "Código", { max: 40, required: true })}
-                <label>
-                  Tipo de socio
-                  <SearchSelect
-                    value={draft.type}
-                    disabled={!canChangeType}
-                    onChange={(e) => changeType(e.target.value)}
-                  >
-                    <option value="customer">Cliente</option>
-                    <option value="supplier">Proveedor</option>
-                  </SearchSelect>
-                </label>
-                {!canChangeType && (
-                  <p className="form-wide muted">
-                    El tipo está protegido porque el socio tiene operaciones o
-                    presentaciones relacionadas.
-                  </p>
-                )}
+                {field("code", partnerType === "customer" ? "Código de cliente · automático" : "Código de proveedor · automático", { max: 40 })}
+                {field("alternate_code", "Código alterno · opcional", { max: 40 })}
+                <p className="form-wide muted">El código definitivo se asigna al guardar. Un socio con ambos tipos conserva un único código e historial.</p>
                 {field("name", "Nombre comercial o nombre completo", {
                   max: 160,
                   required: true,
                 })}
-                {field("legal_name", "Razón social")}
-                {field("tax_id", "NIT / identificación fiscal", { max: 80 })}
-                {field("phone", "Teléfono", { max: 40, inputType: "tel" })}
+                {partnerType === "supplier" && <>
+                  {field("legal_name", "Razón social")}
+                  {field("tax_id", "NIT / identificación fiscal", { max: 80 })}
+                </>}
+                {partnerType === "customer" && <>
+                  {field("instagram", "Instagram · usuario", { max: 200 })}
+                  {field("facebook", "Facebook · usuario o perfil", { max: 200 })}
+                </>}
+                {field("phone", "Teléfono principal", { max: 40, inputType: "tel" })}
+                {partnerType === "customer" && <>
+                  {field("phone_secondary", "Teléfono secundario · opcional", { max: 40, inputType: "tel" })}
+                  <label><input type="checkbox" checked={!!draft.whatsapp_same} onChange={(e) => change("whatsapp_same", e.target.checked)} /> Mismo número que WhatsApp</label>
+                </>}
                 {field("whatsapp", "WhatsApp", { max: 40, inputType: "tel" })}
                 {field("email", "Correo electrónico", {
                   max: 254,
@@ -532,20 +524,26 @@ export default function BusinessPartners({
                     <option value="false">Inactivo</option>
                   </SearchSelect>
                 </label>
-                {draft.contact && (
+                {partnerType === "supplier" && draft.contact && (
                   <p className="form-wide">
                     Contacto anterior: {draft.contact}
                   </p>
                 )}
-                {draft.website_url && (
+                {partnerType === "supplier" && draft.website_url && (
                   <p className="form-wide">
                     Página registrada: {draft.website_url}
                   </p>
                 )}
-                {field("notes", "Observaciones generales", {
+                {partnerType === "supplier" && field("notes", "Observaciones generales", {
                   multiline: true,
                   max: 4000,
                 })}
+                <label className="form-wide"><input type="checkbox"
+                  checked={!!draft[partnerType === "customer" ? "is_supplier" : "is_customer"]}
+                  disabled={draft.type !== partnerType}
+                  onChange={(e) => change(partnerType === "customer" ? "is_supplier" : "is_customer", e.target.checked)} />
+                  {partnerType === "customer" ? "También es proveedor" : "También es cliente"}
+                </label>
               </fieldset>
               <fieldset disabled={readOnly || busy}>
                 <legend>Direcciones</legend>
@@ -563,7 +561,7 @@ export default function BusinessPartners({
                       ["phone", "Teléfono de contacto", 40],
                       ["address", "Dirección completa", 1000],
                       ["instructions", "Indicaciones adicionales", 1000],
-                    ].map(([key, label, max]) => (
+                    ].filter(([key]) => partnerType === "supplier" || !["phone", "instructions"].includes(String(key))).map(([key, label, max]) => (
                       <label
                         key={key}
                         className={
@@ -609,7 +607,7 @@ export default function BusinessPartners({
                         )}
                       </label>
                     ))}
-                    <label>
+                    <label className={a.is_primary ? "partner-primary is-primary form-wide" : "partner-primary form-wide"}>
                       <input
                         type="radio"
                         name="primary_address"
@@ -671,12 +669,19 @@ export default function BusinessPartners({
                 )}
               </fieldset>
               <fieldset disabled={readOnly || busy}>
-                <legend>Información comercial · {typeName(draft.type)}</legend>
+                <legend>Información comercial · {typeName(partnerType)}</legend>
+                {partnerType === "customer" && <label>Preferencia de pago · opcional
+                  <SearchSelect value={draft.payment_preference || ""} onChange={(e) => change("payment_preference", e.target.value)}>
+                    <option value="">Sin preferencia</option>
+                    {paymentMethods.map((method) => <option key={method.value} value={method.value}>{method.label}</option>)}
+                  </SearchSelect>
+                  <small>Solo se sugiere al crear pedidos; no registra pagos.</small>
+                </label>}
                 {field("commercial_notes", "Observaciones comerciales", {
                   multiline: true,
                   max: 4000,
                 })}
-                {draft.type === "supplier"
+                {partnerType === "supplier"
                   ? field("purchase_terms", "Condiciones de compra", {
                       multiline: true,
                       max: 2000,
