@@ -556,6 +556,9 @@ export default function BusinessPartners({
                     key={a.id || a.key || index}
                   >
                     <legend>Dirección {index + 1}</legend>
+                    {partnerType === "customer" && <label>Nombre de dirección
+                      <input required maxLength={100} value={a.label||""} onChange={e=>change("addresses",draft.addresses.map((row:Row,i:number)=>i===index?{...row,label:e.target.value}:row))}/>
+                    </label>}
                     {partnerType === "customer" && <label>Departamento
                       <SearchSelect value={a.department || ""} onChange={e=>change("addresses",draft.addresses.map((row:Row,i:number)=>i===index?{...row,department:e.target.value}:row))}>
                         <option value="">Sin departamento definido</option>
@@ -563,12 +566,19 @@ export default function BusinessPartners({
                       </SearchSelect>
                       <small>Se utilizará para sugerir la tarifa de mensajería por departamento.</small>
                     </label>}
+                    {partnerType === "customer" && <label>Zona
+                      <SearchSelect value={a.zone==null?"":String(a.zone)} onChange={e=>change("addresses",draft.addresses.map((row:Row,i:number)=>i===index?{...row,zone:e.target.value}:row))}>
+                        <option value="">Sin zona definida</option>
+                        {Array.from({length:21},(_,i)=>String(i+1)).map(zone=><option key={zone} value={zone}>Zona {zone}</option>)}
+                      </SearchSelect>
+                      <small>Se utilizará cuando la mensajería tenga tarifas por zona.</small>
+                    </label>}
                     {[
                       ["label", "Nombre o referencia", 100],
                       ["phone", "Teléfono de contacto", 40],
                       ["address", "Dirección completa", 1000],
                       ["instructions", "Indicaciones adicionales", 1000],
-                    ].filter(([key]) => partnerType === "supplier" || !["phone", "instructions"].includes(String(key))).map(([key, label, max]) => (
+                    ].filter(([key]) => partnerType === "supplier" || !["label", "phone", "instructions"].includes(String(key))).map(([key, label, max]) => (
                       <label
                         key={key}
                         className={
@@ -664,6 +674,7 @@ export default function BusinessPartners({
                             label: "",
                             address: "",
                             department: "",
+                            zone: "",
                             instructions: "",
                             phone: "",
                             is_primary: !draft.addresses.length,
