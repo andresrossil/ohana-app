@@ -219,3 +219,17 @@
   align-items: center;
   gap: 6px;
 }
+.shell .user-avatar {
+  width: 64px;
+  height: 64px;
+  object-fit: cover;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.shell .user-avatar-empty {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--admin-secondary);
+  color: var(--admin-heading);
+}

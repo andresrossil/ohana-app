@@ -111,7 +111,7 @@ function ModuleAccess({
     </IconDetails>
   );
 }
-function Members({
+export function Members({
   company,
   corporation,
 }: {

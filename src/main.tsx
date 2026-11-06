@@ -35,6 +35,8 @@ const BarcodeDialog = lazy(() => import("./BarcodeDialog"));
 import { identityPayload, matchesCatalog } from "./catalog-model";
 import CompanySettings from "./CompanySettings";
 import OrganizationAdmin from "./OrganizationAdmin";
+import { PasswordRecovery } from "./UserSettings";
+const UserSettings = lazy(() => import("./UserSettings"));
 import CompanyPicker from "./CompanyPicker";
 import { useCompanyTheme } from "./CompanyBrand";
 type Row = { id: string; [key: string]: any };
@@ -72,6 +74,7 @@ const money = (n: number, c = "GTQ") =>
     maximumFractionDigits: 4,
   }).format(n);
 function App() {
+  const [passwordRecovery, setPasswordRecovery] = useState(() => new URLSearchParams(location.hash.slice(1)).get("type") === "recovery");
   const [quoteCurrency,setQuoteCurrency]=useState("GTQ");
   const protection = useNavigationProtection();
   const [pendingNavigation, setPendingNavigation] = useState<Section | null>(
@@ -217,6 +220,7 @@ function App() {
       }
     });
     const { data } = db.auth.onAuthStateChange((_e, s) => {
+      if (_e === "PASSWORD_RECOVERY") setPasswordRecovery(true);
       acceptSession(s);
       setReady(true);
       if (!s) {
@@ -482,6 +486,7 @@ function App() {
       )}
     </label>
   );
+  if (passwordRecovery && ready && session) return <PasswordRecovery onDone={() => { setPasswordRecovery(false); setConfirmation(null); window.history.replaceState(null, "", import.meta.env.BASE_URL); setNotice("Contraseña actualizada."); }} />;
   if (confirmation)
     return (
       <main className="login">
@@ -743,6 +748,7 @@ function App() {
                     {[
                       ["profile", "Datos de empresa"],
                       ["appearance", "Apariencia"],
+                      ["users", "Usuarios"],
                       ["margin", "Margen esperado"],
                       ["materials", "Materiales"],
                       ["structure", "Corporaciones y accesos"],
@@ -807,6 +813,7 @@ function App() {
                       />
                     )}
                   {configView === "materials" && activeCompany?.manage && <MaterialTypeSettings key={company} company={company} onDirty={setSettingsDirty} />}
+                  {configView === "users" && activeCompany?.manage && <UserSettings key={company} company={company} onDirty={setSettingsDirty} />}
                   {configView === "margin" && activeCompany?.manage && <MarginSettings key={company} company={company} onDirty={setSettingsDirty} />}
                   {configView === "store" && activeCompany?.manage && (
                     <StoreSettings
