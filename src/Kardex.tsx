@@ -229,6 +229,7 @@ export default function Kardex({
                   "Fecha",
                   "Documento",
                   "Tipo",
+                  "Entrada / Salida",
                   "SKU / Artículo / Variante",
                   "Entrada",
                   "Salida",
@@ -281,6 +282,23 @@ export default function Kardex({
                       r.movement_type}
                   </td>
                   <td>
+                    <span
+                      className={
+                        Number(r.entry) > 0
+                          ? "kardex-entry-quantity"
+                          : Number(r.exit) > 0
+                            ? "kardex-exit-quantity"
+                            : undefined
+                      }
+                    >
+                      {Number(r.entry) > 0
+                        ? "Entrada"
+                        : Number(r.exit) > 0
+                          ? "Salida"
+                          : "-"}
+                    </span>
+                  </td>
+                  <td>
                     {r.sku} · {r.name}
                     <small>{r.variant}</small>
                     {r.legacy && (
@@ -323,7 +341,17 @@ export default function Kardex({
                     )}
                   </td>
                   <td data-sort-value={r.value ?? ""}>
-                    {money(r.value, r.currency)}
+                    <span
+                      className={
+                        Number(r.exit) > 0
+                          ? "kardex-exit-quantity"
+                          : Number(r.entry) > 0
+                            ? "kardex-entry-quantity"
+                            : undefined
+                      }
+                    >
+                      {money(r.value, r.currency)}
+                    </span>
                   </td>
                   <td>
                     {r.units?.map((u: Row) => (
@@ -334,12 +362,12 @@ export default function Kardex({
                     ))}
                   </td>
                   <td>
-                    {r.created_by || "Histórico"}
+                    {r.user_name || "Usuario sin nombre registrado"}
                     <small>
                       {new Date(r.created_at).toLocaleString("es-GT")}
                     </small>
                   </td>
-                  <td>{r.notes}</td>
+                  <td>{r.notes || "-"}</td>
                 </tr>
               ))}
             </tbody>
@@ -476,7 +504,8 @@ export default function Kardex({
             </p>
             <p>{detail.header.notes}</p>
             <small>
-              Creado por {detail.header.created_by} ·{" "}
+              Creado por{" "}
+              {detail.header.user_name || "Usuario sin nombre registrado"} ·{" "}
               {new Date(detail.header.created_at).toLocaleString("es-GT")}
             </small>
             {detail.header.reverses_id && (
@@ -680,7 +709,19 @@ export default function Kardex({
                       </td>
                       <td>{l.unit}</td>
                       <td>{money(l.unit_cost, l.currency)}</td>
-                      <td>{money(l.value, l.currency)}</td>
+                      <td data-sort-value={l.value ?? ""}>
+                        <span
+                          className={
+                            Number(l.exit) > 0
+                              ? "kardex-exit-quantity"
+                              : Number(l.entry) > 0
+                                ? "kardex-entry-quantity"
+                                : undefined
+                          }
+                        >
+                          {money(l.value, l.currency)}
+                        </span>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
