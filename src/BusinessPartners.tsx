@@ -9,6 +9,7 @@ import { request } from "./commerce";
 import { money, type Row } from "./operations";
 import "./partners.css";
 import { paymentMethods } from "./payment-methods";
+import { departments } from "./delivery-model";
 
 const typeName = (type: string) =>
   type === "courier" ? "Mensajería" : type === "supplier" ? "Proveedor" : "Cliente";
@@ -555,6 +556,13 @@ export default function BusinessPartners({
                     key={a.id || a.key || index}
                   >
                     <legend>Dirección {index + 1}</legend>
+                    {partnerType === "customer" && <label>Departamento
+                      <SearchSelect value={a.department || ""} onChange={e=>change("addresses",draft.addresses.map((row:Row,i:number)=>i===index?{...row,department:e.target.value}:row))}>
+                        <option value="">Sin departamento definido</option>
+                        {departments.map(department=><option key={department} value={department}>{department}</option>)}
+                      </SearchSelect>
+                      <small>Se utilizará para sugerir la tarifa de mensajería por departamento.</small>
+                    </label>}
                     {[
                       ["label", "Nombre o referencia", 100],
                       ["phone", "Teléfono de contacto", 40],
@@ -655,6 +663,7 @@ export default function BusinessPartners({
                             key: crypto.randomUUID(),
                             label: "",
                             address: "",
+                            department: "",
                             instructions: "",
                             phone: "",
                             is_primary: !draft.addresses.length,

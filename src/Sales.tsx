@@ -11,6 +11,7 @@ import { keyedRequest, money, useOperation, type Row } from "./operations";
 import DeliveryFields from "./DeliveryFields";
 import OrderDeliveryDialog, { InitialPayments } from "./OrderDeliveryDialog";
 import { blankDelivery, courierRead, deliveryStatus } from "./delivery-model";
+import { applyDeliveryAddress } from "./delivery-address";
 import "./couriers.css";
 export default function Sales({
   company,
@@ -189,7 +190,7 @@ export default function Sales({
                           setCustomerId(e.target.value);
                           setPayment(data.customers.find((c: Row) => c.id === e.target.value)?.payment_preference || "");
                           const primary=deliveryOptions.addresses?.find((a:Row)=>a.partner_id===e.target.value&&a.is_primary);
-                          setDelivery(old=>({...old,address:primary?.address||data.customers.find((c:Row)=>c.id===e.target.value)?.address||""}));
+                          setDelivery(old=>applyDeliveryAddress(old,primary||{address:data.customers.find((c:Row)=>c.id===e.target.value)?.address||""},deliveryOptions));
                         }}
                       >
                         <option value="">Nuevo contacto</option>
