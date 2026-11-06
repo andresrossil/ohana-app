@@ -141,6 +141,10 @@ export const defaultIconPools: IconPools = {
     options: ["truck", "handshake", "store", "package", "contact"],
     active: "truck",
   },
+  "module.couriers": {
+    options: ["truck", "bike", "package-check", "route", "send"],
+    active: "truck",
+  },
   "module.reports": {
     options: [
       "chart-column",

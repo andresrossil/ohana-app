@@ -1,0 +1,11 @@
+.shell .courier-tabs {display:flex;flex-wrap:wrap;gap:10px;margin-bottom:18px;}
+.shell .courier-dialog {width:min(1100px,calc(100vw - 24px));max-height:calc(100dvh - 100px);overflow:auto;}
+.shell .delivery-summary {display:flex;flex-wrap:wrap;gap:12px 24px;background:var(--admin-secondary);padding:14px;border:1px solid var(--admin-border);border-radius:9px;margin:12px 0;}
+.shell .delivery-fields {margin:10px 0;}
+.shell .payment-entry {border:1px solid var(--admin-border);border-radius:8px;padding:12px;margin:12px 0;min-width:0;}
+.shell .courier-dialog header {height:auto;min-height:0;letter-spacing:normal;font:inherit;}
+.shell .courier-dialog .table-wrap {max-width:100%;overflow:auto;}
+.shell .courier-dialog input[type="checkbox"] {min-width:20px;min-height:20px;}
+.shell .courier-dialog .form-actions {gap:10px;flex-wrap:wrap;}
+.shell .settlement-balance {font-size:1.15rem;padding:14px;background:var(--admin-secondary);border-radius:8px;}
+@media(max-width:650px){.shell .courier-dialog{padding:14px;}.shell .delivery-summary {flex-direction:column;}.shell .courier-dialog .hierarchy-toolbar {flex-wrap:wrap;gap:10px;}}

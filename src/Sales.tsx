@@ -8,6 +8,10 @@ import { AppButton, AppIcon } from "./AppIcon";
 import { useEffect, useState } from "react";
 import { sales } from "./commerce";
 import { keyedRequest, money, useOperation, type Row } from "./operations";
+import DeliveryFields from "./DeliveryFields";
+import OrderDeliveryDialog, { InitialPayments } from "./OrderDeliveryDialog";
+import { blankDelivery, courierRead, deliveryStatus } from "./delivery-model";
+import "./couriers.css";
 export default function Sales({
   company,
   customersOnly = false,
@@ -31,8 +35,10 @@ export default function Sales({
     [query, setQuery] = useState(""),
     [customerId, setCustomerId] = useState(""),
     [payment, setPayment] = useState("");
+  const [delivery,setDelivery]=useState<Row>(blankDelivery),[deliveryOptions,setDeliveryOptions]=useState<Row>({}),[payments,setPayments]=useState<Row[]>([]),[managedOrder,setManagedOrder]=useState<string|null>(null);
   async function load() {
-    setData(await sales(company));
+    const [orders,options]=await Promise.all([sales(company),courierRead(company,"options")]);
+    setData(orders);setDeliveryOptions(options);
   }
   useEffect(() => {
     state.run(load);
@@ -75,6 +81,7 @@ export default function Sales({
                 ]);
                 setCustomerId("");
                 setPayment("");
+                setDelivery(blankDelivery());setPayments([]);
                 setMode("create");
               }}
             >
@@ -134,7 +141,7 @@ export default function Sales({
                           email: f.get("email"),
                           address: "",
                         },
-                        expected_total: lines.reduce(
+                        expected_total: (delivery.kind!=="pickup"&&delivery.payer!=="customer"?Number(delivery.shipping_charged||0):0) + lines.reduce(
                           (sum, l) =>
                             sum +
                             Number(
@@ -152,7 +159,9 @@ export default function Sales({
                           quantity: l.quantity,
                           unit_price: l.unit_price,
                         })),
-                        delivery: "pickup",
+                        delivery: delivery.kind==="pickup"?"pickup":"delivery",
+                        delivery_info: delivery,
+                        payments: payments.map(({key,...p})=>p),
                         payment: f.get("payment"),
                       }
                     : {
@@ -179,6 +188,8 @@ export default function Sales({
                         onChange={(e) => {
                           setCustomerId(e.target.value);
                           setPayment(data.customers.find((c: Row) => c.id === e.target.value)?.payment_preference || "");
+                          const primary=deliveryOptions.addresses?.find((a:Row)=>a.partner_id===e.target.value&&a.is_primary);
+                          setDelivery(old=>({...old,address:primary?.address||data.customers.find((c:Row)=>c.id===e.target.value)?.address||""}));
                         }}
                       >
                         <option value="">Nuevo contacto</option>
@@ -232,10 +243,7 @@ export default function Sales({
                       </SearchSelect>
                     </label>
                   </div>
-                  <p>
-                    Esta venta se registra con retiro, sin envío. Los precios se
-                    confirman con la moneda vigente de la empresa ({currency}).
-                  </p>
+                  <section><h3>Entrega y pagos</h3><DeliveryFields value={delivery} options={deliveryOptions} customerId={customerId} onChange={setDelivery} currency={currency}/><InitialPayments rows={payments} onChange={setPayments} courier={delivery.kind==="courier"&&!!delivery.courier_id} method={payment} currency={currency}/></section>
                   {lines.map((l) => (
                     <div key={l.key} className="ingredient-row">
                       <label>
@@ -381,7 +389,7 @@ export default function Sales({
                   <strong>
                     Total:{" "}
                     {money(
-                      lines.reduce(
+                      (delivery.kind!=="pickup"&&delivery.payer!=="customer"?Number(delivery.shipping_charged||0):0) + lines.reduce(
                         (sum, l) =>
                           sum +
                           Number(
@@ -492,7 +500,8 @@ export default function Sales({
                       <small>Envío: {money(o.shipping, o.currency)}</small>
                     </td>
                     <td>
-                      {o.delivery === "delivery" ? "Domicilio" : "Retiro"}
+                      {o.delivery_info?.courier_snapshot?.name || (o.delivery === "delivery" ? "Domicilio" : "Retiro")}
+                      {o.delivery_info&&<small>{deliveryStatus[o.delivery_info.status]} · Costo real: {money(o.delivery_info.shipping_cost,o.currency)}{o.delivery_info.payer==="customer"?" · Pagado directamente al transportista":""}</small>}
                       <small>
                         {
                           {
@@ -503,8 +512,9 @@ export default function Sales({
                         }
                       </small>
                       <small>
-                        {o.paid_at ? "Pagado" : "Pendiente de pago"}
+                        {o.paid_at ? "Pagado por el cliente" : "Pendiente de pago"}
                       </small>
+                      {o.payment_summary&&<><small>Saldo cliente: {money(Number(o.total)-Number(o.payment_summary.paid),o.currency)}</small><small>En mensajero, pendiente de liquidar: {money(o.payment_summary.courier_pending,o.currency)}</small></>}
                       {o.refund_pending && (
                         <small className="error">Reembolso pendiente</small>
                       )}
@@ -528,18 +538,7 @@ export default function Sales({
                       )}
                     </td>
                     <td className="actions">
-                      {state.canWrite &&
-                        !["cancelled", "expired"].includes(o.status) &&
-                        !o.paid_at && (
-                          <AppButton
-                            onClick={() => {
-                              setOrder(o);
-                              setMode("paid");
-                            }}
-                          >
-                            Confirmar pago
-                          </AppButton>
-                        )}
+                      <AppButton className="secondary" onClick={()=>setManagedOrder(o.id)}>Entrega y pagos</AppButton>
                       {state.canWrite && o.status === "pending" && (
                         <>
                           <AppButton
@@ -572,6 +571,7 @@ export default function Sales({
           )}
         </div>
       </section>
+      {managedOrder&&<OrderDeliveryDialog company={company} orderId={managedOrder} onClose={()=>setManagedOrder(null)} onSaved={load}/>}
     </>
   );
 }

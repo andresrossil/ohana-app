@@ -17,6 +17,7 @@ export const sections = [
   ["sales", "Ventas", "↗"],
   ["customers", "Clientes", "♧"],
   ["suppliers", "Proveedores", ""],
+  ["couriers", "Mensajerías", ""],
   ["prices", "Listas de precios", ""],
   ["expenses", "Gastos", ""],
   ["reports", "Reportes", "▥"],

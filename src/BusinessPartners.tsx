@@ -11,7 +11,7 @@ import "./partners.css";
 import { paymentMethods } from "./payment-methods";
 
 const typeName = (type: string) =>
-  type === "supplier" ? "Proveedor" : "Cliente";
+  type === "courier" ? "Mensajería" : type === "supplier" ? "Proveedor" : "Cliente";
 const orderStatus: Record<string, string> = {
   pending: "Pendiente",
   dispatched: "Entregado",
@@ -37,11 +37,13 @@ const blank = (): Row => ({
 export default function BusinessPartners({
   company,
   partnerType,
+  onTariffs,
   onDirty,
   onSaved,
 }: {
   company: string;
-  partnerType: "customer" | "supplier";
+  partnerType: "customer" | "supplier" | "courier";
+  onTariffs?: (row: Row) => void;
   onDirty: (dirty: boolean) => void;
   onSaved: () => Promise<void>;
 }) {
@@ -157,6 +159,7 @@ export default function BusinessPartners({
         initial.type = partnerType;
         initial.is_customer = partnerType === "customer";
         initial.is_supplier = partnerType === "supplier";
+        initial.is_courier = partnerType === "courier";
         initial.code = (await api("suggest", { type: initial.type })).code;
         setDraft(initial);
         setRelated({});
@@ -272,11 +275,11 @@ export default function BusinessPartners({
         <div>
           <p className="eyebrow">RELACIONES DE TU EMPRESA</p>
           <h1 className="module-title">
-            <AppIcon name={partnerType === "customer" ? "module.customers" : "module.suppliers"} />
-            {partnerType === "customer" ? "Clientes" : "Proveedores"}
+            <AppIcon name={partnerType === "courier" ? "module.couriers" : partnerType === "customer" ? "module.customers" : "module.suppliers"} />
+            {partnerType === "courier" ? "Mensajerías" : partnerType === "customer" ? "Clientes" : "Proveedores"}
           </h1>
           <p>
-            {partnerType === "customer" ? "Tus clientes, contactos y pedidos." : "Tus proveedores, materiales y compras."}
+            {partnerType === "courier" ? "Contactos de transporte y sus tarifas por entrega." : partnerType === "customer" ? "Tus clientes, contactos y pedidos." : "Tus proveedores, materiales y compras."}
           </p>
         </div>
         {data.canManage && (
@@ -285,7 +288,7 @@ export default function BusinessPartners({
             iconKey="action.add"
             onClick={() => open()}
           >
-            {partnerType === "customer" ? "Nuevo cliente" : "Nuevo proveedor"}
+            {partnerType === "courier" ? "Nueva mensajería" : partnerType === "customer" ? "Nuevo cliente" : "Nuevo proveedor"}
           </AppButton>
         )}
       </section>
@@ -299,7 +302,7 @@ export default function BusinessPartners({
       <section className="catalog partner-catalog">
         <div className="partner-filters">
           <label>
-            {partnerType === "customer" ? "Buscar cliente" : "Buscar proveedor"}
+            Buscar {typeName(partnerType).toLowerCase()}
             <SearchField
               type="search"
               placeholder="Código, nombre, redes sociales o teléfonos…"
@@ -334,7 +337,7 @@ export default function BusinessPartners({
                   ["code", "Código"],
                   ["alternate_code", "Código alterno"],
                   ["name", "Nombre"],
-                  ["partner_type", "Tipo"],
+                  partnerType === "courier" ? ["courier_tariff_mode", "Modalidad de tarifa"] : ["partner_type", "Tipo"],
                   ["phone", "Teléfono"],
                   ["active", "Estado"],
                 ].map(([key, label]) => (
@@ -377,7 +380,7 @@ export default function BusinessPartners({
                   >
                     {row.name}
                   </td>
-                  <td>{row.is_customer && row.is_supplier ? "Cliente y proveedor" : typeName(row.partner_type)}</td>
+                  <td>{partnerType === "courier" ? ({general:"General",zone:"Por zona",department:"Por departamento"} as Row)[row.courier_tariff_mode] : row.is_customer && row.is_supplier ? "Cliente y proveedor" : typeName(row.partner_type)}</td>
                   <td>{row.phone || "—"}</td>
                   <td>
                     <CatalogBadge
@@ -386,6 +389,7 @@ export default function BusinessPartners({
                     />
                   </td>
                   <td className="actions">
+                    {onTariffs && <AppButton disabled={busy || loading} className="secondary" iconKey="action.calculate" onClick={() => onTariffs(row)}>Tarifas</AppButton>}
                     <AppButton
                       disabled={busy || loading}
                       className="secondary"
@@ -479,17 +483,17 @@ export default function BusinessPartners({
                 <p>Revisa si ya existe este socio antes de crear otro. Las coincidencias de contacto no bloquean el registro.</p>
                 {matches.map((match) => <div className="form-actions" key={match.id}>
                   <span>{match.code} · {match.name}</span>
-                  {!draft.id && <AppButton type="button" className="secondary" disabled={busy} onClick={async () => {
-                    if (dirty && !(await confirmAction("¿Usar este socio existente? Se descartarán los datos nuevos y se abrirá su ficha para agregar el tipo correspondiente, sin duplicarlo."))) return;
-                    await open(match, true, true);
+                  {!draft.id && match[partnerType === "courier" ? "is_courier" : partnerType === "customer" ? "is_customer" : "is_supplier"] && <AppButton type="button" className="secondary" disabled={busy} onClick={async () => {
+                    if (dirty && !(await confirmAction("¿Usar este socio existente? Se descartarán los datos nuevos y se abrirá su ficha, sin duplicar el registro."))) return;
+                    await open(match, true);
                   }}>Usar socio existente</AppButton>}
                 </div>)}
               </aside>}
               <fieldset disabled={readOnly || busy}>
                 <legend>Datos generales</legend>
-                {field("code", partnerType === "customer" ? "Código de cliente · automático" : "Código de proveedor · automático", { max: 40 })}
+                {field("code", `Código de ${typeName(partnerType).toLowerCase()} · automático`, { max: 40 })}
                 {field("alternate_code", "Código alterno · opcional", { max: 40 })}
-                <p className="form-wide muted">El código definitivo se asigna al guardar. Un socio con ambos tipos conserva un único código e historial.</p>
+                <p className="form-wide muted">El código definitivo se asigna al guardar.</p>
                 {field("name", "Nombre comercial o nombre completo", {
                   max: 160,
                   required: true,
@@ -503,6 +507,7 @@ export default function BusinessPartners({
                   {field("facebook", "Facebook · usuario o perfil", { max: 200 })}
                 </>}
                 {field("phone", "Teléfono principal", { max: 40, inputType: "tel" })}
+                {partnerType === "courier" && field("phone_secondary", "Teléfono secundario · opcional", {max:40,inputType:"tel"})}
                 {partnerType === "customer" && <>
                   {field("phone_secondary", "Teléfono secundario · opcional", { max: 40, inputType: "tel" })}
                   <label><input type="checkbox" checked={!!draft.whatsapp_same} onChange={(e) => change("whatsapp_same", e.target.checked)} /> Mismo número que WhatsApp</label>
@@ -534,18 +539,12 @@ export default function BusinessPartners({
                     Página registrada: {draft.website_url}
                   </p>
                 )}
-                {partnerType === "supplier" && field("notes", "Observaciones generales", {
+                {partnerType !== "customer" && field("notes", "Observaciones generales", {
                   multiline: true,
                   max: 4000,
                 })}
-                <label className="form-wide"><input type="checkbox"
-                  checked={!!draft[partnerType === "customer" ? "is_supplier" : "is_customer"]}
-                  disabled={draft.type !== partnerType}
-                  onChange={(e) => change(partnerType === "customer" ? "is_supplier" : "is_customer", e.target.checked)} />
-                  {partnerType === "customer" ? "También es proveedor" : "También es cliente"}
-                </label>
               </fieldset>
-              <fieldset disabled={readOnly || busy}>
+              {partnerType !== "courier" && <fieldset disabled={readOnly || busy}>
                 <legend>Direcciones</legend>
                 <p className="form-wide muted">
                   Hasta 20 direcciones por socio. Marca una como principal.
@@ -667,8 +666,8 @@ export default function BusinessPartners({
                     </AppButton>
                   </div>
                 )}
-              </fieldset>
-              <fieldset disabled={readOnly || busy}>
+              </fieldset>}
+              {partnerType !== "courier" && <fieldset disabled={readOnly || busy}>
                 <legend>Información comercial · {typeName(partnerType)}</legend>
                 {partnerType === "customer" && <label>Preferencia de pago · opcional
                   <SearchSelect value={draft.payment_preference || ""} onChange={(e) => change("payment_preference", e.target.value)}>
@@ -691,7 +690,7 @@ export default function BusinessPartners({
                       "Indicaciones habituales de entrega",
                       { multiline: true, max: 2000 },
                     )}
-              </fieldset>
+              </fieldset>}
               <div className="form-actions">
                 {!readOnly && <AppButton disabled={busy}>Guardar</AppButton>}
                 <AppButton

@@ -50,6 +50,7 @@ const Inventory = lazy(() => import("./Inventory"));
 const Formulas = lazy(() => import("./Formulas"));
 const Production = lazy(() => import("./Production"));
 const BusinessPartners = lazy(() => import("./BusinessPartners"));
+const Couriers = lazy(() => import("./Couriers"));
 const Sales = lazy(() => import("./Sales"));
 const PublicStore = lazy(() => import("./PublicStore"));
 const AdditionalCostSettings = lazy(() => import("./AdditionalCostSettings"));
@@ -629,6 +630,7 @@ function App() {
             ...(activeCompany?.manage || activeCompany?.sales_read
               ? ["customers"]
               : []),
+            ...(activeCompany?.manage || activeCompany?.sales_read ? ["couriers"] : []),
             ...(activeCompany?.manage || activeCompany?.catalog_read || activeCompany?.inventory_read ? ["suppliers"] : []),
             ...(activeCompany?.reports_read ? ["reports"] : []),
             ...(activeCompany?.manage ? ["prices", "expenses"] : []),
@@ -1005,6 +1007,7 @@ function App() {
                   onSaved={load}
                 />
               )}
+              {section === "couriers" && <Couriers key={company} company={company} onDirty={setSettingsDirty} onSaved={load} canManage={activeCompany?.manage===true}/>}
               {section === "reports" && (
                 <Reports key={company} company={company} currency={activeCompany?.currency} inventoryAllowed={activeCompany?.inventory_read === true} />
               )}
@@ -1020,6 +1023,7 @@ function App() {
                 "sales",
                 "customers",
                 "suppliers",
+                "couriers",
                 "reports",
                 "prices",
                 "expenses",
