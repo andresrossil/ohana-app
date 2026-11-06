@@ -1,3 +1,4 @@
+import { onIdleRefresh } from "./idle-refresh";
 import SearchSelect from "./SearchSelect";
 import { AppIcon, AppButton } from "./AppIcon";
 import NavIcon from "./NavIcon";
@@ -77,11 +78,11 @@ export default function Sidebar({
     };
     void load();
     window.addEventListener("ohana-user-profile-saved", load);
-    window.addEventListener("focus", load);
+    const cancelIdle = onIdleRefresh(load);
     return () => {
       live = false;
       window.removeEventListener("ohana-user-profile-saved", load);
-      window.removeEventListener("focus", load);
+      cancelIdle();
     };
   }, [userId]);
   useEffect(() => {

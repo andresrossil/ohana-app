@@ -1,4 +1,5 @@
-import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
+import { lazyWithRecovery as lazy } from "./lazy-module";
 import { AppButton, AppIcon } from "./AppIcon";
 import { request } from "./commerce";
 import { useOperation, money, type Row } from "./operations";

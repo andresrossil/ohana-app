@@ -1,3 +1,4 @@
+import { onIdleRefresh } from "./idle-refresh";
 import { useEffect, useRef } from "react";
 export function pricesChanged(company: string) {
   window.dispatchEvent(new CustomEvent("ohana-prices", { detail: company }));
@@ -23,14 +24,13 @@ export function usePriceRefresh(company: string, refresh: () => void) {
         } catch {}
       }
     };
-    const focus = () => latest.current();
+    const cancelIdle = onIdleRefresh(() => latest.current());
     window.addEventListener("ohana-prices", local);
     window.addEventListener("storage", external);
-    window.addEventListener("focus", focus);
     return () => {
       window.removeEventListener("ohana-prices", local);
       window.removeEventListener("storage", external);
-      window.removeEventListener("focus", focus);
+      cancelIdle();
     };
   }, [company]);
 }

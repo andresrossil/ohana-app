@@ -1,3 +1,4 @@
+import { onIdleRefresh } from "./idle-refresh";
 import {
   adminDefault,
   normalizeAdminTheme,
@@ -33,12 +34,12 @@ export function useCompanyTheme(company: string) {
       if (live && !error) apply(data || {});
     };
     void load();
-    const timer = setInterval(() => void load(), 60000);
+    const cancelIdle = onIdleRefresh(load);
     const refresh = () => void load();
     window.addEventListener("ohana-settings-saved", refresh);
     return () => {
       live = false;
-      clearInterval(timer);
+      cancelIdle();
       window.removeEventListener("ohana-settings-saved", refresh);
       apply({});
     };

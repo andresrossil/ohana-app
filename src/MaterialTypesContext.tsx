@@ -1,3 +1,4 @@
+import { onIdleRefresh } from "./idle-refresh";
 import {
   createContext,
   useContext,
@@ -38,13 +39,11 @@ export function MaterialTypesProvider({
       if (!(e instanceof CustomEvent) || e.detail === company) void load();
     };
     void load();
-    const timer = setInterval(() => void load(), 60000);
-    window.addEventListener("focus", load);
+    const cancelIdle = onIdleRefresh(load);
     window.addEventListener("ohana-material-types-saved", changed);
     return () => {
       live = false;
-      clearInterval(timer);
-      window.removeEventListener("focus", load);
+      cancelIdle();
       window.removeEventListener("ohana-material-types-saved", changed);
     };
   }, [company]);

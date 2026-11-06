@@ -13,7 +13,10 @@ import CatalogBadge from "./CatalogBadge";
 import { useNavigationProtection } from "./navigation-protection";
 import { AppButton, AppIcon } from "./AppIcon";
 import { IconProvider } from "./AppIcon";
-import React, { Suspense, lazy, useEffect, useRef, useState } from "react";
+import React, { Suspense, useEffect, useRef, useState } from "react";
+import { lazyWithRecovery as lazy } from "./lazy-module";
+import UpdateGuard from "./UpdateGuard";
+import { onIdleRefresh } from "./idle-refresh";
 import { createRoot } from "react-dom/client";
 import type { Session } from "@supabase/supabase-js";
 import { supabase as db, confirmationRedirect } from "./client";
@@ -254,10 +257,10 @@ function App() {
   useEffect(() => {
     if (!session) return;
     void refreshContext();
-    const timer = setInterval(() => void refreshContext(), 60000);
+    const cancelIdle = onIdleRefresh(() => refreshContext());
     return () => {
       contextVersion.current++;
-      clearInterval(timer);
+      cancelIdle();
     };
   }, [session?.user.id]);
   async function load() {
@@ -1726,6 +1729,7 @@ function App() {
           </div>
         )}
         <ConfirmHost key={company} />
+        <UpdateGuard user={session.user.id} blocked={() => busy || sheetDirty || settingsDirty || protection.busy() || protection.dirty()} />
       </div>
     </MaterialTypesProvider></MarginProvider></IconProvider>
   );

@@ -1,3 +1,4 @@
+import { onIdleRefresh } from "./idle-refresh";
 import {
   createContext,
   useContext,
@@ -48,7 +49,7 @@ import {
 } from "lucide-react";
 import { request } from "./commerce";
 import { iconRegistry, actionIcon } from "./icon-registry";
-const Dynamic = lazy(() => import("./LucideDynamic"));
+const Dynamic = lazy(() => import("./LucideDynamic").catch(() => ({ default: () => <span className="icon-placeholder" aria-hidden="true" /> })));
 const defaults: Record<string, any> = {
   house: House,
   layers: Layers,
@@ -140,16 +141,14 @@ export function IconProvider({
     /* active names only: the option library stays lazy in Appearance */
 
     load();
-    const timer = setInterval(load, 60000);
+    const cancelIdle = onIdleRefresh(load);
     window.addEventListener("ohana-icons-saved", changed);
     window.addEventListener("storage", stored);
-    window.addEventListener("focus", load);
     return () => {
       live = false;
-      clearInterval(timer);
+      cancelIdle();
       window.removeEventListener("ohana-icons-saved", changed);
       window.removeEventListener("storage", stored);
-      window.removeEventListener("focus", load);
     };
   }, [company]);
   return (
