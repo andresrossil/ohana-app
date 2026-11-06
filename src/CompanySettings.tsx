@@ -368,6 +368,10 @@ function CompanyProfile({
             <section className="settings-block">
               <h3>Información fiscal y regional</h3>
               <div className="settings-grid">
+                <label>Siglas para guías de envío
+                  <input maxLength={12} pattern="[A-Za-z0-9]{1,12}" value={details.shipping_guide_initials||""} onChange={e=>update("shipping_guide_initials",e.target.value.toUpperCase())}/>
+                  <small>Ejemplo: OH → OH - 0049, usando el número del pedido. Los números mayores de cuatro dígitos se conservan completos.</small>
+                </label>
                 {field("legal_name", "Razón social")}
                 {field("tax_id", "NIT / identificación fiscal")}
                 <label>

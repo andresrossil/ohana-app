@@ -10,6 +10,7 @@ import { money, type Row } from "./operations";
 import "./partners.css";
 import { paymentMethods } from "./payment-methods";
 import { departments } from "./delivery-model";
+import CustomerBalance from "./CustomerBalance";
 
 const typeName = (type: string) =>
   type === "courier" ? "Mensajería" : type === "supplier" ? "Proveedor" : "Cliente";
@@ -66,6 +67,7 @@ export default function BusinessPartners({
     [draft, setDraft] = useState<Row>(blank),
     [related, setRelated] = useState<Row>({}),
     [matches, setMatches] = useState<Row[]>([]),
+    [accounts, setAccounts] = useState<Row[]>([]),
     [dirty, setDirty] = useState(false),
     [refresh, setRefresh] = useState(0);
   const generation = useRef(0),
@@ -155,6 +157,7 @@ export default function BusinessPartners({
           ...(addRole ? { [partnerType === "customer" ? "is_customer" : "is_supplier"]: true } : {}),
         });
         setRelated(detail.related);
+        setAccounts(detail.account || []);
       } else {
         const initial = blank();
         initial.type = partnerType;
@@ -164,6 +167,7 @@ export default function BusinessPartners({
         initial.code = (await api("suggest", { type: initial.type })).code;
         setDraft(initial);
         setRelated({});
+        setAccounts([]);
       }
       setDirty(addRole);
       setMode(row && !edit ? "view" : "edit");
@@ -468,6 +472,7 @@ export default function BusinessPartners({
                     ? `Editar ${typeName(partnerType).toLowerCase()}`
                     : `Nuevo ${typeName(partnerType).toLowerCase()}`}
               </h2>
+              {partnerType === "customer" && <CustomerBalance accounts={accounts} currency={data.currency||"GTQ"}/>}
               <AppButton className="secondary" disabled={busy} onClick={close}>
                 Cerrar
               </AppButton>

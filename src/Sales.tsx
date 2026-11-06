@@ -1,425 +1,28 @@
-import SearchSelect from "./SearchSelect";
-import { paymentMethods } from "./payment-methods";
+import { useEffect, useState } from "react";
 import ResponsiveTable from "./ResponsiveTable";
 import { SaleUnits } from "./PhysicalUnits";
-import MoneyInput from "./MoneyInput";
 import { SearchField } from "./PoolControls";
 import { AppButton, AppIcon } from "./AppIcon";
-import { useEffect, useState } from "react";
 import { sales } from "./commerce";
 import { keyedRequest, money, useOperation, type Row } from "./operations";
-import DeliveryFields from "./DeliveryFields";
-import OrderDeliveryDialog, { InitialPayments } from "./OrderDeliveryDialog";
-import { blankDelivery, courierRead, deliveryStatus } from "./delivery-model";
-import { applyDeliveryAddress } from "./delivery-address";
+import OrderDeliveryDialog from "./OrderDeliveryDialog";
+import SaleEditor from "./SaleEditor";
+import { deliveryStatus } from "./delivery-model";
 import "./couriers.css";
-export default function Sales({
-  company,
-  customersOnly = false,
-  currency = "GTQ",
-}: {
-  company: string;
-  customersOnly?: boolean;
-  currency?: string;
-}) {
-  const state = useOperation(company, "sales"),
-    [data, setData] = useState<Row>({
-      orders: [],
-      customers: [],
-      variants: [],
-    }),
-    [mode, setMode] = useState<string | null>(null),
-    [order, setOrder] = useState<Row | null>(null),
-    [lines, setLines] = useState<Row[]>([
-      { key: crypto.randomUUID(), variant: "", quantity: 1 },
-    ]),
-    [query, setQuery] = useState(""),
-    [customerId, setCustomerId] = useState(""),
-    [payment, setPayment] = useState("");
-  const [delivery,setDelivery]=useState<Row>(blankDelivery),[deliveryOptions,setDeliveryOptions]=useState<Row>({}),[payments,setPayments]=useState<Row[]>([]),[managedOrder,setManagedOrder]=useState<string|null>(null);
-  async function load() {
-    const [orders,options]=await Promise.all([sales(company),courierRead(company,"options")]);
-    setData(orders);setDeliveryOptions(options);
-  }
-  useEffect(() => {
-    state.run(load);
-  }, [company]);
-  const statusNames: Row = {
-    pending: "Pendiente",
-    dispatched: "Entregado",
-    cancelled: "Cancelado",
-    expired: "Vencido",
-  };
-  const orders = data.orders.filter((o: Row) =>
-    [
-      o.number,
-      o.customer_snapshot.name,
-      o.customer_snapshot.phone,
-      statusNames[o.status],
-    ]
-      .join(" ")
-      .toLowerCase()
-      .includes(query.toLowerCase()),
-  );
-  return (
-    <>
-      <section className="intro">
-        <div>
-          <p className="eyebrow">CADA PEDIDO, EN SU EMPRESA</p>
-          <h1>{customersOnly ? "Clientes" : "Ventas y pedidos"}</h1>
-          <p>
-            {customersOnly
-              ? "Contactos registrados al realizar pedidos."
-              : "Los pedidos reservan existencias; la entrega descuenta el inventario una sola vez."}
-          </p>
-        </div>
-        <div className="actions">
-          {state.canWrite && !customersOnly && (
-            <AppButton
-              onClick={() => {
-                setLines([
-                  { key: crypto.randomUUID(), variant: "", quantity: 1 },
-                ]);
-                setCustomerId("");
-                setPayment("");
-                setDelivery(blankDelivery());setPayments([]);
-                setMode("create");
-              }}
-            >
-              Registrar venta
-            </AppButton>
-          )}
-          <AppButton
-            className="secondary"
-            disabled={state.busy}
-            onClick={() => state.run(load)}
-          >
-            Actualizar
-          </AppButton>
-        </div>
-      </section>
-      {!mode && state.error && (
-        <p className="error" role="alert">
-          <AppIcon name="status.error" />
-          {state.error}
-        </p>
-      )}
-      {state.notice && <p role="status">{state.notice}</p>}
-      {mode && (
-        <div className="overlay">
-          <section
-            className="modal operations-dialog"
-            role="dialog"
-            aria-modal="true"
-            aria-label="Gestionar pedido"
-          >
-            <h2>
-              {mode === "create"
-                ? "Registrar venta"
-                : mode === "paid"
-                  ? "Confirmar pago"
-                  : mode === "dispatch"
-                    ? "Entregar pedido"
-                    : "Cancelar pedido"}
-            </h2>
-            {state.error && (
-              <p className="error" role="alert">
-                <AppIcon name="status.error" />
-                {state.error}
-              </p>
-            )}
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                const f = new FormData(e.currentTarget);
-                const payload =
-                  mode === "create"
-                    ? {
-                        customer_id: customerId || undefined,
-                        customer: {
-                          name: f.get("name"),
-                          phone: f.get("phone"),
-                          email: f.get("email"),
-                          address: "",
-                        },
-                        expected_total: (delivery.kind!=="pickup"&&delivery.payer!=="customer"?Number(delivery.shipping_charged||0):0) + lines.reduce(
-                          (sum, l) =>
-                            sum +
-                            Number(
-                              l.unit_price ??
-                                data.variants.find(
-                                  (v: Row) => v.id === l.variant,
-                                )?.price ??
-                                0,
-                            ) *
-                              l.quantity,
-                          0,
-                        ),
-                        items: lines.map((l) => ({
-                          variant: l.variant,
-                          quantity: l.quantity,
-                          unit_price: l.unit_price,
-                        })),
-                        delivery: delivery.kind==="pickup"?"pickup":"delivery",
-                        delivery_info: delivery,
-                        payments: payments.map(({key,...p})=>p),
-                        payment: f.get("payment"),
-                      }
-                    : {
-                        order: order!.id,
-                        ...(mode === "cancel"
-                          ? { reason: f.get("reason") }
-                          : {}),
-                      };
-                state.run(async () => {
-                  await keyedRequest(company, "sales", payload, mode);
-                  setMode(null);
-                  state.setNotice("Pedido actualizado");
-                  await load();
-                });
-              }}
-            >
-              {mode === "create" ? (
-                <>
-                  <div className="settings-grid">
-                    <label className="form-wide">
-                      Cliente
-                      <SearchSelect
-                        value={customerId}
-                        onChange={(e) => {
-                          setCustomerId(e.target.value);
-                          setPayment(data.customers.find((c: Row) => c.id === e.target.value)?.payment_preference || "");
-                          const primary=deliveryOptions.addresses?.find((a:Row)=>a.partner_id===e.target.value&&a.is_primary);
-                          setDelivery(old=>applyDeliveryAddress(old,primary||{address:data.customers.find((c:Row)=>c.id===e.target.value)?.address||""},deliveryOptions));
-                        }}
-                      >
-                        <option value="">Nuevo contacto</option>
-                        {data.customers
-                          .filter((c: Row) => c.active)
-                          .map((c: Row) => (
-                            <option key={c.id} value={c.id}>
-                              {c.code} · {c.name}
-                            </option>
-                          ))}
-                      </SearchSelect>
-                    </label>
-                    {!customerId && (
-                      <>
-                        <label>
-                          Nombre
-                          <input
-                            name="name"
-                            required
-                            minLength={2}
-                            maxLength={120}
-                          />
-                        </label>
-                        <label>
-                          Teléfono
-                          <input
-                            name="phone"
-                            type="tel"
-                            required
-                            maxLength={25}
-                          />
-                        </label>
-                        <label>
-                          Correo (opcional)
-                          <input name="email" type="email" maxLength={254} />
-                        </label>
-                      </>
-                    )}
-                    {customerId && (
-                      <p className="form-wide">
-                        {data.customers.find((c: Row) => c.id === customerId)
-                          ?.phone ||
-                          "Este cliente no tiene teléfono registrado."}
-                      </p>
-                    )}
-                    <label>
-                      Pago
-                      <SearchSelect name="payment" required value={payment} onChange={(e) => setPayment(e.target.value)}>
-                        <option value="">Seleccionar forma de pago</option>
-                        {paymentMethods.map((method) => <option key={method.value} value={method.value}>{method.label}</option>)}
-                      </SearchSelect>
-                    </label>
-                  </div>
-                  <section><h3>Entrega y pagos</h3><DeliveryFields value={delivery} options={deliveryOptions} customerId={customerId} onChange={setDelivery} currency={currency}/><InitialPayments rows={payments} onChange={setPayments} courier={delivery.kind==="courier"&&!!delivery.courier_id} method={payment} currency={currency}/></section>
-                  {lines.map((l) => (
-                    <div key={l.key} className="ingredient-row">
-                      <label>
-                        Variante
-                        <SearchSelect
-                          required
-                          value={l.variant}
-                          onChange={(e) =>
-                            setLines((old) =>
-                              old.map((x) =>
-                                x.key === l.key
-                                  ? {
-                                      ...x,
-                                      variant: e.target.value,
-                                      unit_price:
-                                        data.variants.find(
-                                          (v: Row) => v.id === e.target.value,
-                                        )?.price ?? "",
-                                    }
-                                  : x,
-                              ),
-                            )
-                          }
-                        >
-                          <option value="">Seleccionar</option>
-                          {data.variants
-                            .filter((v: Row) => v.currency === currency)
-                            .map((v: Row) => (
-                              <option key={v.id} value={v.id}>
-                                {v.sku} · {v.name} ·{" "}
-                                {v.price == null
-                                  ? "Pendiente de precio"
-                                  : money(v.price, v.currency)}{" "}
-                                · {v.available} disponibles
-                              </option>
-                            ))}
-                        </SearchSelect>
-                      </label>
-                      <label>
-                        Cantidad
-                        <input
-                          type="number"
-                          required
-                          min="1"
-                          max="1000"
-                          step="1"
-                          value={l.quantity}
-                          onChange={(e) =>
-                            setLines((old) =>
-                              old.map((x) =>
-                                x.key === l.key
-                                  ? { ...x, quantity: Number(e.target.value) }
-                                  : x,
-                              ),
-                            )
-                          }
-                        />
-                      </label>
-                      <label>
-                        Precio realmente vendido · {currency}
-                        <MoneyInput
-                          currency={currency}
-                          type="number"
-                          min="0"
-                          step="any"
-                          required
-                          value={l.unit_price ?? ""}
-                          onChange={(e) =>
-                            setLines((old) =>
-                              old.map((x) =>
-                                x.key === l.key
-                                  ? { ...x, unit_price: e.target.value }
-                                  : x,
-                              ),
-                            )
-                          }
-                        />
-                        <small>
-                          Sugerido desde la lista base. Puedes editarlo para
-                          esta venta.
-                        </small>
-                      </label>
-                      {lines.length > 1 && (
-                        <AppButton
-                          type="button"
-                          className="secondary"
-                          onClick={() =>
-                            setLines((old) =>
-                              old.filter((x) => x.key !== l.key),
-                            )
-                          }
-                        >
-                          Quitar
-                        </AppButton>
-                      )}
-                    </div>
-                  ))}
-                  <AppButton
-                    type="button"
-                    className="secondary"
-                    disabled={lines.length >= 30}
-                    onClick={() =>
-                      setLines([
-                        ...lines,
-                        { key: crypto.randomUUID(), variant: "", quantity: 1 },
-                      ])
-                    }
-                  >
-                    Añadir variante
-                  </AppButton>
-                </>
-              ) : (
-                <>
-                  <p>
-                    Pedido #{order?.number} · {order?.customer_snapshot.name} ·{" "}
-                    {money(order?.total, order?.currency)}
-                  </p>
-                  <p>
-                    {mode === "paid"
-                      ? "Registra el pago solo después de comprobar que fue recibido. La aplicación no procesa cobros."
-                      : mode === "dispatch"
-                        ? "Confirma que entregarás las unidades de este pedido. Se descontarán las existencias físicas."
-                        : "Se liberarán las unidades reservadas. Si el pedido ya fue pagado, el reembolso quedará pendiente de gestionar."}
-                  </p>
-                  {mode === "cancel" && (
-                    <label>
-                      Motivo de cancelación
-                      <input
-                        name="reason"
-                        required
-                        minLength={5}
-                        maxLength={500}
-                      />
-                    </label>
-                  )}
-                  <label>
-                    <input type="checkbox" required /> Confirmo esta operación
-                  </label>
-                </>
-              )}
-              <div className="form-actions">
-                {mode === "create" && (
-                  <strong>
-                    Total:{" "}
-                    {money(
-                      (delivery.kind!=="pickup"&&delivery.payer!=="customer"?Number(delivery.shipping_charged||0):0) + lines.reduce(
-                        (sum, l) =>
-                          sum +
-                          Number(
-                            l.unit_price ??
-                              data.variants.find((v: Row) => v.id === l.variant)
-                                ?.price ??
-                              0,
-                          ) *
-                            l.quantity,
-                        0,
-                      ),
-                      currency,
-                    )}
-                  </strong>
-                )}
-                <AppButton disabled={state.busy}>Confirmar</AppButton>
-                <AppButton
-                  type="button"
-                  className="secondary"
-                  disabled={state.busy}
-                  onClick={() => setMode(null)}
-                >
-                  Volver
-                </AppButton>
-              </div>
-            </form>
-          </section>
-        </div>
-      )}
+export default function Sales({company,customersOnly=false,currency="GTQ"}:{company:string;customersOnly?:boolean;currency?:string}) {
+ const state=useOperation(company,"sales");
+ const [data,setData]=useState<Row>({orders:[],customers:[],variants:[]}),[mode,setMode]=useState<string|null>(null),[order,setOrder]=useState<Row|null>(null),[query,setQuery]=useState(""),[managedOrder,setManagedOrder]=useState<string|null>(null),[editor,setEditor]=useState<Row|null|undefined>();
+ const load=async()=>setData(await sales(company));
+ useEffect(()=>{void state.run(load);},[company]);
+ const statusNames:Row={pending:"Pendiente",dispatched:"Entregado",cancelled:"Cancelado",expired:"Vencido"};
+ const orders=data.orders.filter((o:Row)=>[o.number,o.customer_snapshot.name,o.customer_snapshot.phone,statusNames[o.status]].join(" ").toLowerCase().includes(query.toLowerCase()));
+ return <>
+  <section className="intro"><div><p className="eyebrow">CADA PEDIDO, EN SU EMPRESA</p><h1>{customersOnly?"Clientes":"Ventas y pedidos"}</h1><p>Pedidos, facturas, entregas y pagos de tu empresa.</p></div><div className="actions">{state.canWrite&&!customersOnly&&<AppButton onClick={()=>setEditor(null)}>Registrar venta</AppButton>}<AppButton className="secondary" disabled={state.busy} onClick={()=>state.run(load)}>Actualizar</AppButton></div></section>
+  {state.error&&!mode&&<p className="error" role="alert"><AppIcon name="status.error"/>{state.error}</p>}{state.notice&&<p role="status">{state.notice}</p>}
+  {editor!==undefined&&<SaleEditor company={company} orderId={editor?.id} currency={editor?.currency||currency} onClose={()=>setEditor(undefined)} onSaved={load}/>}
+  {mode&&order&&<div className="overlay"><section className="modal operations-dialog" role="dialog" aria-modal="true" aria-label="Confirmar operación de venta"><h2>{mode==="dispatch"?"Entregar pedido":"Cancelar pedido"}</h2>{state.error&&<p className="error">{state.error}</p>}<p>Pedido #{order.number} · {order.customer_snapshot.name} · {money(order.total,order.currency)}</p><form onSubmit={e=>{e.preventDefault();const f=new FormData(e.currentTarget);void state.run(async()=>{await keyedRequest(company,"sales",{order:order.id,...(mode==="cancel"?{reason:f.get("reason")}:{})},mode);setMode(null);await load();});}}>
+   <p>{mode==="dispatch"?"Se descontarán las existencias de las unidades entregadas.":"Se liberarán las reservas. Los pagos y saldos aplicados deben revertirse antes de cancelar."}</p>{mode==="cancel"&&<label>Motivo de cancelación<input name="reason" required minLength={5} maxLength={500}/></label>}<label><input type="checkbox" required/> Confirmo esta operación</label><div className="form-actions"><AppButton disabled={state.busy}>Confirmar</AppButton><AppButton type="button" className="secondary" disabled={state.busy} onClick={()=>setMode(null)}>Volver</AppButton></div>
+  </form></section></div>}
       <section className="catalog">
         <div className="toolbar">
           <h2>{customersOnly ? "Contactos" : "Pedidos recientes"}</h2>
@@ -516,7 +119,7 @@ export default function Sales({
                         {o.paid_at ? "Pagado por el cliente" : "Pendiente de pago"}
                       </small>
                       {o.payment_summary&&<><small>Saldo cliente: {money(Number(o.total)-Number(o.payment_summary.paid),o.currency)}</small><small>En mensajero, pendiente de liquidar: {money(o.payment_summary.courier_pending,o.currency)}</small></>}
-                      {o.refund_pending && (
+                      {Number(o.payment_summary?.pending_confirmation)>0&&<small>Transferencia por confirmar: {money(o.payment_summary.pending_confirmation,o.currency)}</small>}{Number(o.payment_summary?.excess)>0&&<small className="balance-credit">A favor disponible: {money(o.payment_summary.excess,o.currency)}</small>}{o.refund_pending && (
                         <small className="error">Reembolso pendiente</small>
                       )}
                     </td>
@@ -538,7 +141,7 @@ export default function Sales({
                         </small>
                       )}
                     </td>
-                    <td className="actions">
+                    <td className="actions">{state.canWrite&&!["cancelled","expired"].includes(o.status)&&!o.settled&&<AppButton className="secondary" onClick={()=>setEditor(o)}>Editar factura</AppButton>}{o.settled&&<small>Liquidada por mensajería</small>}
                       <AppButton className="secondary" onClick={()=>setManagedOrder(o.id)}>Entrega y pagos</AppButton>
                       {state.canWrite && o.status === "pending" && (
                         <>
@@ -572,7 +175,7 @@ export default function Sales({
           )}
         </div>
       </section>
-      {managedOrder&&<OrderDeliveryDialog company={company} orderId={managedOrder} onClose={()=>setManagedOrder(null)} onSaved={load}/>}
-    </>
-  );
+
+  {managedOrder&&<OrderDeliveryDialog company={company} orderId={managedOrder} onClose={()=>setManagedOrder(null)} onSaved={load}/>}
+ </>;
 }

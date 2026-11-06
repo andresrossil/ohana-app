@@ -1,0 +1,18 @@
+.shell .sale-editor{width:min(1120px,calc(100vw - 24px));max-height:calc(100dvh - 92px);overflow:auto;padding:20px;}
+.shell .sale-editor h2{font-size:1.45rem;margin:0;}.shell .sale-editor h3{font-size:1.1rem;margin:10px 0;}
+.shell .sale-editor header{height:auto;min-height:0;font:inherit;letter-spacing:normal;margin-bottom:12px;}
+.shell .sale-editor .settings-grid,.shell .sale-editor .delivery-fields{gap:10px 14px;}
+.shell .sale-editor :is(input:not([type="checkbox"]),select,input[data-search-select]){min-height:39px;padding:8px 10px;font-size:14px;}
+.shell .sale-editor label{gap:4px;font-size:14px;}.shell .sale-editor small{font-size:12px;line-height:1.35;}
+.shell .sale-editor fieldset{padding:12px;margin:8px 0;min-width:0;}.shell .sale-editor form>fieldset{border:0;padding:0;}
+.shell .sale-editor .delivery-fields{grid-template-columns:repeat(3,minmax(0,1fr));}.shell .sale-editor .delivery-fields .form-wide{grid-column:span 2;}
+.shell .sale-editor textarea{min-height:60px;height:65px;padding:8px 10px;font-size:14px;}
+.shell .sale-editor table{min-width:720px;}.shell .sale-editor td{padding:8px;vertical-align:middle;}
+.shell .sale-editor td:first-child{min-width:260px;}.shell .sale-editor td:nth-child(2){width:90px;}.shell .sale-editor td:nth-child(3){width:145px;}
+.shell .sale-editor button{min-height:38px;padding:8px 12px;font-size:14px;}.shell .sale-discounts,.shell .sale-credit{display:flex;align-items:center;flex-wrap:wrap;gap:12px;margin:10px 0;padding:10px;background:var(--admin-secondary);border-radius:8px;}
+.shell .sale-discounts label,.shell .sale-credit label{width:170px;max-width:100%;}.shell .sale-editor-footer{position:sticky;bottom:-20px;background:var(--admin-surface);border-top:1px solid var(--admin-border);padding:12px 0;gap:10px;z-index:3;}
+.customer-balance{margin-left:auto;background:#fff;border:1px solid var(--admin-border);border-radius:9px;padding:10px 14px;text-align:right;min-width:210px;max-width:100%;color:#334155;}
+.customer-balance output{display:block;font-weight:700;font-size:1.15rem;}.customer-balance small{display:block;font-size:12px;overflow-wrap:anywhere;}
+.balance-zero{color:#111!important;}.balance-debt{color:#b42318!important;}.balance-credit{color:#15803d!important;}
+@media(max-width:720px){.shell .sale-editor{padding:14px;}.shell .sale-editor .delivery-fields{grid-template-columns:repeat(2,minmax(0,1fr));}.shell .sale-editor :is(input:not([type="checkbox"]),input[data-search-select]){font-size:16px;}.shell .sale-editor .form-actions{flex-wrap:wrap;}.shell .sale-editor-footer{bottom:-14px;}}
+@media(max-width:460px){.shell .sale-editor .delivery-fields{grid-template-columns:minmax(0,1fr);}.shell .sale-editor .delivery-fields .form-wide{grid-column:1;}.customer-balance{margin-left:0;text-align:left;}.shell .sale-editor td:first-child{min-width:220px;}}
