@@ -17,15 +17,15 @@ export default function Sales({company,customersOnly=false,currency="GTQ"}:{comp
  const load=async()=>setData(await sales(company));
  useEffect(()=>{void state.run(load);},[company]);
  const statusNames:Row={pending:"Pendiente",dispatched:"Entregado",cancelled:"Cancelado",expired:"Vencido"};
- const orderStage=(o:Row)=>["cancelled","expired"].includes(o.status)?statusNames[o.status]:o.status==="dispatched"&&o.fulfillment_stage==="invoiced"?"Entregado":fulfillmentLabels[o.fulfillment_stage||"invoiced"];
- const invoiceBalance=(o:Row)=>o.payment_summary?.paid!=null?Math.max(0,Number(o.total)-Number(o.payment_summary.paid)):null;
+ const orderStage=(o:Row)=>["cancelled","expired"].includes(o.status)?statusNames[o.status]:o.settled?"Ruta liquidada":o.status==="dispatched"&&o.fulfillment_stage==="invoiced"?"Entregado":fulfillmentLabels[o.fulfillment_stage||"invoiced"];
+ const invoiceBalance=(o:Row)=>["cancelled","expired"].includes(o.status)?0:o.payment_summary?.balance??(o.payment_summary?.paid!=null?Math.max(0,Number(o.total)-Number(o.payment_summary.paid)):null);
  const orders=data.orders.filter((o:Row)=>[o.number,o.customer_snapshot.name,o.customer_snapshot.phone,orderStage(o)].join(" ").toLowerCase().includes(query.toLowerCase()));
  return <>
   <section className="intro"><div><p className="eyebrow">CADA PEDIDO, EN SU EMPRESA</p><h1>{customersOnly?"Clientes":"Ventas y pedidos"}</h1><p>Pedidos, facturas, entregas y pagos de tu empresa.</p></div><div className="actions">{state.canWrite&&!customersOnly&&<AppButton onClick={()=>setEditor(null)}>Ingresar factura</AppButton>}<AppButton className="secondary" disabled={state.busy} onClick={()=>state.run(load)}>Actualizar</AppButton></div></section>
   {state.error&&!mode&&<p className="error" role="alert"><AppIcon name="status.error"/>{state.error}</p>}{state.notice&&<p role="status">{state.notice}</p>}
   {editor!==undefined&&<SaleEditor company={company} orderId={editor?.id} currency={editor?.currency||currency} onClose={()=>setEditor(undefined)} onSaved={load}/>}
   {mode&&order&&<div className="overlay"><section className="modal operations-dialog" role="dialog" aria-modal="true" aria-label="Confirmar operación de venta"><h2>{mode==="dispatch"?"Entregar pedido":"Cancelar pedido"}</h2>{state.error&&<p className="error">{state.error}</p>}<p>Pedido #{order.number} · {order.customer_snapshot.name} · {money(order.total,order.currency)}</p><form onSubmit={e=>{e.preventDefault();const f=new FormData(e.currentTarget);void state.run(async()=>{await keyedRequest(company,"sales",{order:order.id,...(mode==="cancel"?{reason:f.get("reason")}:{})},mode);setMode(null);await load();});}}>
-   <p>{mode==="dispatch"?"Se descontarán las existencias de las unidades entregadas.":"Se liberarán las reservas. Los pagos y saldos aplicados deben revertirse antes de cancelar."}</p>{mode==="cancel"&&<label>Motivo de cancelación<input name="reason" required minLength={5} maxLength={500}/></label>}<label><input type="checkbox" required/> Confirmo esta operación</label><div className="form-actions"><AppButton disabled={state.busy}>Confirmar</AppButton><AppButton type="button" className="secondary" disabled={state.busy} onClick={()=>setMode(null)}>Volver</AppButton></div>
+   <p>El saldo del documento quedará en cero. Si el inventario ya salió, se devolverá; si no, se liberarán las reservas. Los pagos y saldos aplicados deben revertirse antes de cancelar.</p>{mode==="cancel"&&<label>Motivo de cancelación<input name="reason" required minLength={5} maxLength={500}/></label>}<label><input type="checkbox" required/> Confirmo esta operación</label><div className="form-actions"><AppButton disabled={state.busy}>Confirmar</AppButton><AppButton type="button" className="secondary" disabled={state.busy} onClick={()=>setMode(null)}>Volver</AppButton></div>
   </form></section></div>}
       <section className="catalog">
         <div className="toolbar">
@@ -152,13 +152,13 @@ export default function Sales({company,customersOnly=false,currency="GTQ"}:{comp
                       )}
                     </td>
                     <td className="actions">{state.canWrite&&!["cancelled","expired"].includes(o.status)&&!o.settled&&<AppButton className="secondary" onClick={()=>setEditor(o)}>Editar factura</AppButton>}{o.settled&&<small>Liquidada por mensajería</small>}
-                      <AppButton className="secondary" onClick={()=>setManagedOrder(o.id)}>{o.payment!=="cash"&&invoiceBalance(o)!==null&&Number(invoiceBalance(o))>0?"Pagar factura":"Ver pagos"}</AppButton>
-                      {state.canWrite && o.status === "pending" && (
+                      <AppButton className="secondary" onClick={()=>setManagedOrder(o.id)}>{invoiceBalance(o)!==null&&Number(invoiceBalance(o))>0?"Pagar factura":"Ver pagos"}</AppButton>
+                      {state.canWrite && ["pending","dispatched"].includes(o.status) && !o.settled && (
                         <>
-                          <AppButton iconKey="action.edit" disabled={state.busy} onClick={()=>setPreparing(o.id)}>{o.fulfillment_stage==="preparing"?"Ver preparación":o.fulfillment_stage==="finished"?"Ver pedido terminado":"Preparar pedido"}</AppButton>
+                          {(o.status==="pending"||o.fulfillment_stage==="finished")&&<AppButton iconKey="action.edit" disabled={state.busy} onClick={()=>setPreparing(o.id)}>{o.fulfillment_stage==="preparing"?"Ver preparación":o.fulfillment_stage==="finished"?"Ver pedido terminado":"Preparar pedido"}</AppButton>}
                           {["preparing","finished"].includes(o.fulfillment_stage)&&<AppButton iconKey="action.confirm" disabled={state.busy} onClick={()=>state.run(async()=>{
                             const action=o.fulfillment_stage==="preparing"?"finish":"handoff";
-                            if(!(await confirmAction(action==="finish"?"¿Confirmas que el pedido está terminado?":"¿Confirmas la entrega? Se descontarán las existencias de los productos.")))return;
+                            if(!(await confirmAction(action==="finish"?"¿Confirmas que el pedido está terminado? Se descontarán las existencias de sus productos.":"¿Confirmas la entrega al mensajero o cliente? El inventario ya se descontó al terminar el pedido.")))return;
                             await keyedRequest(company,"sales_fulfillment",{order:o.id,expected_stage:o.fulfillment_stage},action);await load();
                           })}>{o.fulfillment_stage==="preparing"?"Pedido terminado":o.delivery_info?.kind==="courier"?"Entregado a mensajería":"Entregar al cliente"}</AppButton>}
                           <AppButton

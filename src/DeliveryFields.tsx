@@ -22,7 +22,7 @@ export default function DeliveryFields({value,options,onChange,currency="GTQ",cu
     }
     onChange(next);
   }
-  return <fieldset className="settings-grid delivery-fields"><legend>Entrega</legend>
+  return <fieldset className="settings-grid delivery-fields"><legend>Mensajería y entrega</legend>
     <label>Tipo de entrega<SearchSelect value={value.kind} onChange={e=>change("kind",e.target.value)}><option value="pickup">Recoger pedido</option><option value="own">Entrega propia</option><option value="courier">Mensajería</option></SearchSelect></label>
     {value.kind==="courier"&&<>
       <label>Mensajería<SearchSelect required value={value.courier_id||""} onChange={e=>change("courier_id",e.target.value)}><option value="">Seleccionar mensajería</option>{options.couriers?.filter((c:Row)=>c.active||c.id===value.courier_id).map((c:Row)=><option key={c.id} value={c.id}>{c.name}{!c.active?" · Inactiva":""}</option>)}</SearchSelect></label>
@@ -32,8 +32,6 @@ export default function DeliveryFields({value,options,onChange,currency="GTQ",cu
       {(addresses.length>0||value.address_label)&&<label className="form-wide">Dirección del cliente<SearchSelect value={value.address_id||""} onChange={e=>{const a=addresses.find((a:Row)=>a.id===e.target.value);if(a)onChange(applyDeliveryAddress(value,a,options));else onChange({...value,address_id:"",address_label:""});}}><option value="">Usar una dirección guardada</option>{value.address_id&&value.address_label&&!addresses.some((a:Row)=>a.id===value.address_id)&&<option value={value.address_id}>{value.address_label} · Histórica</option>}{addresses.map((a:Row)=><option key={a.id} value={a.id}>{a.label}</option>)}</SearchSelect></label>}
       <label className="form-wide">Dirección completa<AutoTextarea required value={value.address||""} maxLength={2000} onChange={e=>change("address",e.target.value)}/></label>
       <label>Costo de envío<MoneyInput currency={currency} required min="0" value={value.shipping_cost??""} onChange={e=>change("shipping_cost",e.target.value)}/><small>{value.shipping_cost===""?"Sin tarifa disponible. Ingresa el costo manualmente.":"Sugerido según la mensajería y la dirección. Puedes editarlo."}</small></label>
-      <label>Quién paga al transportista<SearchSelect value={value.payer} onChange={e=>change("payer",e.target.value)}><option value="ohana">Ohana</option><option value="customer">Cliente directamente</option></SearchSelect></label>
-      <p className="muted">{value.payer==="customer"?"El cliente paga este envío directamente al transportista. No se suma al total del pedido ni a la liquidación de Ohana.":"El costo de envío se suma al pedido al seleccionar o editar su tarifa."}</p>
       <label>Guía de envío · automática<input readOnly value={value.guide||""} placeholder="SIGLAS-DDMMAA-CLIENTE"/><small>Se genera al guardar, con la fecha del pedido y el código del cliente.</small></label>
     </>}
     <label>Estado de entrega<SearchSelect value={value.status||"pending"} onChange={e=>change("status",e.target.value)}>{Object.entries(deliveryStatus).map(([key,label])=><option key={key} value={key}>{label}</option>)}</SearchSelect></label>
