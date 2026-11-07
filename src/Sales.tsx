@@ -15,6 +15,7 @@ export default function Sales({company,customersOnly=false,currency="GTQ"}:{comp
  const load=async()=>setData(await sales(company));
  useEffect(()=>{void state.run(load);},[company]);
  const statusNames:Row={pending:"Pendiente",dispatched:"Entregado",cancelled:"Cancelado",expired:"Vencido"};
+ const invoiceBalance=(o:Row)=>o.payment_summary?.paid!=null?Math.max(0,Number(o.total)-Number(o.payment_summary.paid)):null;
  const orders=data.orders.filter((o:Row)=>[o.number,o.customer_snapshot.name,o.customer_snapshot.phone,statusNames[o.status]].join(" ").toLowerCase().includes(query.toLowerCase()));
  return <>
   <section className="intro"><div><p className="eyebrow">CADA PEDIDO, EN SU EMPRESA</p><h1>{customersOnly?"Clientes":"Ventas y pedidos"}</h1><p>Pedidos, facturas, entregas y pagos de tu empresa.</p></div><div className="actions">{state.canWrite&&!customersOnly&&<AppButton onClick={()=>setEditor(null)}>Registrar venta</AppButton>}<AppButton className="secondary" disabled={state.busy} onClick={()=>state.run(load)}>Actualizar</AppButton></div></section>
@@ -65,6 +66,7 @@ export default function Sales({company,customersOnly=false,currency="GTQ"}:{comp
                   <th>Cliente</th>
                   <th>Artículos vendidos</th>
                   <th>Total</th>
+                  <th>Saldo de factura</th>
                   <th>Entrega / pago</th>
                   <th>Estado</th>
                   <th>Acciones</th>
@@ -104,6 +106,10 @@ export default function Sales({company,customersOnly=false,currency="GTQ"}:{comp
                       <small>Descuento: {money(o.discount, o.currency)}</small>
                       <small>Envío: {money(o.shipping, o.currency)}</small>
                     </td>
+                    <td data-sort-value={invoiceBalance(o)}>
+                      <strong className={Number(invoiceBalance(o))>0?"balance-debt":"balance-zero"}>{money(invoiceBalance(o),o.currency)}</strong>
+                      {Number(o.payment_summary?.excess)>0&&<small className="balance-credit">A favor disponible: {money(o.payment_summary.excess,o.currency)}</small>}
+                    </td>
                     <td>
                       {o.delivery_info?.courier_snapshot?.name || (o.delivery === "delivery" ? "Domicilio" : "Retiro")}
                       {o.delivery_info&&<small>{deliveryStatus[o.delivery_info.status]} · Costo real: {money(o.delivery_info.shipping_cost,o.currency)}{o.delivery_info.payer==="customer"?" · Pagado directamente al transportista":""}</small>}
@@ -119,8 +125,8 @@ export default function Sales({company,customersOnly=false,currency="GTQ"}:{comp
                       <small>
                         {o.paid_at ? "Pagado por el cliente" : "Pendiente de pago"}
                       </small>
-                      {o.payment_summary&&<><small>Saldo cliente: {money(Number(o.total)-Number(o.payment_summary.paid),o.currency)}</small><small>En mensajero, pendiente de liquidar: {money(o.payment_summary.courier_pending,o.currency)}</small></>}
-                      {Number(o.payment_summary?.pending_confirmation)>0&&<small>Transferencia por confirmar: {money(o.payment_summary.pending_confirmation,o.currency)}</small>}{Number(o.payment_summary?.excess)>0&&<small className="balance-credit">A favor disponible: {money(o.payment_summary.excess,o.currency)}</small>}{o.refund_pending && (
+                      {o.payment_summary&&<small>En mensajero, pendiente de liquidar: {money(o.payment_summary.courier_pending,o.currency)}</small>}
+                      {Number(o.payment_summary?.pending_confirmation)>0&&<small>Transferencia por confirmar: {money(o.payment_summary.pending_confirmation,o.currency)}</small>}{o.refund_pending && (
                         <small className="error">Reembolso pendiente</small>
                       )}
                     </td>
