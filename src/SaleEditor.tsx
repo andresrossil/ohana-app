@@ -71,7 +71,7 @@ export default function SaleEditor({company,orderId,currency,onClose,onSaved}:{c
    <DeliveryFields value={delivery} options={options} customerId={customer} currency={currency} onChange={v=>{setDelivery(v);setDirty(true);}}/>
    {!original&&<details className="sale-payments" open={payments.length>0||undefined}><summary>Pagos y transferencias · opcional</summary><InitialPayments rows={payments} onChange={v=>{setPayments(v);setDirty(true);}} courier={delivery.kind==="courier"&&!!delivery.courier_id} method={payment} currency={currency}/></details>}
    {customer&&<div className="sale-credit"><strong>Saldo a favor disponible: {money(available,currency)}</strong><label>Aplicar saldo a esta factura<MoneyInput currency={currency} min="0" max={Math.min(available,due)} disabled={available<=0||due<=0} value={credit} onChange={e=>setCredit(e.target.value)}/></label></div>}
-   <footer className="form-actions sale-editor-footer"><strong>Total: {money(totals.total,currency)}</strong><small>Envío: {money(totals.shipping,currency)} · Descuento: {money(totals.discount,currency)}</small><AppButton>{original?"Guardar cambios":"Confirmar factura"}</AppButton><AppButton type="button" className="secondary" onClick={close}>Volver</AppButton></footer>
+   <footer className="form-actions sale-editor-footer"><strong className="sale-final-total">Total a pagar: {money(totals.total,currency)}</strong><AppButton>{original?"Guardar cambios":"Confirmar factura"}</AppButton><AppButton type="button" className="secondary" onClick={close}>Volver</AppButton></footer>
   </fieldset></form>}
  </section></div>;
 }
