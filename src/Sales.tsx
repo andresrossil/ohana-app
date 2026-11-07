@@ -90,6 +90,7 @@ export default function Sales({company,customersOnly=false,currency="GTQ"}:{comp
                         <div key={l.id} className="sale-line">
                           {l.quantity} × {l.description} ·{" "}
                           {money(l.unit_price, o.currency)} / ud
+                          {l.is_gift && <strong className="sale-gift-label"> · Regalo</strong>}
                           <SaleUnits units={l.physical_units || []} />
                         </div>
                       ))}

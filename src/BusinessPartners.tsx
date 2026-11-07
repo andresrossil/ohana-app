@@ -165,6 +165,7 @@ export default function BusinessPartners({
         initial.is_supplier = partnerType === "supplier";
         initial.is_courier = partnerType === "courier";
         initial.code = (await api("suggest", { type: initial.type })).code;
+        if (partnerType === "customer") initial.price_list_id = data.default_price_list || "";
         setDraft(initial);
         setRelated({});
         setAccounts([]);
@@ -694,6 +695,14 @@ export default function BusinessPartners({
               </fieldset>}
               {partnerType !== "courier" && <fieldset disabled={readOnly || busy}>
                 <legend>Información comercial · {typeName(partnerType)}</legend>
+                {partnerType === "customer" && <label>Lista de precios
+                  <SearchSelect value={draft.price_list_id || data.default_price_list || ""} onChange={e => change("price_list_id", e.target.value)}>
+                    <option value="">Sin lista disponible</option>
+                    {draft.price_list_id && !(data.price_lists || []).some((l: Row) => l.id === draft.price_list_id) && <option value={draft.price_list_id}>Lista asignada · inactiva</option>}
+                    {(data.price_lists || []).map((l: Row) => <option key={l.id} value={l.id}>{l.name}</option>)}
+                  </SearchSelect>
+                  <small>Se utiliza para sugerir los precios de sus nuevas ventas.</small>
+                </label>}
                 {partnerType === "customer" && <label>Preferencia de pago · opcional
                   <SearchSelect value={draft.payment_preference || ""} onChange={(e) => change("payment_preference", e.target.value)}>
                     <option value="">Sin preferencia</option>
@@ -751,7 +760,7 @@ export default function BusinessPartners({
                             {key === "presentations"
                               ? `${record.material} · ${record.quantity} ${record.unit} · ${record.active ? "Activa" : "Inactiva"}`
                               : key === "orders"
-                                ? `#${record.number} · ${orderStatus[record.status] || record.status} · ${money(record.total, record.currency)}`
+                                ? `#${record.number} · ${orderStatus[record.status] || record.status} · ${money(record.total, record.currency)}${Number(record.gift_units)>0 ? ` · Regalos: ${record.gift_units} unidades` : ""}`
                                 : `${record.effective_on || record.received_on || "Sin fecha"} · ${record.material || record.reference || ""} · ${money(record.amount, record.currency)}`}
                           </li>
                         ))}

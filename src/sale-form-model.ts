@@ -1,7 +1,7 @@
 type Row = Record<string, any>;
 export const roundMoney = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100;
 export function saleTotals(lines: Row[], delivery: Row, mode: string, input: string | number) {
-  const subtotal = roundMoney(lines.reduce((sum,l)=>sum+roundMoney(Number(l.quantity||0)*Number(l.unit_price||0)),0));
+  const subtotal = roundMoney(lines.reduce((sum,l)=>sum+(l.is_gift?0:roundMoney(Number(l.quantity||0)*Number(l.unit_price||0))),0));
   const source=Number(input||0);
   const discount=mode==='percent'?roundMoney(subtotal*source/100):roundMoney(source);
   const percent=subtotal>0?roundMoney(discount/subtotal*100):0;
