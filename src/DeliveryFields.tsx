@@ -34,7 +34,7 @@ export default function DeliveryFields({value,options,onChange,currency="GTQ",cu
       <label>Costo de envío<MoneyInput currency={currency} required min="0" value={value.shipping_cost??""} onChange={e=>change("shipping_cost",e.target.value)}/><small>{value.shipping_cost===""?"Sin tarifa disponible. Ingresa el costo manualmente.":"Sugerido según la mensajería y la dirección. Puedes editarlo."}</small></label>
       <label>Quién paga al transportista<SearchSelect value={value.payer} onChange={e=>change("payer",e.target.value)}><option value="ohana">Ohana</option><option value="customer">Cliente directamente</option></SearchSelect></label>
       <p className="muted">{value.payer==="customer"?"El cliente paga este envío directamente al transportista. No se suma al total del pedido ni a la liquidación de Ohana.":"El costo de envío se suma al pedido al seleccionar o editar su tarifa."}</p>
-      <label>Guía de envío · automática<input readOnly value={value.guide||""} placeholder="Se genera al guardar el pedido"/></label>
+      <label>Guía de envío · automática<input readOnly value={value.guide||""} placeholder="SIGLAS-DDMMAA-CLIENTE"/><small>Se genera al guardar, con la fecha del pedido y el código del cliente.</small></label>
     </>}
     <label>Estado de entrega<SearchSelect value={value.status||"pending"} onChange={e=>change("status",e.target.value)}>{Object.entries(deliveryStatus).map(([key,label])=><option key={key} value={key}>{label}</option>)}</SearchSelect></label>
     <label className="form-wide">Observaciones de entrega<AutoTextarea maxLength={2000} value={value.notes||""} onChange={e=>change("notes",e.target.value)}/></label>

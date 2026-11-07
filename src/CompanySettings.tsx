@@ -370,7 +370,7 @@ function CompanyProfile({
               <div className="settings-grid">
                 <label>Siglas para guías de envío
                   <input maxLength={12} pattern="[A-Za-z0-9]{1,12}" value={details.shipping_guide_initials||""} onChange={e=>update("shipping_guide_initials",e.target.value.toUpperCase())}/>
-                  <small>Ejemplo: OH → OH - 0049, usando el número del pedido. Los números mayores de cuatro dígitos se conservan completos.</small>
+                  <small>Ejemplo: OHN-061126-C0002. Siglas, fecha del pedido (ddmmaa, hora de Guatemala) y código del cliente. Las guías ya registradas se conservan.</small>
                 </label>
                 {field("legal_name", "Razón social")}
                 {field("tax_id", "NIT / identificación fiscal")}
