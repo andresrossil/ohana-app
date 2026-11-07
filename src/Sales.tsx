@@ -126,7 +126,7 @@ export default function Sales({company,customersOnly=false,currency="GTQ"}:{comp
                         }
                       </small>
                       <small>
-                        {o.paid_at ? "Pagado por el cliente" : "Pendiente de pago"}
+                        {o.paid_at ? "Pagado por el cliente" : o.payment==="cash" ? "Efectivo pendiente de liquidación de ruta" : "Pendiente de pago"}
                       </small>
                       {o.payment_summary&&<small>En mensajero, pendiente de liquidar: {money(o.payment_summary.courier_pending,o.currency)}</small>}
                       {Number(o.payment_summary?.pending_confirmation)>0&&<small>Transferencia por confirmar: {money(o.payment_summary.pending_confirmation,o.currency)}</small>}{o.refund_pending && (
@@ -152,7 +152,7 @@ export default function Sales({company,customersOnly=false,currency="GTQ"}:{comp
                       )}
                     </td>
                     <td className="actions">{state.canWrite&&!["cancelled","expired"].includes(o.status)&&!o.settled&&<AppButton className="secondary" onClick={()=>setEditor(o)}>Editar factura</AppButton>}{o.settled&&<small>Liquidada por mensajería</small>}
-                      <AppButton className="secondary" onClick={()=>setManagedOrder(o.id)}>{invoiceBalance(o)!==null&&Number(invoiceBalance(o))>0?"Pagar factura":"Ver pagos"}</AppButton>
+                      <AppButton className="secondary" onClick={()=>setManagedOrder(o.id)}>{o.payment!=="cash"&&invoiceBalance(o)!==null&&Number(invoiceBalance(o))>0?"Pagar factura":"Ver pagos"}</AppButton>
                       {state.canWrite && o.status === "pending" && (
                         <>
                           <AppButton iconKey="action.edit" disabled={state.busy} onClick={()=>setPreparing(o.id)}>{o.fulfillment_stage==="preparing"?"Ver preparación":o.fulfillment_stage==="finished"?"Ver pedido terminado":"Preparar pedido"}</AppButton>

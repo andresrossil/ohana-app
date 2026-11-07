@@ -68,7 +68,7 @@ export default function SaleEditor({company,orderId,currency,onClose,onSaved}:{c
     <label>Descuento · %<input type="number" min="0" max="100" step="0.01" value={discountMode==="percent"?discountInput:String(totals.percent)} onChange={e=>{setDiscountMode("percent");setDiscountInput(e.target.value);}}/></label>
    </div>
    <DeliveryFields value={delivery} options={options} customerId={customer} currency={currency} onChange={v=>{setDelivery(v);setDirty(true);}}/>
-   {payment==="cash"&&!original&&<p className="muted">La factura en efectivo quedará pagada automáticamente al guardarla.</p>}
+   {payment==="cash"&&!original&&<p className="muted">Efectivo pendiente de liquidación de ruta. Guardar la factura no registra dinero recibido ni reduce su saldo.</p>}
    {customer&&<div className="sale-credit"><strong>Saldo a favor disponible: {money(available,currency)}</strong><label>Aplicar saldo a esta factura<MoneyInput currency={currency} min="0" max={Math.min(available,due)} disabled={available<=0||due<=0} value={credit} onChange={e=>setCredit(e.target.value)}/></label></div>}
    <footer className="form-actions sale-editor-footer"><strong className="sale-final-total">Total a pagar: {money(totals.total,currency)}</strong><AppButton>{original?"Guardar cambios":"Confirmar factura"}</AppButton><AppButton type="button" className="secondary" onClick={close}>Volver</AppButton></footer>
   </fieldset></form>}
