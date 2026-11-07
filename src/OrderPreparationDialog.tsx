@@ -1,0 +1,29 @@
+import { useEffect, useState } from "react";
+import { request } from "./commerce";
+import { keyedRequest, money, useOperation, type Row } from "./operations";
+import { AppButton, AppIcon } from "./AppIcon";
+import ResponsiveTable from "./ResponsiveTable";
+import { confirmAction } from "./ConfirmDialog";
+import OrderDeliverySummary from "./OrderDeliverySummary";
+export const fulfillmentLabels:Row={invoiced:"Facturado",preparing:"En preparación",finished:"Terminado",courier:"Mensajería",delivered:"Entregado"};
+export default function OrderPreparationDialog({company,orderId,onClose,onSaved}:{company:string;orderId:string;onClose:()=>void;onSaved:()=>Promise<void>}){
+ const state=useOperation(company,"sales"),[data,setData]=useState<Row|null>(null);
+ const load=async()=>setData(await request("sales_fulfillment",{p_company:company,p_action:"detail",p_data:{order:orderId}}));
+ useEffect(()=>{void state.run(load);},[company,orderId]);
+ const stage=data?.order.fulfillment_stage||"invoiced";
+ const action=stage==="invoiced"?"prepare":stage==="preparing"?"finish":stage==="finished"?"handoff":null;
+ const actionLabel=action==="prepare"?"Iniciar preparación":action==="finish"?"Pedido terminado":data?.delivery?.kind==="courier"?"Entregado a mensajería":"Entregar al cliente";
+ const advance=()=>state.run(async()=>{
+  if(!action||!data)return;
+  if(!(await confirmAction(action==="handoff"?"¿Confirmas la entrega del pedido? Se descontarán las existencias de sus productos.":`¿Confirmas ${action==="prepare"?"iniciar la preparación":"que el pedido está terminado"}?`)))return;
+  await keyedRequest(company,"sales_fulfillment",{order:orderId,expected_stage:stage},action);await load();await onSaved();
+ });
+ return <div className="overlay"><section className="modal operations-dialog order-preparation" role="dialog" aria-modal="true" aria-label="Preparar pedido"><header className="hierarchy-toolbar"><h2>Preparar pedido · #{data?.order.number||"…"}</h2><AppButton className="secondary" disabled={state.busy} onClick={onClose}>Cerrar</AppButton></header>
+ {state.error&&<p className="error"><AppIcon name="status.error"/>{state.error}</p>}
+ {data&&<><p><strong>{data.order.customer_snapshot.name}</strong> · {data.order.customer_snapshot.phone}</p><p>{fulfillmentLabels[stage]}</p><OrderDeliverySummary order={data.order} delivery={data.delivery}/>
+ <div className="table-wrap"><ResponsiveTable><thead><tr><th>Producto</th><th>Cantidad</th><th>Regalo</th></tr></thead><tbody>{data.lines.map((l:Row)=><tr key={l.id}><td>{l.description}</td><td data-sort-value={l.quantity}>{l.quantity}</td><td>{l.is_gift?"Sí":"—"}</td></tr>)}</tbody></ResponsiveTable></div>
+ <div className="order-preparation-total"><strong>Total de factura: {money(data.order.total,data.order.currency)}</strong><strong className={Number(data.order.total)>Number(data.summary.paid)?"balance-debt":"balance-zero"}>Total pendiente: {money(Math.max(0,Number(data.order.total)-Number(data.summary.paid)),data.order.currency)}</strong></div>
+ <div className="form-actions">{state.canWrite&&data.order.status==="pending"&&action&&<AppButton iconKey={action==="handoff"?"action.confirm":"action.edit"} disabled={state.busy} onClick={advance}>{actionLabel}</AppButton>}<AppButton className="secondary" disabled={state.busy} onClick={onClose}>Volver</AppButton></div>
+ </>}
+ </section></div>;
+}

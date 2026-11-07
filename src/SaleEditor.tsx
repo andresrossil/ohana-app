@@ -9,7 +9,6 @@ import { keyedRequest, money, useOperation, type Row } from "./operations";
 import { blankDelivery, courierRead } from "./delivery-model";
 import { applyDeliveryAddress } from "./delivery-address";
 import DeliveryFields from "./DeliveryFields";
-import { InitialPayments } from "./OrderDeliveryDialog";
 import { paymentMethods } from "./payment-methods";
 import { saleTotals } from "./sale-form-model";
 import "./sales-compact.css";
@@ -17,7 +16,7 @@ import "./sales-compact.css";
 export default function SaleEditor({company,orderId,currency,onClose,onSaved}:{company:string;orderId?:string;currency:string;onClose:()=>void;onSaved:()=>Promise<void>}){
  const state=useOperation(company,"sales");
  const [catalog,setCatalog]=useState<Row>({customers:[],variants:[]}),[options,setOptions]=useState<Row>({}),[original,setOriginal]=useState<Row|null>(null),[ready,setReady]=useState(false),[dirty,setDirty]=useState(false);
- const [customer,setCustomer]=useState(""),[contact,setContact]=useState({name:"",phone:"",email:""}),[payment,setPayment]=useState(""),[delivery,setDelivery]=useState<Row>(blankDelivery),[lines,setLines]=useState<Row[]>([]),[payments,setPayments]=useState<Row[]>([]),[discountMode,setDiscountMode]=useState("amount"),[discountInput,setDiscountInput]=useState("0"),[credit,setCredit]=useState(""),[accounts,setAccounts]=useState<Row[]>([]);
+ const [customer,setCustomer]=useState(""),[contact,setContact]=useState({name:"",phone:"",email:""}),[payment,setPayment]=useState(""),[delivery,setDelivery]=useState<Row>(blankDelivery),[lines,setLines]=useState<Row[]>([]),[discountMode,setDiscountMode]=useState("amount"),[discountInput,setDiscountInput]=useState("0"),[credit,setCredit]=useState(""),[accounts,setAccounts]=useState<Row[]>([]);
  useEffect(()=>{void state.run(async()=>{
   const [data,o]=await Promise.all([sales(company),courierRead(company,"options")]);setCatalog(data);setOptions(o);
   if(orderId){const current=data.orders.find((x:Row)=>x.id===orderId);if(!current)throw Error("La factura ya no está disponible. Actualiza el listado.");if(current.settled)throw Error("La factura ya está liquidada por mensajería.");setOriginal(current);setCustomer(current.customer_id);setPayment(current.payment);setDelivery(current.delivery_info||{...blankDelivery(),kind:current.delivery==="pickup"?"pickup":"own",shipping_charged:current.shipping,shipping_cost:current.shipping,single_shipping_cost:false});setLines(current.lines.filter((l:Row)=>l.quantity>0).map((l:Row)=>({key:crypto.randomUUID(),variant:l.variant_id,quantity:String(l.quantity),unit_price:String(l.unit_price),is_gift:!!l.is_gift})));setDiscountMode(current.discount_basis||"amount");setDiscountInput(String(current.discount_input??current.discount??0));}
@@ -31,8 +30,8 @@ export default function SaleEditor({company,orderId,currency,onClose,onSaved}:{c
  const totals=saleTotals(lines,delivery,discountMode,discountInput);
  const account=accounts.find(a=>a.currency===currency);
  const available=Math.max(0,Number(account?.credit||0)-Number(original?.payment_summary?.excess||0));
- const confirmedInitial=payments.reduce((s,p)=>s+((p.method==="cash"||p.confirmed)?Number(p.amount||0):0),0);
- const due=Math.max(0,totals.total-Number(original?.payment_summary?.paid||0)-confirmedInitial);
+
+ const due=Math.max(0,totals.total-Number(original?.payment_summary?.paid||0));
  const close=async()=>{if(state.busy)return;if(dirty&&!(await confirmAction("Hay cambios sin guardar. ¿Salir sin guardar?")))return;onClose();};
  const updateLine=(key:string,field:string,value:any)=>{setLines(old=>old.map(l=>{
   if(l.key!==key)return l;
@@ -41,12 +40,12 @@ export default function SaleEditor({company,orderId,currency,onClose,onSaved}:{c
   return {...l,[field]:value};
  }));setDirty(true);};
  const changeCustomer=(id:string)=>{const list=catalog.customers.find((c:Row)=>c.id===id)?.price_list_id||catalog.default_price_list;setLines(old=>old.map(l=>({...l,regular_price:String(suggestedPrice(l.variant,list)??""),unit_price:l.is_gift?"0":String(suggestedPrice(l.variant,list)??"")})));setCustomer(id);setCredit("");setPayment(catalog.customers.find((x:Row)=>x.id===id)?.payment_preference||"");const a=options.addresses?.find((x:Row)=>x.partner_id===id&&x.is_primary);setDelivery(old=>applyDeliveryAddress(old,a||{address:catalog.customers.find((x:Row)=>x.id===id)?.address||""},options));setDirty(true);};
- return <div className="overlay"><section className="modal operations-dialog sale-editor" role="dialog" aria-modal="true" aria-label={orderId?"Editar factura":"Registrar venta"} data-navigation-dirty={dirty}>
-  <header className="hierarchy-toolbar"><h2>{original?`Editar factura #${original.number}`:"Registrar venta"}</h2><AppButton className="secondary" disabled={state.busy} onClick={close}>Cerrar</AppButton></header>
+ return <div className="overlay"><section className="modal operations-dialog sale-editor" role="dialog" aria-modal="true" aria-label={orderId?"Editar factura":"Ingresar factura"} data-navigation-dirty={dirty}>
+  <header className="hierarchy-toolbar"><h2>{original?`Editar factura #${original.number}`:"Ingresar factura"}</h2><AppButton className="secondary" disabled={state.busy} onClick={close}>Cerrar</AppButton></header>
   {state.error&&<p className="error" role="alert"><AppIcon name="status.error"/>{state.error}</p>}
   {ready&&<form data-dirty-managed aria-busy={state.busy} onChange={()=>setDirty(true)} onSubmit={e=>{e.preventDefault();if(totals.discount<0||totals.discount>totals.subtotal){state.setError("Revisa el descuento; no puede superar el subtotal.");return;}void state.run(async()=>{
    const payload={...(original?{order:original.id,expected_revision:original.revision}:{}),customer_id:customer||undefined,customer:contact,payment,delivery:delivery.kind==="pickup"?"pickup":"delivery",delivery_info:delivery,
-    items:lines.map(l=>({variant:l.variant,quantity:Number(l.quantity),unit_price:l.is_gift?"0":l.unit_price,is_gift:!!l.is_gift})),discount:{mode:discountMode,value:discountInput||"0"},expected_total:totals.total.toFixed(2),credit_amount:credit||"0",...(!original?{payments:payments.map(({key,...p})=>p)}:{})};
+    items:lines.map(l=>({variant:l.variant,quantity:Number(l.quantity),unit_price:l.is_gift?"0":l.unit_price,is_gift:!!l.is_gift})),discount:{mode:discountMode,value:discountInput||"0"},expected_total:totals.total.toFixed(2),credit_amount:credit||"0",};
    await keyedRequest(company,original?"edit_sale":"sales",payload,original?undefined:"create");setDirty(false);await onSaved();onClose();
   });}}><fieldset disabled={state.busy||!state.canWrite}>
    <div className="settings-grid"><label>Cliente<SearchSelect required={!!original} value={customer} onChange={e=>changeCustomer(e.target.value)}><option value="">Nuevo contacto</option>{original&&!catalog.customers.some((c:Row)=>c.id===customer)&&<option value={customer}>{original.customer_snapshot.name}</option>}{catalog.customers.filter((c:Row)=>c.active||c.id===customer).map((c:Row)=><option key={c.id} value={c.id}>{c.code} · {c.name}</option>)}</SearchSelect></label>
@@ -69,7 +68,7 @@ export default function SaleEditor({company,orderId,currency,onClose,onSaved}:{c
     <label>Descuento · %<input type="number" min="0" max="100" step="0.01" value={discountMode==="percent"?discountInput:String(totals.percent)} onChange={e=>{setDiscountMode("percent");setDiscountInput(e.target.value);}}/></label>
    </div>
    <DeliveryFields value={delivery} options={options} customerId={customer} currency={currency} onChange={v=>{setDelivery(v);setDirty(true);}}/>
-   {!original&&<details className="sale-payments" open={payments.length>0||undefined}><summary>Pagos y transferencias · opcional</summary><InitialPayments rows={payments} onChange={v=>{setPayments(v);setDirty(true);}} courier={delivery.kind==="courier"&&!!delivery.courier_id} method={payment} currency={currency}/></details>}
+   {payment==="cash"&&!original&&<p className="muted">La factura en efectivo quedará pagada automáticamente al guardarla.</p>}
    {customer&&<div className="sale-credit"><strong>Saldo a favor disponible: {money(available,currency)}</strong><label>Aplicar saldo a esta factura<MoneyInput currency={currency} min="0" max={Math.min(available,due)} disabled={available<=0||due<=0} value={credit} onChange={e=>setCredit(e.target.value)}/></label></div>}
    <footer className="form-actions sale-editor-footer"><strong className="sale-final-total">Total a pagar: {money(totals.total,currency)}</strong><AppButton>{original?"Guardar cambios":"Confirmar factura"}</AppButton><AppButton type="button" className="secondary" onClick={close}>Volver</AppButton></footer>
   </fieldset></form>}
