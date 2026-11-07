@@ -11,6 +11,7 @@ import "./partners.css";
 import { paymentMethods } from "./payment-methods";
 import { departments } from "./delivery-model";
 import CustomerBalance from "./CustomerBalance";
+import { courierBalanceClass, courierBalanceText } from "./courier-account";
 
 const typeName = (type: string) =>
   type === "courier" ? "Mensajería" : type === "supplier" ? "Proveedor" : "Cliente";
@@ -68,6 +69,7 @@ export default function BusinessPartners({
     [related, setRelated] = useState<Row>({}),
     [matches, setMatches] = useState<Row[]>([]),
     [accounts, setAccounts] = useState<Row[]>([]),
+    [courierBalance, setCourierBalance] = useState(0),
     [dirty, setDirty] = useState(false),
     [refresh, setRefresh] = useState(0);
   const generation = useRef(0),
@@ -158,6 +160,7 @@ export default function BusinessPartners({
         });
         setRelated(detail.related);
         setAccounts(detail.account || []);
+        setCourierBalance(Number(detail.courier_account || 0));
       } else {
         const initial = blank();
         initial.type = partnerType;
@@ -169,6 +172,7 @@ export default function BusinessPartners({
         setDraft(initial);
         setRelated({});
         setAccounts([]);
+        setCourierBalance(0);
       }
       setDirty(addRole);
       setMode(row && !edit ? "view" : "edit");
@@ -474,6 +478,7 @@ export default function BusinessPartners({
                     : `Nuevo ${typeName(partnerType).toLowerCase()}`}
               </h2>
               {partnerType === "customer" && <CustomerBalance accounts={accounts} currency={data.currency||"GTQ"}/>}
+              {partnerType === "courier" && <aside className="customer-balance" aria-label="Saldo de mensajería, solo lectura"><strong>Saldo acumulado</strong><output className={courierBalanceClass(courierBalance)}>{courierBalanceText(courierBalance,draft.name||"El mensajero")}</output></aside>}
               <AppButton className="secondary" disabled={busy} onClick={close}>
                 Cerrar
               </AppButton>

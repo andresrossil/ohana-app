@@ -145,6 +145,10 @@ export const defaultIconPools: IconPools = {
     options: ["truck", "bike", "package-check", "route", "send"],
     active: "truck",
   },
+  "module.settlements": {
+    options: ["calculator", "receipt", "hand-coins", "wallet", "badge-dollar-sign"],
+    active: "calculator",
+  },
   "module.reports": {
     options: [
       "chart-column",

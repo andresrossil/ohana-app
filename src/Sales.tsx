@@ -126,7 +126,7 @@ export default function Sales({company,customersOnly=false,currency="GTQ"}:{comp
                         }
                       </small>
                       <small>
-                        {o.paid_at ? "Pagado por el cliente" : o.payment==="cash" ? "Efectivo pendiente de liquidación de ruta" : "Pendiente de pago"}
+                        {o.paid_at ? "Pagado por el cliente" : o.payment==="cash"&&!o.settled ? "Efectivo pendiente de liquidación de ruta" : "Pendiente de pago"}
                       </small>
                       {o.payment_summary&&<small>En mensajero, pendiente de liquidar: {money(o.payment_summary.courier_pending,o.currency)}</small>}
                       {Number(o.payment_summary?.pending_confirmation)>0&&<small>Transferencia por confirmar: {money(o.payment_summary.pending_confirmation,o.currency)}</small>}{o.refund_pending && (

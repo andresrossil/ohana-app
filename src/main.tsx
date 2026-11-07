@@ -55,6 +55,7 @@ const Sales = lazy(() => import("./Sales"));
 const PublicStore = lazy(() => import("./PublicStore"));
 const AdditionalCostSettings = lazy(() => import("./AdditionalCostSettings"));
 const PriceLists = lazy(() => import("./PriceLists"));
+const CourierSettlements = lazy(() => import("./CourierSettlements"));
 const MaterialCreateForm = lazy(() => import("./MaterialCreateForm"));
 const StoreSettings = lazy(() => import("./StoreSettings"));
 type Tab = "raw_materials" | "suppliers" | "presentations" | "units";
@@ -630,7 +631,7 @@ function App() {
             ...(activeCompany?.manage || activeCompany?.sales_read
               ? ["customers"]
               : []),
-            ...(activeCompany?.manage || activeCompany?.sales_read ? ["couriers"] : []),
+            ...(activeCompany?.manage || activeCompany?.sales_read ? ["couriers", "settlements"] : []),
             ...(activeCompany?.manage || activeCompany?.catalog_read || activeCompany?.inventory_read ? ["suppliers"] : []),
             ...(activeCompany?.reports_read ? ["reports"] : []),
             ...(activeCompany?.manage ? ["prices", "expenses"] : []),
@@ -1008,6 +1009,7 @@ function App() {
                 />
               )}
               {section === "couriers" && <Couriers key={company} company={company} onDirty={setSettingsDirty} onSaved={load} canManage={activeCompany?.manage===true}/>}
+              {section === "settlements" && <CourierSettlements key={company} company={company} onDirty={setSettingsDirty}/>}
               {section === "reports" && (
                 <Reports key={company} company={company} currency={activeCompany?.currency} inventoryAllowed={activeCompany?.inventory_read === true} />
               )}
@@ -1024,6 +1026,7 @@ function App() {
                 "customers",
                 "suppliers",
                 "couriers",
+                "settlements",
                 "reports",
                 "prices",
                 "expenses",
