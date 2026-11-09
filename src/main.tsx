@@ -1,4 +1,5 @@
 import MoneyInput from "./MoneyInput";
+import MaterialMinimums from "./MaterialMinimums";
 import MaterialPhoto, { uploadMaterialPhoto } from "./MaterialPhoto";
 import ProductImage from "./ProductImage";
 import { MaterialTypesProvider, MaterialTypeLabel } from "./MaterialTypesContext";
@@ -380,7 +381,10 @@ function App() {
         return;
       }
     }
-    if (tab === "raw_materials") Object.assign(payload, identityPayload(f));
+    if (tab === "raw_materials") {
+      Object.assign(payload, identityPayload(f));
+      payload.minimum_stock=f.get("minimum_stock")===""?null:Number(f.get("minimum_stock"));
+    }
     if (tab === "units") payload.base_factor = Number(payload.base_factor);
     if (tab === "presentations") {
       payload.quantity = Number(payload.quantity);
@@ -1142,6 +1146,7 @@ function App() {
                   </section>
                   {tab === "raw_materials" && (
                     <div className="sheet-view-switch">
+                      {canWrite&&<MaterialMinimums key={company} company={company} onSaved={load}/>}
                       {canWrite && (
                         <AppButton
                           disabled={busy}
@@ -1245,6 +1250,7 @@ function App() {
                                     <th>Clasificación</th>
                                     <th>Origen</th>
                                     <th>Código de barras</th>
+                                    <th>Inventario mínimo</th>
                                   </>
                                 )}
                                 {tab === "presentations" && (
@@ -1292,6 +1298,7 @@ function App() {
                                           />
                                         </td>
                                         <td>{r.barcode || "—"}</td>
+                                        <td data-sort-value={r.minimum_stock}>{r.minimum_stock==null?"—":Number(r.minimum_stock).toLocaleString("es-GT",{maximumFractionDigits:8})}</td>
                                       </>
                                     )}
                                     {tab === "presentations" && (
@@ -1526,6 +1533,7 @@ function App() {
                       origins={data.catalog_origins}
                     />
                     {select("unit_id", "Unidad base", data.units, !!edit)}
+                    <label>Inventario mínimo · opcional<input name="minimum_stock" type="number" min="0" max="999999999999999" step="any" defaultValue={edit?.minimum_stock??""}/><small>En la unidad de inventario seleccionada.</small></label>
                     <MaterialPhoto path={edit?.photo_path} name={edit?.name} />
                   </>
                 )}

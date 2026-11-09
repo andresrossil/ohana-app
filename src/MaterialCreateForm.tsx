@@ -203,6 +203,7 @@ export default function MaterialCreateForm({
           barcode: identity.barcode || "",
           barcodeCustom: identity.barcode_custom,
           notes: String(data.get("notes") || ""),
+          minimumStock: String(data.get("minimum_stock") || ""),
           productUrl: String(data.get("product_url") || "").trim(),
         },
       ];
@@ -292,6 +293,7 @@ export default function MaterialCreateForm({
             </label>
             {textField(1, "Otro nombre")}
             <MaterialPhoto />
+            <label>Inventario mínimo · opcional<input name="minimum_stock" type="number" min="0" max="999999999999999" step="any"/><small>En la unidad de inventario del material.</small></label>
             <CatalogFields
               company={company}
               kind="material"
