@@ -151,11 +151,11 @@ export default function Sales({company,customersOnly=false,currency="GTQ"}:{comp
                         </small>
                       )}
                     </td>
-                    <td className="actions">{state.canWrite&&!["cancelled","expired"].includes(o.status)&&!o.settled&&<AppButton className="secondary" onClick={()=>setEditor(o)}>Editar factura</AppButton>}{o.settled&&<small>Liquidada por mensajería</small>}
+                    <td className="actions"><AppButton className="secondary" iconKey="action.expand" onClick={()=>setPreparing(o.id)}>Ver factura</AppButton>{state.canWrite&&!["cancelled","expired"].includes(o.status)&&!o.settled&&o.status==="pending"&&o.fulfillment_stage==="invoiced"&&<AppButton className="secondary" onClick={()=>setEditor(o)}>Editar factura</AppButton>}{o.settled&&<small>Liquidada por mensajería</small>}
                       <AppButton className="secondary" onClick={()=>setManagedOrder(o.id)}>{invoiceBalance(o)!==null&&Number(invoiceBalance(o))>0?"Pagar factura":"Ver pagos"}</AppButton>
                       {state.canWrite && ["pending","dispatched"].includes(o.status) && !o.settled && (
                         <>
-                          {(o.status==="pending"||o.fulfillment_stage==="finished")&&<AppButton iconKey="action.edit" disabled={state.busy} onClick={()=>setPreparing(o.id)}>{o.fulfillment_stage==="preparing"?"Ver preparación":o.fulfillment_stage==="finished"?"Ver pedido terminado":"Preparar pedido"}</AppButton>}
+                          {(o.status==="pending"&&o.fulfillment_stage==="invoiced")&&<AppButton iconKey="action.edit" disabled={state.busy} onClick={()=>setPreparing(o.id)}>{o.fulfillment_stage==="preparing"?"Ver preparación":o.fulfillment_stage==="finished"?"Ver pedido terminado":"Preparar pedido"}</AppButton>}
                           {["preparing","finished"].includes(o.fulfillment_stage)&&<AppButton iconKey="action.confirm" disabled={state.busy} onClick={()=>state.run(async()=>{
                             const action=o.fulfillment_stage==="preparing"?"finish":"handoff";
                             if(!(await confirmAction(action==="finish"?"¿Confirmas que el pedido está terminado? Se descontarán las existencias de sus productos.":"¿Confirmas la entrega al mensajero o cliente? El inventario ya se descontó al terminar el pedido.")))return;
