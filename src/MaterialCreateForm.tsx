@@ -245,10 +245,6 @@ export default function MaterialCreateForm({
           <div>
             <p className="eyebrow">MATERIALES</p>
             <h2>Agregar material individual</h2>
-            <p className="muted">
-              Los mismos campos de la tabla, en una sola ventana. Solo nombre,
-              cantidad y unidad son obligatorios.
-            </p>
           </div>
           <AppButton
             type="button"
