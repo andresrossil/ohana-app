@@ -5,11 +5,14 @@ export function syncShippingCost(value: Row): Row {
     shipping_charged: value.payer === "customer" || value.kind === "pickup" ? "0" : value.shipping_cost ?? "" };
 }
 
-export function quoteDelivery(value: Row, options: Row): Row {
+export function deliveryTariff(value: Row, options: Row): Row | undefined {
   const courier = options.couriers?.find((c: Row) => c.id === value.courier_id);
-  const tariff = options.tariffs?.find((t: Row) =>
+  return options.tariffs?.find((t: Row) =>
     t.courier_id === value.courier_id && t.mode === courier?.mode &&
     t.destination === (courier?.mode === "general" ? "general" : value.destination) && t.available);
+}
+export function quoteDelivery(value: Row, options: Row): Row {
+  const tariff = deliveryTariff(value, options);
   return syncShippingCost({ ...value, shipping_cost: tariff?.amount ?? "" });
 }
 
