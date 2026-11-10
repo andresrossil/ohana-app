@@ -204,6 +204,7 @@ export default function MaterialCreateForm({
           barcodeCustom: identity.barcode_custom,
           notes: String(data.get("notes") || ""),
           minimumStock: String(data.get("minimum_stock") || ""),
+          maximumStock: String(data.get("maximum_stock") || ""),
           productUrl: String(data.get("product_url") || "").trim(),
         },
       ];
@@ -289,7 +290,6 @@ export default function MaterialCreateForm({
             </label>
             {textField(1, "Otro nombre")}
             <MaterialPhoto />
-            <label>Inventario mínimo · opcional<input name="minimum_stock" type="number" min="0" max="999999999999999" step="any"/><small>En la unidad de inventario del material.</small></label>
             <CatalogFields
               company={company}
               kind="material"
@@ -304,6 +304,12 @@ export default function MaterialCreateForm({
             className="form-wide settings-grid"
             disabled={state.busy || saved}
           >
+            <legend>Inventario</legend>
+            <label>Inventario mínimo · opcional<input name="minimum_stock" type="number" min="0" max="999999999999999" step="any"/></label>
+            <label>Inventario máximo · opcional<input name="maximum_stock" type="number" min="0" max="999999999999999" step="any"/></label>
+            <small className="form-wide">Cantidades en la unidad de inventario del material. Puedes dejar ambos campos vacíos.</small>
+          </fieldset>
+          <fieldset className="form-wide settings-grid" disabled={state.busy || saved}>
             <legend>Proveedor y presentación</legend>
             <label>
               Proveedor

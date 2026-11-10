@@ -384,6 +384,7 @@ function App() {
     if (tab === "raw_materials") {
       Object.assign(payload, identityPayload(f));
       payload.minimum_stock=f.get("minimum_stock")===""?null:Number(f.get("minimum_stock"));
+      payload.maximum_stock=f.get("maximum_stock")===""?null:Number(f.get("maximum_stock"));
     }
     if (tab === "units") payload.base_factor = Number(payload.base_factor);
     if (tab === "presentations") {
@@ -1534,6 +1535,7 @@ function App() {
                     />
                     {select("unit_id", "Unidad base", data.units, !!edit)}
                     <label>Inventario mínimo · opcional<input name="minimum_stock" type="number" min="0" max="999999999999999" step="any" defaultValue={edit?.minimum_stock??""}/><small>En la unidad de inventario seleccionada.</small></label>
+                    <label>Inventario máximo · opcional<input name="maximum_stock" type="number" min="0" max="999999999999999" step="any" defaultValue={edit?.maximum_stock??""}/><small>En la unidad de inventario seleccionada.</small></label>
                     <MaterialPhoto path={edit?.photo_path} name={edit?.name} />
                   </>
                 )}
