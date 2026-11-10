@@ -36,7 +36,7 @@ export default function Inventory({
       movements: [],
     }),
     [receipts, setReceipts] = useState<Row[]>([]),
-    [form, setForm] = useState<"receive" | "adjust" | null>(null),
+    [form, setForm] = useState<"receive" | "adjust" | "count" | null>(null),
     [material, setMaterial] = useState(""),
     [query, setQuery] = useState("");
   useEffect(() => setPaymentCurrency(currency), [company, currency, form]);
@@ -92,6 +92,7 @@ export default function Inventory({
               >
                 Ajustar existencias
               </AppButton>
+              <AppButton className="secondary" onClick={()=>setForm("count")}>Conteo de inventario</AppButton>
             </>
           )}
           <AppButton
@@ -110,16 +111,17 @@ export default function Inventory({
         </p>
       )}
       {state.notice && <p role="status">{state.notice}</p>}
-      {form === "adjust" && (
+      {(form === "adjust" || form === "count") && (
         <InventoryAdjustment
-          key={company}
+          key={company+form}
           company={company}
           currency={currency}
+          countMode={form==="count"}
           onClose={() => setForm(null)}
-          onSaved={load}
+          onSaved={async()=>{await load();if(form==="count")state.setNotice("Conteo registrado. Se ajustaron únicamente las diferencias de los artículos capturados.");}}
         />
       )}
-      {form && form !== "adjust" && (
+      {form === "receive" && (
         <div className="overlay">
           <section
             className="modal operations-dialog"

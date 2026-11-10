@@ -24,6 +24,7 @@ export const inventoryKinds: Record<string, string> = {
   opening: "Inventario inicial",
   adjust_in: "Entrada por ajuste",
   adjust_out: "Salida por ajuste",
+  count: "Conteo de inventario",
   reversal: "Reversión",
   receipt: "Compra",
   production: "Producción",
@@ -64,6 +65,7 @@ export default function InventoryAdjustment({
   onSaved,
   reversal,
   correction,
+  countMode = false,
 }: {
   company: string;
   currency: string;
@@ -71,6 +73,7 @@ export default function InventoryAdjustment({
   onSaved: () => Promise<void>;
   reversal?: string;
   correction?: string;
+  countMode?: boolean;
 }) {
   const state = useOperation(company, "inventory");
   const [cat, setCat] = useState<Row>({
@@ -82,10 +85,10 @@ export default function InventoryAdjustment({
     }),
     [rows, setRows] = useState<Row[]>([]),
     [kind, setKind] = useState(
-      reversal ? "reversal" : correction ? "adjust_in" : "opening",
+      countMode ? "count" : reversal ? "reversal" : correction ? "adjust_in" : "opening",
     ),
     [date, setDate] = useState(today()),
-    [reason, setReason] = useState(""),
+    [reason, setReason] = useState(countMode ? "Conteo físico de inventario" : ""),
     [notes, setNotes] = useState(""),
     [review, setReview] = useState<Row | null>(null),
     [ack, setAck] = useState(false),
@@ -111,6 +114,15 @@ export default function InventoryAdjustment({
     })),
   ];
   const outgoing = kind === "adjust_out";
+  const num=(n:any)=>n==null?"—":Number(n).toLocaleString("es-GT",{maximumFractionDigits:8});
+  const displayColumns=columns.map(([key,label])=>[key,countMode&&key==="quantity"?"Cantidad real":label] as const);
+  function countValues(r:Row){
+    const a=articles.find(x=>x.key===r.article),unit=cat.units.find((u:Row)=>u.id===r.unit_id),base=cat.units.find((u:Row)=>u.id===a?.unit_id);
+    const factor=a?.item_kind==="variant"?1:unit&&base?Number(unit.base_factor)/Number(base.base_factor):null;
+    const balance=cat.balances?.find((b:Row)=>b.item_kind===r.item_kind&&b.item_id===r.item_id);
+    const theoretical=a&&factor?Number(balance?.on_hand||0)/factor:null;
+    return {theoretical,difference:theoretical!=null&&r.quantity!==""?Number(r.quantity)-theoretical:null};
+  }
   function changed() {
     setDirty(true);
     setReview(null);
@@ -170,6 +182,7 @@ export default function InventoryAdjustment({
       peso: "ignore",
       lote: "ignore",
       cantidad: "quantity",
+      "cantidad real": "quantity",
       unidad: "unit",
       um: "unit",
       "costo unitario": "ignore",
@@ -287,6 +300,7 @@ export default function InventoryAdjustment({
   async function currentPayload() {
     if (reversal) return payload();
     const c = await inventoryRequest(company, "catalog");
+    if(countMode)setCat(c);
     if (!rows.some((r) => r.item_kind === "variant")) return payload(c);
     const [math, formulas] = await Promise.all([
       request("formula_catalog", { p_company: company }),
@@ -318,12 +332,12 @@ export default function InventoryAdjustment({
         className="modal inventory-adjustment"
         role="dialog"
         aria-modal="true"
-        aria-label="Ajuste de existencias"
+        aria-label={countMode?"Conteo de inventario":"Ajuste de existencias"}
         data-navigation-dirty={dirty}
         aria-busy={state.busy}
       >
         <header className="catalog-head">
-          <h2>Ajuste de existencias</h2>
+          <h2>{countMode?"Conteo de inventario":"Ajuste de existencias"}</h2>
           <AppButton
             className="secondary"
             disabled={state.busy}
@@ -334,7 +348,7 @@ export default function InventoryAdjustment({
         </header>
         <fieldset disabled={state.busy}>
           <div className="settings-grid">
-            <label>
+            {countMode?<label>Tipo de registro<input readOnly value="Conteo físico · entrada o salida automática"/></label>:<label>
               Tipo de movimiento
               <SearchSelect
                 value={kind}
@@ -363,7 +377,7 @@ export default function InventoryAdjustment({
                   </option>
                 ))}
               </SearchSelect>
-            </label>
+            </label>}
             <label>
               Fecha efectiva
               <input
@@ -439,12 +453,12 @@ export default function InventoryAdjustment({
                     }}
                   />
                 </label>
-                <small>
+                {countMode?<small>Captura la cantidad física total que encontraste, incluido cero. Solo se ajustarán los artículos capturados. El sistema comparará contra el físico teórico y registrará la diferencia; los costos se toman automáticamente. El teórico se valida nuevamente antes de confirmar.</small>:<small>
                   Pega aquí sin crear filas. Usa SKU, nombre exacto o código de
                   barras existente. Ingresa únicamente cantidades. El costo
                   vigente se asigna automáticamente al confirmar. Las cantidades
                   siempre son positivas; el tipo determina entrada o salida.
-                </small>
+                </small>}
               </section>
               <div className="actions">
                 <AppButton
@@ -502,9 +516,10 @@ export default function InventoryAdjustment({
                     <tr>
                       <th>#</th>
                       <th>Tipo de artículo</th>
-                      {columns.map((c) => (
+                      {displayColumns.map((c) => (
                         <th key={c[0]}>{c[1]}</th>
                       ))}
+                      {countMode&&<><th>Teórico</th><th>Diferencia</th></>}
                       <th>Acciones</th>
                     </tr>
                   </thead>
@@ -613,6 +628,7 @@ export default function InventoryAdjustment({
                             </td>
                           ))}
 
+                          {countMode&&<><td data-sort-value={countValues(r).theoretical}>{num(countValues(r).theoretical)}</td><td data-sort-value={countValues(r).difference} className={Number(countValues(r).difference)<0?"balance-debt":"balance-credit"}>{num(countValues(r).difference)}</td></>}
                           <td>
                             <AppButton
                               className="danger"
@@ -636,6 +652,7 @@ export default function InventoryAdjustment({
           {review && (
             <section className="inventory-review">
               <h3>Revisar documento · {review.line_count} líneas</h3>
+              {countMode&&<p>{review.changed_count} artículos con diferencia · {review.unchanged_count} sin movimiento. Las filas sin diferencia se conservarán en la captura histórica y no generarán entradas ni salidas.</p>}
               <p>
                 {inventoryKinds[review.kind]} · {review.date} · {review.reason}
               </p>
@@ -648,20 +665,19 @@ export default function InventoryAdjustment({
                 <ResponsiveTable>
                   <thead>
                     <tr>
-                      {["Artículo", "Cantidad", "Unidad"].map((h) => (
+                      {(countMode?["Artículo","Teórico","Cantidad real","Diferencia","Movimiento","Unidad"]:["Artículo", "Cantidad", "Unidad"]).map((h) => (
                         <th key={h}>{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
-                    {review.lines.map((r: Row) => (
+                    {(countMode?review.counts:review.lines).map((r: Row) => (
                       <tr key={r.line_key}>
                         <td>
-                          {r.snapshot.sku} · {r.snapshot.name}
-                          <small>{r.snapshot.variant}</small>
+                          {(r.snapshot||r).sku} · {(r.snapshot||r).name}
+                          <small>{(r.snapshot||r).variant}</small>
                         </td>
-                        <td>{r.quantity}</td>
-                        <td>{r.snapshot.input_unit}</td>
+                        {countMode?<><td data-sort-value={r.theoretical}>{num(r.theoretical)}</td><td data-sort-value={r.actual}>{num(r.actual)}</td><td data-sort-value={r.difference}>{num(r.difference)}</td><td>{Number(r.difference)>0?"Entrada":Number(r.difference)<0?"Salida":"Sin movimiento"}</td><td>{r.unit}</td></>:<><td>{r.quantity}</td><td>{r.snapshot.input_unit}</td></>}
                       </tr>
                     ))}
                   </tbody>

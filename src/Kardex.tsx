@@ -556,6 +556,7 @@ export default function Kardex({
             {detail.header.reverses_id && (
               <p>Revierte el documento {detail.header.reverses_id}</p>
             )}
+            {detail.header.count_snapshot&&<><h3>Conteo físico registrado</h3><div className="table-wrap"><ResponsiveTable><thead><tr><th>Artículo</th><th>Teórico</th><th>Cantidad real</th><th>Diferencia</th><th>Movimiento</th><th>Unidad</th></tr></thead><tbody>{detail.header.count_snapshot.map((r:Row)=><tr key={r.line_key}><td>{r.sku} · {r.name}<small>{r.variant}</small></td><td data-sort-value={r.theoretical}>{Number(r.theoretical).toLocaleString("es-GT",{maximumFractionDigits:8})}</td><td data-sort-value={r.actual}>{Number(r.actual).toLocaleString("es-GT",{maximumFractionDigits:8})}</td><td data-sort-value={r.difference}>{Number(r.difference).toLocaleString("es-GT",{maximumFractionDigits:8})}</td><td>{Number(r.difference)>0?"Entrada":Number(r.difference)<0?"Salida":"Sin movimiento"}</td><td>{r.unit}</td></tr>)}</tbody></ResponsiveTable></div><h3>Ajustes generados por diferencias</h3></>}
             <div className="table-wrap">
               <ResponsiveTable>
                 <thead>
