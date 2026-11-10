@@ -42,6 +42,7 @@ const columns: readonly (readonly [string, string])[] = [
   ["notes", "Observaciones"],
 ] as const;
 const empty = (): Row => ({
+  count_action: "count",
   line_key: crypto.randomUUID(),
   article: "",
   quantity: "",
@@ -115,13 +116,15 @@ export default function InventoryAdjustment({
   ];
   const outgoing = kind === "adjust_out";
   const num=(n:any)=>n==null?"—":Number(n).toLocaleString("es-GT",{maximumFractionDigits:8});
-  const displayColumns=columns.map(([key,label])=>[key,countMode&&key==="quantity"?"Cantidad real":label] as const);
+  const countActions:Record<string,string>={count:"Conteo real",adjust_in:"Entrada por ajuste",adjust_out:"Salida por ajuste"};
+  const displayColumns=columns;
+  const exportColumns:readonly (readonly [string,string])[]=countMode?[...columns,["count_action","Acción"]]:columns;
   function countValues(r:Row){
     const a=articles.find(x=>x.key===r.article),unit=cat.units.find((u:Row)=>u.id===r.unit_id),base=cat.units.find((u:Row)=>u.id===a?.unit_id);
     const factor=a?.item_kind==="variant"?1:unit&&base?Number(unit.base_factor)/Number(base.base_factor):null;
     const balance=cat.balances?.find((b:Row)=>b.item_kind===r.item_kind&&b.item_id===r.item_id);
     const theoretical=a&&factor?Number(balance?.on_hand||0)/factor:null;
-    return {theoretical,difference:theoretical!=null&&r.quantity!==""?Number(r.quantity)-theoretical:null};
+    return {theoretical,difference:theoretical!=null&&r.quantity!==""?(r.count_action==="adjust_in"?Number(r.quantity):r.count_action==="adjust_out"?-Number(r.quantity):Number(r.quantity)-theoretical):null};
   }
   function changed() {
     setDirty(true);
@@ -183,6 +186,7 @@ export default function InventoryAdjustment({
       lote: "ignore",
       cantidad: "quantity",
       "cantidad real": "quantity",
+      accion: "count_action",
       unidad: "unit",
       um: "unit",
       "costo unitario": "ignore",
@@ -228,6 +232,10 @@ export default function InventoryAdjustment({
             r.unresolved = value;
             errors.push(`Fila ${idx + 1}: artículo no identificado: ${value}`);
           }
+        } else if (field === "count_action") {
+          const action=Object.keys(countActions).find(key=>norm(key)===norm(value)||norm(countActions[key])===norm(value));
+          if(action)r.count_action=action;
+          else if(value.trim())errors.push(`Fila ${idx+1}: acción no identificada: ${value}`);
         } else if (field === "unit") {
           const u = cat.units.filter(
             (u: Row) =>
@@ -276,6 +284,7 @@ export default function InventoryAdjustment({
               item_kind: r.item_kind,
               item_id: r.item_id,
               quantity: r.quantity,
+              ...(countMode?{count_action:r.count_action||"count"}:{}),
               unit_id: r.unit_id || null,
               cost_mode: "current",
               unit_cost:
@@ -453,7 +462,7 @@ export default function InventoryAdjustment({
                     }}
                   />
                 </label>
-                {countMode?<small>Captura la cantidad física total que encontraste, incluido cero. Solo se ajustarán los artículos capturados. El sistema comparará contra el físico teórico y registrará la diferencia; los costos se toman automáticamente. El teórico se valida nuevamente antes de confirmar.</small>:<small>
+                {countMode?<small>Elige la acción por línea. Conteo real reemplaza el total físico (cero es válido). Entrada por ajuste suma solo la cantidad adicional encontrada; Salida por ajuste resta la cantidad indicada. El teórico se valida nuevamente antes de confirmar.</small>:<small>
                   Pega aquí sin crear filas. Usa SKU, nombre exacto o código de
                   barras existente. Ingresa únicamente cantidades. El costo
                   vigente se asigna automáticamente al confirmar. Las cantidades
@@ -477,10 +486,10 @@ export default function InventoryAdjustment({
                     state.run(async () => {
                       await navigator.clipboard.writeText(
                         formatTSV([
-                          columns.map((c) => c[1]),
+                          exportColumns.map((c) => c[1]),
                           ...rows.map((r) =>
-                            columns.map(([key]) =>
-                              key === "article"
+                            exportColumns.map(([key]) =>
+                              key === "count_action"?countActions[r.count_action||"count"]:key === "article"
                                 ? articles.find((a) => a.key === r.article)
                                     ?.sku ||
                                   r.unresolved ||
@@ -516,6 +525,7 @@ export default function InventoryAdjustment({
                     <tr>
                       <th>#</th>
                       <th>Tipo de artículo</th>
+                      {countMode&&<th>Acción</th>}
                       {displayColumns.map((c) => (
                         <th key={c[0]}>{c[1]}</th>
                       ))}
@@ -537,6 +547,7 @@ export default function InventoryAdjustment({
                                 ? "Producto terminado"
                                 : "—"}
                           </td>
+                          {countMode&&<td><SearchSelect aria-label="Acción de inventario" value={r.count_action||"count"} onChange={e=>update(i,{count_action:e.target.value})}>{Object.entries(countActions).map(([key,label])=><option key={key} value={key}>{label}</option>)}</SearchSelect><small>{r.count_action==="adjust_in"?"Suma la cantidad encontrada":r.count_action==="adjust_out"?"Resta la cantidad indicada":"Captura el total físico real"}</small></td>}
                           {columns.map(([key], ci) => (
                             <td
                               key={key}
@@ -665,7 +676,7 @@ export default function InventoryAdjustment({
                 <ResponsiveTable>
                   <thead>
                     <tr>
-                      {(countMode?["Artículo","Teórico","Cantidad real","Diferencia","Movimiento","Unidad"]:["Artículo", "Cantidad", "Unidad"]).map((h) => (
+                      {(countMode?["Artículo","Acción","Cantidad capturada","Teórico","Existencia resultante","Diferencia","Movimiento","Unidad"]:["Artículo", "Cantidad", "Unidad"]).map((h) => (
                         <th key={h}>{h}</th>
                       ))}
                     </tr>
@@ -677,7 +688,7 @@ export default function InventoryAdjustment({
                           {(r.snapshot||r).sku} · {(r.snapshot||r).name}
                           <small>{(r.snapshot||r).variant}</small>
                         </td>
-                        {countMode?<><td data-sort-value={r.theoretical}>{num(r.theoretical)}</td><td data-sort-value={r.actual}>{num(r.actual)}</td><td data-sort-value={r.difference}>{num(r.difference)}</td><td>{Number(r.difference)>0?"Entrada":Number(r.difference)<0?"Salida":"Sin movimiento"}</td><td>{r.unit}</td></>:<><td>{r.quantity}</td><td>{r.snapshot.input_unit}</td></>}
+                        {countMode?<><td>{countActions[r.action||"count"]}</td><td data-sort-value={r.captured_quantity??r.actual}>{num(r.captured_quantity??r.actual)}</td><td data-sort-value={r.theoretical}>{num(r.theoretical)}</td><td data-sort-value={r.actual}>{num(r.actual)}</td><td data-sort-value={r.difference}>{num(r.difference)}</td><td>{Number(r.difference)>0?"Entrada":Number(r.difference)<0?"Salida":"Sin movimiento"}</td><td>{r.unit}</td></>:<><td>{r.quantity}</td><td>{r.snapshot.input_unit}</td></>}
                       </tr>
                     ))}
                   </tbody>
