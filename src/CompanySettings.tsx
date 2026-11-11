@@ -71,6 +71,9 @@ function CompanyProfile({
     [countries, setCountries] = useState<CatalogRow[]>([]),
     [currencies, setCurrencies] = useState<CatalogRow[]>([]),
     [file, setFile] = useState<File | null>(null),
+    [documentFile, setDocumentFile] = useState<File | null>(null),
+    [documentPreview, setDocumentPreview] = useState(""),
+    [documentFileKey, setDocumentFileKey] = useState(0),
     [preview, setPreview] = useState(""),
     [dirty, setDirty] = useState(false),
     [error, setError] = useState(""),
@@ -134,6 +137,20 @@ function CompanyProfile({
     setPreview(url);
     return () => URL.revokeObjectURL(url);
   }, [file]);
+  const documentLogoPath = details.document_logo_path as string | undefined;
+  useEffect(() => {
+    setDocumentPreview("");
+    if (documentFile) {
+      const url = URL.createObjectURL(documentFile);
+      setDocumentPreview(url);
+      return () => URL.revokeObjectURL(url);
+    }
+    if (!documentLogoPath) return;
+    let active = true;
+    void db.storage.from("company-logos").createSignedUrl(documentLogoPath, 3600)
+      .then(({ data }) => { if (active) setDocumentPreview(data?.signedUrl ?? ""); });
+    return () => { active = false; };
+  }, [documentFile, documentLogoPath]);
   const update = (key: string, value: unknown) => {
     setDetails((old) => ({ ...old, [key]: value }));
     setDirty(true);
@@ -145,7 +162,7 @@ function CompanyProfile({
     setBusy(true);
     setError("");
     setNotice("");
-    let uploaded: string | null = null;
+    const uploaded: string[] = [];
     try {
       if (!appearance && !details.country)
         throw Error("Selecciona el país de la empresa.");
@@ -161,48 +178,56 @@ function CompanyProfile({
             throw Error("Revisa los enlaces de redes sociales y página web.");
         }
       }
-      let path = company.logo_path || null;
-      if (file) {
+      async function uploadLogo(imageFile: File, prefix = "") {
         if (
-          !["image/png", "image/jpeg", "image/webp"].includes(file.type) ||
-          file.size > 3145728
+          !["image/png", "image/jpeg", "image/webp"].includes(imageFile.type) ||
+          imageFile.size > 3145728
         )
           throw Error("Usa un logo PNG, JPG o WebP de hasta 3 MB.");
-        const image = await createImageBitmap(file);
+        const image = await createImageBitmap(imageFile);
         image.close();
-        uploaded =
+        const path =
           company.id +
           "/" +
+          prefix +
           crypto.randomUUID() +
           "." +
-          (file.type === "image/png"
+          (imageFile.type === "image/png"
             ? "png"
-            : file.type === "image/webp"
+            : imageFile.type === "image/webp"
               ? "webp"
               : "jpg");
         const { error } = await db.storage
           .from("company-logos")
-          .upload(uploaded, file, { contentType: file.type });
+          .upload(path, imageFile, { contentType: imageFile.type });
         if (error) throw error;
-        path = uploaded;
+        uploaded.push(path);
+        return path;
       }
+      const path = file ? await uploadLogo(file) : company.logo_path || null;
+      const savedDetails = documentFile
+        ? { ...details, document_logo_path: await uploadLogo(documentFile, "document-") }
+        : details;
       const { error } = await db.rpc("save_company_settings", {
         p_company: company.id,
         p_name: name,
         p_currency: currency,
-        p_details: details,
+        p_details: savedDetails,
         p_appearance: theme,
         p_logo: path,
       });
       if (error) throw error;
-      uploaded = null;
+      uploaded.length = 0;
+      setDetails(savedDetails);
       setDirty(false);
       setFile(null);
+      setDocumentFile(null);
+      setDocumentFileKey((key) => key + 1);
       await onSaved();
       window.dispatchEvent(new Event("ohana-settings-saved"));
       setNotice("Cambios guardados para todos los usuarios de esta empresa.");
     } catch (e: any) {
-      if (uploaded) await db.storage.from("company-logos").remove([uploaded]);
+      if (uploaded.length) await db.storage.from("company-logos").remove(uploaded);
       setError(e.message);
     } finally {
       setBusy(false);
@@ -352,6 +377,25 @@ function CompanyProfile({
                 />
                 <small>PNG, JPG o WebP · máximo 3 MB</small>
               </label>
+              {documentPreview && (
+                <img className="logo-preview" src={documentPreview} alt="Vista previa del logo para documentos" />
+              )}
+              <label>
+                Logo para documentos
+                <input key={documentFileKey} type="file" accept="image/png,image/jpeg,image/webp"
+                  onChange={(e) => {
+                    setDocumentFile(e.target.files?.[0] ?? null);
+                    setDirty(true);
+                  }} />
+                <small>Se usa en borradores y facturas. Usa un PNG transparente para que se vea el fondo del documento. Máximo 3 MB.</small>
+              </label>
+              {(documentLogoPath || documentFile) && (
+                <AppButton type="button" className="secondary" iconKey="action.delete" onClick={() => {
+                  setDocumentFile(null);
+                  setDocumentFileKey((key) => key + 1);
+                  update("document_logo_path", null);
+                }}>Quitar logo para documentos</AppButton>
+              )}
               <label>
                 Nombre comercial *
                 <input

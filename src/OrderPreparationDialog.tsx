@@ -6,6 +6,7 @@ import ResponsiveTable from "./ResponsiveTable";
 import { confirmAction } from "./ConfirmDialog";
 import OrderDeliverySummary from "./OrderDeliverySummary";
 import CustomerCommercialInfo from "./CustomerCommercialInfo";
+import { openSaleDocument } from "./SaleDocument";
 import { saleLineTotals } from "./sale-form-model";
 export const fulfillmentLabels:Row={draft:"Borrador",invoiced:"Facturado",preparing:"En preparación",finished:"Terminado",courier:"Mensajería",delivered:"Entregado"};
 export default function OrderPreparationDialog({company,orderId,onClose,onSaved}:{company:string;orderId:string;onClose:()=>void;onSaved:()=>Promise<void>}){
@@ -21,7 +22,12 @@ export default function OrderPreparationDialog({company,orderId,onClose,onSaved}
   if(!(await confirmAction(action==="handoff"?"¿Confirmas la entrega del pedido? El inventario ya se descontó al terminarlo.":action==="finish"?"¿Confirmas que el pedido está terminado? Se descontarán las existencias de sus productos.":"¿Confirmas iniciar la preparación? No se descontará inventario todavía.")))return;
   await keyedRequest(company,"sales_fulfillment",{order:orderId,expected_stage:stage},action);await load();await onSaved();
  });
- return <div className="overlay"><section className="modal operations-dialog order-preparation" role="dialog" aria-modal="true" aria-label="Ver factura" data-navigation-dirty={reverting&&reason!==""}><header className="hierarchy-toolbar"><h2>Factura · #{data?.order.number||"…"}</h2><AppButton className="secondary" disabled={state.busy} onClick={close}>Cerrar</AppButton></header>
+ return <div className="overlay"><section className="modal operations-dialog order-preparation" role="dialog" aria-modal="true" aria-label="Ver factura" data-navigation-dirty={reverting&&reason!==""}><header className="hierarchy-toolbar"><h2>Factura · #{data?.order.number||"…"}</h2><div className="actions">
+ {data&&<AppButton iconKey="action.print" disabled={state.busy} onClick={()=>{
+  const status=data.order.status==="cancelled"?"Cancelado":data.order.status==="expired"?"Vencido":fulfillmentLabels[stage];
+  if(!openSaleDocument(data,status))state.setError("Permite las ventanas emergentes para abrir la vista de impresión.");
+ }}>Imprimir</AppButton>}
+ <AppButton className="secondary" disabled={state.busy} onClick={close}>Cerrar</AppButton></div></header>
  {state.error&&<p className="error"><AppIcon name="status.error"/>{state.error}</p>}
  {data&&<><p><strong>{data.order.customer_snapshot.name}</strong> · {data.order.customer_snapshot.phone}</p><p>{fulfillmentLabels[stage]}</p><OrderDeliverySummary order={data.order} delivery={data.delivery}/><CustomerCommercialInfo info={data.commercial_info}/>
  <div className="table-wrap"><ResponsiveTable><thead><tr><th>Producto</th><th>Cantidad</th><th>Regalo</th><th>Precio unitario</th><th>Descuento</th><th>Subtotal</th></tr></thead><tbody>{data.lines.map((l:Row)=><tr key={l.id}><td>{l.description}</td><td data-sort-value={l.quantity}>{l.quantity}</td><td>{l.is_gift?"Sí":"—"}</td><td data-sort-value={l.unit_price}>{money(l.unit_price,data.order.currency)}</td><td data-sort-value={l.line_discount??0}>{money(l.line_discount??0,data.order.currency)}</td><td data-sort-value={saleLineTotals(l).net}>{money(saleLineTotals(l).net,data.order.currency)}</td></tr>)}</tbody></ResponsiveTable></div>
