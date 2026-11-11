@@ -152,10 +152,15 @@ export default function Sales({company,customersOnly=false,currency="GTQ"}:{comp
                         </small>
                       )}
                     </td>
-                    <td className="actions"><AppButton className="secondary" iconKey="action.expand" onClick={()=>setPreparing(o.id)}>Ver factura</AppButton>{state.canWrite&&!["cancelled","expired"].includes(o.status)&&!o.settled&&o.status==="pending"&&o.fulfillment_stage==="invoiced"&&<AppButton className="secondary" onClick={()=>setEditor(o)}>Editar factura</AppButton>}{o.settled&&<small>Liquidada por mensajería</small>}
-                      <AppButton className="secondary" onClick={()=>setManagedOrder(o.id)}>{invoiceBalance(o)!==null&&Number(invoiceBalance(o))>0?"Pagar factura":"Ver pagos"}</AppButton>
+                    <td className="actions"><AppButton className="secondary" iconKey="action.expand" onClick={()=>setPreparing(o.id)}>Ver factura</AppButton>{state.canWrite&&!["cancelled","expired"].includes(o.status)&&!o.settled&&o.status==="pending"&&["draft","invoiced"].includes(o.fulfillment_stage)&&<AppButton className="secondary" onClick={()=>setEditor(o)}>Editar factura</AppButton>}{o.settled&&<small>Liquidada por mensajería</small>}
+                      {o.fulfillment_stage!=="draft"&&<AppButton className="secondary" onClick={()=>setManagedOrder(o.id)}>{invoiceBalance(o)!==null&&Number(invoiceBalance(o))>0?"Pagar factura":"Ver pagos"}</AppButton>}
                       {state.canWrite && ["pending","dispatched"].includes(o.status) && !o.settled && (
                         <>
+                          {o.status==="pending"&&o.fulfillment_stage==="draft"&&<AppButton iconKey="action.confirm" disabled={state.busy} onClick={()=>state.run(async()=>{
+                            if(!(await confirmAction("¿El cliente confirmó el pedido? Se reservarán las unidades disponibles para esta factura.",{title:"Confirmación del cliente",confirmText:"Confirmar pedido"})))return;
+                            await keyedRequest(company,"sales_fulfillment",{order:o.id,expected_stage:"draft",expected_revision:o.revision},"confirm_customer");
+                            await load();
+                          })}>Confirmación del cliente</AppButton>}
                           {(o.status==="pending"&&o.fulfillment_stage==="invoiced")&&<AppButton iconKey="action.edit" disabled={state.busy} onClick={()=>setPreparing(o.id)}>{o.fulfillment_stage==="preparing"?"Ver preparación":o.fulfillment_stage==="finished"?"Ver pedido terminado":"Preparar pedido"}</AppButton>}
                           {["preparing","finished"].includes(o.fulfillment_stage)&&<AppButton iconKey="action.confirm" disabled={state.busy} onClick={()=>state.run(async()=>{
                             const action=o.fulfillment_stage==="preparing"?"finish":"handoff";
