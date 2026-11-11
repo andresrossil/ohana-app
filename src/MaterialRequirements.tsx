@@ -133,7 +133,14 @@ export default function MaterialRequirements({
                               {num(r.shortage)} {r.unit}
                             </span>
                           ) : (
-                            "-"
+                            <span
+                              className="material-sufficient"
+                              role="img"
+                              aria-label="Inventario suficiente"
+                              title="Inventario suficiente"
+                            >
+                              <AppIcon name="status.success" />
+                            </span>
                           )}
                         </td>
                       </tr>

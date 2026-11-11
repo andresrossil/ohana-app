@@ -219,6 +219,11 @@
   align-items: center;
   gap: 6px;
 }
+.shell .material-requirements .material-sufficient {
+  color: var(--functional-success, #166534);
+  display: inline-flex;
+  align-items: center;
+}
 .shell .user-avatar {
   width: 64px;
   height: 64px;
