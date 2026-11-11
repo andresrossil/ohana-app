@@ -578,7 +578,7 @@ export default function BusinessPartners({
                       <small>Se utilizará para sugerir la tarifa de mensajería por departamento.</small>
                     </label>}
                     {partnerType === "customer" && <label>Zona
-                      <input type="number" min="1" max="32767" step="1" placeholder="Sin zona definida" value={a.zone??""} onChange={e=>change("addresses",draft.addresses.map((row:Row,i:number)=>i===index?{...row,zone:e.target.value}:row))}/>
+                      <input type="text" maxLength={120} placeholder="Ej. San José Pinula Z1" value={a.zone??""} onChange={e=>change("addresses",draft.addresses.map((row:Row,i:number)=>i===index?{...row,zone:e.target.value}:row))}/>
                       <small>Se utilizará cuando la mensajería tenga tarifas por zona.</small>
                     </label>}
                     {[

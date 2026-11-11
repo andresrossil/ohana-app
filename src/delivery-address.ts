@@ -1,5 +1,12 @@
 type Row = Record<string, any>;
 
+export const deliveryZoneKey = (value: unknown) => String(value ?? "").trim().toLowerCase();
+
+export function deliveryZoneLabel(value: unknown) {
+  const zone = String(value ?? "").trim();
+  return /^\d+$/.test(zone) ? `Zona ${zone}` : zone;
+}
+
 export function syncShippingCost(value: Row): Row {
   return { ...value, single_shipping_cost: true,
     shipping_charged: value.payer === "customer" || value.kind === "pickup" ? "0" : value.shipping_cost ?? "" };
@@ -9,7 +16,9 @@ export function deliveryTariff(value: Row, options: Row): Row | undefined {
   const courier = options.couriers?.find((c: Row) => c.id === value.courier_id);
   return options.tariffs?.find((t: Row) =>
     t.courier_id === value.courier_id && t.mode === courier?.mode &&
-    t.destination === (courier?.mode === "general" ? "general" : value.destination) && t.available);
+    (courier?.mode === "zone"
+      ? deliveryZoneKey(t.destination) === deliveryZoneKey(value.destination)
+      : t.destination === (courier?.mode === "general" ? "general" : value.destination)) && t.available);
 }
 export function quoteDelivery(value: Row, options: Row): Row {
   const tariff = deliveryTariff(value, options);

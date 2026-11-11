@@ -8,6 +8,7 @@ import AutoTextarea from "./AutoTextarea";
 import { confirmAction } from "./ConfirmDialog";
 import { courierRead, tariffDestinations, tariffModes } from "./delivery-model";
 import { keyedRequest, useOperation, type Row } from "./operations";
+import { deliveryZoneKey, deliveryZoneLabel } from "./delivery-address";
 import "./couriers.css";
 
 function Tariffs({company,courier,canManage,onClose}:{company:string;courier:Row;canManage:boolean;onClose:()=>void}){
@@ -26,17 +27,17 @@ function Tariffs({company,courier,canManage,onClose}:{company:string;courier:Row
    <label>Modalidad activa<SearchSelect value={mode} onChange={async e=>{const v=e.target.value;if(!(await confirmAction(dirty?"¿Cambiar de modalidad? Se conservarán las tarifas guardadas; se descartarán las ediciones sin guardar de esta tabla.":"¿Cambiar la modalidad activa? Las tarifas anteriores se conservarán y los pedidos existentes no cambiarán.")))return;choose(v,all);setDirty(true);}}>{Object.entries(tariffModes).map(([key,label])=><option value={key} key={key}>{label}</option>)}</SearchSelect></label>
    <div className="settings-grid delivery-summary"><label><input type="checkbox" checked={generalEnabled} onChange={e=>{setGeneralEnabled(e.target.checked);if(e.target.checked)setRows(old=>old.map(r=>({...r,amount:generalAmount})));setDirty(true);}}/> Tarifa general</label><label>Importe general GTQ<MoneyInput currency="GTQ" min="0" required={generalEnabled} value={generalAmount} onChange={e=>{const amount=e.target.value;setGeneralAmount(amount);if(generalEnabled)setRows(old=>old.map(r=>({...r,amount})));setDirty(true);}}/></label><small className="form-wide">Al desmarcar, los importes quedan disponibles para edición individual. Los horarios no cambian.</small></div>
    {mode === "zone" && <div className="form-actions">
-     <label>Número de zona<input type="number" min="1" max="32767" step="1" value={newZone} onChange={e=>setNewZone(e.target.value)} /></label>
+     <label>Nombre de zona<input type="text" maxLength={120} placeholder="Ej. Villa Nueva Z1" value={newZone} onChange={e=>setNewZone(e.target.value)} /></label>
      <AppButton type="button" className="secondary" onClick={()=>{
-       const zone = Number(newZone);
-       if (!Number.isInteger(zone) || zone < 1 || zone > 32767) { state.setError("Indica un número de zona válido."); return; }
-       if (rows.some(row=>row.destination===String(zone))) { state.setError("Esa zona ya está en el tarifario."); return; }
+       const zone = newZone.trim();
+       if (!zone || zone.length > 120) { state.setError("Escribe un nombre de zona de hasta 120 caracteres."); return; }
+       if (rows.some(row=>deliveryZoneKey(row.destination)===deliveryZoneKey(zone))) { state.setError("Esa zona ya está en el tarifario."); return; }
        if (rows.length >= 200) { state.setError("El tarifario admite hasta 200 zonas."); return; }
-       setRows(old=>[...old,{destination:String(zone),amount:generalEnabled?generalAmount:"",available:false,delivery_schedule:""}]);
+       setRows(old=>[...old,{destination:zone,amount:generalEnabled?generalAmount:"",available:false,delivery_schedule:""}]);
        setNewZone("");setDirty(true);state.setError("");
      }}>Agregar zona</AppButton>
    </div>}
-   <div className="table-wrap"><ResponsiveTable><thead><tr><th>Destino</th><th>Tarifa GTQ</th><th>Horario</th><th>Disponible</th></tr></thead><tbody>{rows.map((r,i)=><tr key={r.destination}><td>{mode==="general"?"Todas las entregas":mode==="zone"?`Zona ${r.destination}`:r.destination}</td><td data-sort-value={r.amount}><MoneyInput currency="GTQ" min="0" readOnly={generalEnabled} required={r.available} value={r.amount??""} onChange={e=>{setRows(old=>old.map((x,j)=>j===i?{...x,amount:e.target.value}:x));setDirty(true);}}/></td><td><AutoTextarea aria-label={`Horario ${r.destination}`} maxLength={500} placeholder="Ej. Lunes a viernes, 9:00 a 17:00" value={r.delivery_schedule||""} onChange={e=>{setRows(old=>old.map((x,j)=>j===i?{...x,delivery_schedule:e.target.value}:x));setDirty(true);}}/></td><td><input aria-label={`Disponible ${r.destination}`} type="checkbox" checked={r.available} onChange={e=>{setRows(old=>old.map((x,j)=>j===i?{...x,available:e.target.checked}:x));setDirty(true);}}/></td></tr>)}</tbody></ResponsiveTable></div>
+   <div className="table-wrap"><ResponsiveTable><thead><tr><th>Destino</th><th>Tarifa GTQ</th><th>Horario</th><th>Disponible</th></tr></thead><tbody>{rows.map((r,i)=><tr key={r.destination}><td>{mode==="general"?"Todas las entregas":mode==="zone"?deliveryZoneLabel(r.destination):r.destination}</td><td data-sort-value={r.amount}><MoneyInput currency="GTQ" min="0" readOnly={generalEnabled} required={r.available} value={r.amount??""} onChange={e=>{setRows(old=>old.map((x,j)=>j===i?{...x,amount:e.target.value}:x));setDirty(true);}}/></td><td><AutoTextarea aria-label={`Horario ${r.destination}`} maxLength={500} placeholder="Ej. Lunes a viernes, 9:00 a 17:00" value={r.delivery_schedule||""} onChange={e=>{setRows(old=>old.map((x,j)=>j===i?{...x,delivery_schedule:e.target.value}:x));setDirty(true);}}/></td><td><input aria-label={`Disponible ${r.destination}`} type="checkbox" checked={r.available} onChange={e=>{setRows(old=>old.map((x,j)=>j===i?{...x,available:e.target.checked}:x));setDirty(true);}}/></td></tr>)}</tbody></ResponsiveTable></div>
    <div className="form-actions"><AppButton disabled={!dirty}>Guardar tarifas</AppButton></div>
   </fieldset></form>}
  </section></div>;
