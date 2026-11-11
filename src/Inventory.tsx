@@ -1,5 +1,6 @@
 import MoneyInput from "./MoneyInput";
 import InventoryAdjustment from "./InventoryAdjustment";
+import CuringProduction from "./CuringProduction";
 import { useMaterialTypes, MaterialTypeLabel } from "./MaterialTypesContext";
 import { materialTypeName } from "./material-types-model";
 import SearchSelect from "./SearchSelect";
@@ -19,13 +20,16 @@ export default function Inventory({
   company,
   purchases = false,
   currency = "GTQ",
+  productionRead = false,
 }: {
   company: string;
   purchases?: boolean;
   currency?: string;
+  productionRead?: boolean;
 }) {
   const types = useMaterialTypes();
   const [paymentCurrency, setPaymentCurrency] = useState(currency);
+  const [showCuring, setShowCuring] = useState(false);
   const state = useOperation(company, "inventory"),
     [data, setData] = useState<Row>({
       balances: [],
@@ -61,6 +65,9 @@ export default function Inventory({
       .toLowerCase()
       .includes(query.toLowerCase()),
   );
+  const curingBalances = data.balances.filter(
+    (row: Row) => row.item_kind === "variant" && Number(row.blocked) > 0,
+  );
   return (
     <>
       <section className="intro">
@@ -74,6 +81,11 @@ export default function Inventory({
           </p>
         </div>
         <div className="actions">
+          {!purchases && (
+            <AppButton className="secondary" iconKey="status.pending" onClick={() => setShowCuring(true)}>
+              Productos en curación
+            </AppButton>
+          )}
           {state.canWrite && (
             <>
               <AppButton
@@ -111,6 +123,36 @@ export default function Inventory({
         </p>
       )}
       {state.notice && <p role="status">{state.notice}</p>}
+      {showCuring && (
+        <div className="overlay">
+          <section className="modal operations-dialog" role="dialog" aria-modal="true" aria-labelledby="curing-title">
+            <header>
+              <h2 id="curing-title">Productos en curación</h2>
+              <AppButton className="secondary" onClick={() => setShowCuring(false)}>Cerrar</AppButton>
+            </header>
+            {productionRead ? (
+              <CuringProduction company={company} />
+            ) : state.busy ? (
+              <p className="empty" role="status">Consultando existencias…</p>
+            ) : state.error ? (
+              <p className="error" role="alert">No se pudieron consultar las existencias.</p>
+            ) : curingBalances.length ? (
+              <div className="table-wrap">
+                <ResponsiveTable>
+                  <thead><tr><th>Producto / variante</th><th>Unidades en curación</th></tr></thead>
+                  <tbody>
+                    {curingBalances.map((row: Row) => (
+                      <tr key={row.item_id}><td>{row.name}</td><td>{Number(row.blocked)}</td></tr>
+                    ))}
+                  </tbody>
+                </ResponsiveTable>
+              </div>
+            ) : (
+              <p className="empty">No hay existencias en curación.</p>
+            )}
+          </section>
+        </div>
+      )}
       {(form === "adjust" || form === "count") && (
         <InventoryAdjustment
           key={company+form}

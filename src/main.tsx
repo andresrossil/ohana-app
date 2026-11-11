@@ -48,6 +48,7 @@ import { useCompanyTheme } from "./CompanyBrand";
 type Row = { id: string; [key: string]: any };
 const Reports = lazy(() => import("./Reports"));
 const Inventory = lazy(() => import("./Inventory"));
+const CuringProduction = lazy(() => import("./CuringProduction"));
 const Formulas = lazy(() => import("./Formulas"));
 const Production = lazy(() => import("./Production"));
 const BusinessPartners = lazy(() => import("./BusinessPartners"));
@@ -913,6 +914,19 @@ function App() {
                   )}
                 </section>
               )}
+              {section === "dashboard" && activeCompany?.production_read && (
+                <section className="catalog admin-dashboard" aria-labelledby="dashboard-alerts">
+                  <h2 id="dashboard-alerts">Alertas</h2>
+                  <CuringProduction
+                    key={company}
+                    company={company}
+                    alerts
+                    onProduction={async () => {
+                      if (await leaveSheet()) setSection("production");
+                    }}
+                  />
+                </section>
+              )}
               {section === "prices" && activeCompany?.manage && (
                 <PriceLists
                   key={company}
@@ -980,6 +994,7 @@ function App() {
                   company={company}
                   currency={activeCompany?.currency}
                   purchases={section === "purchases"}
+                  productionRead={activeCompany?.production_read}
                 />
               )}
               {section === "formulas" && (
