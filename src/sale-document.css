@@ -1,13 +1,14 @@
 :root { color-scheme: light; font-family: Arial, sans-serif; color: #372319; background: white; }
 * { box-sizing: border-box; }
 body { margin: 0; }
-.print-controls { display: flex; justify-content: center; padding: 16px; }
+.print-controls { display: flex; justify-content: center; flex-wrap: wrap; gap: 8px; padding: 16px; }
+.print-controls p { flex-basis: 100%; margin: 0; text-align: center; }
 .print-controls button { display: flex; align-items: center; gap: 8px; padding: 10px 16px; border: 0; border-radius: 8px; background: #735047; color: white; font: inherit; cursor: pointer; }
 .print-controls button:disabled { opacity: .5; cursor: wait; }
 .document { --paper: #fcf8f5; --line: #e7d7cb; --sand: #f0e3d8; margin: 0 auto 24px; padding: 10mm; width: min(100%, 210mm); font-size: 11pt; }
 .document-heading { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 2.7fr) auto; align-items: center; gap: 4mm; margin: 0 0 7mm; }
 .document-brand { min-width: 0; }
-.document-brand img { display: block; width: auto; height: auto; max-width: 100%; max-height: 40.5mm; object-fit: contain; }
+.document-brand img { display: block; width: auto; height: auto; max-width: 100%; max-height: 40.5mm; object-fit: contain; transform: translateX(3mm); }
 .document-brand p { margin: 0; font: 17pt Georgia, serif; overflow-wrap: anywhere; }
 .document-title { display: flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap; }
 .document h1 { margin: 0; font-size: 15pt; text-transform: uppercase; }

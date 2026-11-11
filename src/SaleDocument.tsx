@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { Clock3, CreditCard, MapPin, Phone, Printer, Truck, UserRound } from "lucide-react";
+import { Clock3, CreditCard, Download, MapPin, Phone, Printer, Truck, UserRound } from "lucide-react";
 import { supabase } from "./client";
 import { deliveryZoneLabel } from "./delivery-address";
 import { money, type Row } from "./operations";
@@ -15,13 +15,23 @@ const documentDate = new Intl.DateTimeFormat("es-GT", {
   year: "numeric",
 });
 
-export function openSaleDocument(data: Row) {
+const grams = new Intl.NumberFormat("es-GT", { maximumFractionDigits: 8 });
+
+export function saleDocumentLine(line: Row) {
+  const [product, ...size] = String(line.description ?? "").split(" · ");
+  const range = line.weight_min != null && line.weight_max != null
+    ? `${grams.format(Number(line.weight_min))}–${grams.format(Number(line.weight_max))} g`
+    : "";
+  return { product, size: [size.join(" · "), range].filter(Boolean).join(" · ") || "—" };
+}
+
+export function openSaleDocument(source: Row | (() => Promise<Row>)) {
   const preview = window.open("", "_blank");
   if (!preview) return false;
   preview.opener = null;
   const doc = preview.document;
   doc.documentElement.lang = "es";
-  doc.title = `Resumen de pedido · #${data.order.number}`;
+  doc.title = "Resumen de pedido";
   const viewport = doc.createElement("meta");
   viewport.name = "viewport";
   viewport.content = "width=device-width, initial-scale=1";
@@ -31,7 +41,17 @@ export function openSaleDocument(data: Row) {
   const container = doc.createElement("div");
   doc.body.replaceChildren(container);
   const root = createRoot(container);
-  root.render(<SaleDocument data={data} onPrint={() => preview.print()} />);
+  const show = (data: Row) => {
+    if (preview.closed) return;
+    doc.title = `Resumen de pedido · #${data.order.number}`;
+    root.render(<SaleDocument data={data} onPrint={() => preview.print()} />);
+  };
+  if (typeof source === "function") {
+    root.render(<p className="print-controls" role="status">Cargando documento…</p>);
+    void source().then(show, () => {
+      if (!preview.closed) root.render(<p className="print-controls" role="alert">No se pudo cargar el documento. Cierra esta ventana y vuelve a intentarlo.</p>);
+    });
+  } else show(source);
   preview.addEventListener("pagehide", () => root.unmount(), { once: true });
   return true;
 }
@@ -43,6 +63,9 @@ function SaleDocument({ data, onPrint }: { data: Row; onPrint: () => void }) {
   const lines: Row[] = data.lines ?? [];
   const [logo, setLogo] = useState("");
   const [loadingLogo, setLoadingLogo] = useState(!!brand?.logo_path);
+  const article = useRef<HTMLElement>(null);
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState("");
   useEffect(() => {
     if (!brand?.logo_path) return;
     let active = true;
@@ -66,12 +89,46 @@ function SaleDocument({ data, onPrint }: { data: Row; onPrint: () => void }) {
     .filter(Boolean).join(" · ");
   const schedule = delivery.tariff_snapshot?.delivery_schedule;
 
+  async function downloadImage() {
+    const documentNode = article.current;
+    if (!documentNode || exporting) return;
+    setExporting(true);
+    setExportError("");
+    try {
+      const { default: capture } = await import("html2canvas");
+      const canvas = await capture(documentNode, {
+        backgroundColor: "#ffffff",
+        scale: 2,
+        useCORS: true,
+        logging: false,
+      });
+      const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
+      if (!blob) throw new Error("No se generó la imagen");
+      const url = URL.createObjectURL(blob);
+      const link = documentNode.ownerDocument.createElement("a");
+      link.href = url;
+      link.download = `${isDraft ? "Borrador" : "Factura"}-${String(order.number).padStart(6, "0")}.png`;
+      documentNode.ownerDocument.body.append(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 30_000);
+    } catch {
+      setExportError("No se pudo guardar la imagen. Intenta nuevamente.");
+    } finally {
+      setExporting(false);
+    }
+  }
+
   return (
     <>
       <div className="print-controls">
-        <button type="button" disabled={loadingLogo} onClick={onPrint}><Printer size={16} aria-hidden="true" /> Imprimir / guardar PDF</button>
+        <button type="button" disabled={loadingLogo || exporting} onClick={onPrint}><Printer size={16} aria-hidden="true" /> Imprimir / guardar PDF</button>
+        <button type="button" disabled={loadingLogo || exporting} onClick={downloadImage}>
+          <Download size={16} aria-hidden="true" /> {exporting ? "Preparando imagen…" : "Guardar imagen PNG"}
+        </button>
+        {exportError && <p role="alert">{exportError}</p>}
       </div>
-      <article className="document">
+      <article ref={article} className="document">
         <header className="document-heading">
           <div className="document-brand">
             {logo ? (
@@ -98,14 +155,14 @@ function SaleDocument({ data, onPrint }: { data: Row; onPrint: () => void }) {
         </div>
 
         <table aria-label="Productos del pedido">
-          <thead><tr><th>Producto</th><th>Variante</th><th>Cant.</th><th>Precio</th><th>Desc.</th><th>Importe</th></tr></thead>
+          <thead><tr><th>Producto</th><th>Tamaño</th><th>Cant.</th><th>Precio</th><th>Desc.</th><th>Importe</th></tr></thead>
           <tbody>
             {lines.map((line) => {
-              const [product, ...variant] = String(line.description ?? "").split(" · ");
+              const { product, size } = saleDocumentLine(line);
               const amounts = saleLineTotals(line);
               return <tr key={line.id}>
                 <td>{product}{line.is_gift && <small>Regalo</small>}</td>
-                <td>{variant.join(" · ") || "—"}</td>
+                <td>{size}</td>
                 <td>{line.quantity}</td>
                 <td>{money(line.unit_price, currency)}</td>
                 <td>{amounts.discount > 0 ? money(amounts.discount, currency) : "—"}</td>

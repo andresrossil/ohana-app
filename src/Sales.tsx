@@ -5,7 +5,8 @@ import ResponsiveTable from "./ResponsiveTable";
 import { SaleUnits } from "./PhysicalUnits";
 import { SearchField } from "./PoolControls";
 import { AppButton, AppIcon } from "./AppIcon";
-import { sales } from "./commerce";
+import { request, sales } from "./commerce";
+import { openSaleDocument } from "./SaleDocument";
 import { keyedRequest, money, useOperation, type Row } from "./operations";
 import OrderDeliveryDialog from "./OrderDeliveryDialog";
 import SaleEditor from "./SaleEditor";
@@ -152,7 +153,10 @@ export default function Sales({company,customersOnly=false,currency="GTQ"}:{comp
                         </small>
                       )}
                     </td>
-                    <td className="actions"><AppButton className="secondary" iconKey="action.expand" onClick={()=>setPreparing(o.id)}>Ver factura</AppButton>{state.canWrite&&!["cancelled","expired"].includes(o.status)&&!o.settled&&o.status==="pending"&&["draft","invoiced"].includes(o.fulfillment_stage)&&<AppButton className="secondary" onClick={()=>setEditor(o)}>Editar factura</AppButton>}{o.settled&&<small>Liquidada por mensajería</small>}
+                    <td className="actions"><AppButton className="secondary" iconKey="action.expand" onClick={()=>setPreparing(o.id)}>Ver factura</AppButton><AppButton className="secondary" iconKey="action.print" onClick={()=>{
+                      if(!openSaleDocument(()=>request("sales_fulfillment",{p_company:company,p_action:"detail",p_data:{order:o.id}})))
+                        state.setError("Permite las ventanas emergentes para abrir la vista de impresión.");
+                    }}>Imprimir</AppButton>{state.canWrite&&!["cancelled","expired"].includes(o.status)&&!o.settled&&o.status==="pending"&&["draft","invoiced"].includes(o.fulfillment_stage)&&<AppButton className="secondary" onClick={()=>setEditor(o)}>Editar factura</AppButton>}{o.settled&&<small>Liquidada por mensajería</small>}
                       {o.fulfillment_stage!=="draft"&&<AppButton className="secondary" onClick={()=>setManagedOrder(o.id)}>{invoiceBalance(o)!==null&&Number(invoiceBalance(o))>0?"Pagar factura":"Ver pagos"}</AppButton>}
                       {state.canWrite && ["pending","dispatched"].includes(o.status) && !o.settled && (
                         <>

@@ -12,6 +12,7 @@
   "dependencies": {
     "@supabase/supabase-js": "2.118.0",
     "fflate": "0.8.2",
+    "html2canvas": "1.4.1",
     "jsbarcode": "3.12.3",
     "lucide-react": "1.65.0",
     "react": "19.2.8",
