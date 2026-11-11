@@ -22,9 +22,8 @@ body { margin: 0; }
 .document table { width: 100%; table-layout: fixed; border: 1px solid var(--line); border-spacing: 0; border-radius: 10px; color: #30231b; background: var(--paper); }
 .document th, .document td { padding: 2.6mm 2mm; text-align: right; overflow-wrap: anywhere; vertical-align: top; }
 .document th { background: var(--sand); }
-.document th:first-child, .document td:first-child { width: 29%; text-align: left; }
-.document th:nth-child(2), .document td:nth-child(2) { width: 19%; text-align: left; }
-.document th:nth-child(3), .document td:nth-child(3) { width: 8%; }
+.document th:first-child, .document td:first-child { width: 48%; text-align: left; }
+.document th:nth-child(2), .document td:nth-child(2) { width: 8%; }
 .document td { border-top: 1px solid var(--line); }
 .document td small { display: block; margin-top: 2px; }
 .document tr { break-inside: avoid; }

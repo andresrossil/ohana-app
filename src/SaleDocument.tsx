@@ -155,14 +155,13 @@ function SaleDocument({ data, onPrint }: { data: Row; onPrint: () => void }) {
         </div>
 
         <table aria-label="Productos del pedido">
-          <thead><tr><th>Producto</th><th>Tamaño</th><th>Cant.</th><th>Precio</th><th>Desc.</th><th>Importe</th></tr></thead>
+          <thead><tr><th>Producto</th><th>Cant.</th><th>Precio</th><th>Desc.</th><th>Importe</th></tr></thead>
           <tbody>
             {lines.map((line) => {
-              const { product, size } = saleDocumentLine(line);
+              const { product } = saleDocumentLine(line);
               const amounts = saleLineTotals(line);
               return <tr key={line.id}>
                 <td>{product}{line.is_gift && <small>Regalo</small>}</td>
-                <td>{size}</td>
                 <td>{line.quantity}</td>
                 <td>{money(line.unit_price, currency)}</td>
                 <td>{amounts.discount > 0 ? money(amounts.discount, currency) : "—"}</td>
