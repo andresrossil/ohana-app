@@ -915,8 +915,8 @@ function App() {
                 </section>
               )}
               {section === "dashboard" && activeCompany?.production_read && (
-                <section className="catalog admin-dashboard" aria-labelledby="dashboard-alerts">
-                  <h2 id="dashboard-alerts">Alertas</h2>
+                <section className="catalog admin-dashboard" aria-labelledby="dashboard-curing">
+                  <h2 id="dashboard-curing">Lotes en curación</h2>
                   <CuringProduction
                     key={company}
                     company={company}

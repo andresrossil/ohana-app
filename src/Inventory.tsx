@@ -1,6 +1,6 @@
 import MoneyInput from "./MoneyInput";
 import InventoryAdjustment from "./InventoryAdjustment";
-import { CuringProductionTable, curingCount, useCuringProduction } from "./CuringProduction";
+import { CuringProductionTable, curingCount, summarizeCuringProducts, useCuringProduction } from "./CuringProduction";
 import { useMaterialTypes, MaterialTypeLabel } from "./MaterialTypesContext";
 import { materialTypeName } from "./material-types-model";
 import SearchSelect from "./SearchSelect";
@@ -70,22 +70,7 @@ export default function Inventory({
   const curingBalances = data.balances.filter(
     (row: Row) => row.item_kind === "variant" && Number(row.blocked) > 0,
   );
-  const curingByProduct = new Map<string, { name: string; total: number; known: number; missing: number }>();
-  if (!curing.error) {
-    for (const batch of curing.batches ?? []) {
-      const summary = curingByProduct.get(batch.product_id) ?? {
-        name: batch.product_name, total: 0, known: 0, missing: 0,
-      };
-      if (batch.theoreticalQuantity == null) {
-        summary.missing += 1;
-      } else {
-        summary.total += Number(batch.theoreticalQuantity);
-        summary.known += 1;
-      }
-      curingByProduct.set(batch.product_id, summary);
-    }
-  }
-  const curingProducts = [...curingByProduct].filter(([id, product]) =>
+  const curingProducts = summarizeCuringProducts(curing.error ? [] : curing.batches ?? []).filter(([id, product]) =>
     product.name.toLowerCase().includes(query.toLowerCase()) ||
     data.variants.some((variant: Row) =>
       variant.product_id === id &&

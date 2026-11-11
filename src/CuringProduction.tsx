@@ -24,6 +24,30 @@ type CuringBatch = {
 
 export const curingCount = new Intl.NumberFormat("es-GT", { maximumFractionDigits: 8 });
 
+export function summarizeCuringProducts(batches: CuringBatch[]) {
+  const products = new Map<string, {
+    name: string;
+    lots: number;
+    total: number;
+    known: number;
+    missing: number;
+  }>();
+  for (const batch of batches) {
+    const product = products.get(batch.product_id) ?? {
+      name: batch.product_name, lots: 0, total: 0, known: 0, missing: 0,
+    };
+    product.lots += 1;
+    if (batch.theoreticalQuantity == null) {
+      product.missing += 1;
+    } else {
+      product.total += Number(batch.theoreticalQuantity);
+      product.known += 1;
+    }
+    products.set(batch.product_id, product);
+  }
+  return [...products];
+}
+
 export function useCuringProduction(company: string | null, revision = 0) {
   const [batches, setBatches] = useState<CuringBatch[] | null>(null);
   const [error, setError] = useState(false);
@@ -83,31 +107,61 @@ export default function CuringProduction({
   company: string;
   onProduction: () => void;
 }) {
-  const state = useCuringProduction(company);
-  return <CuringProductionTable state={state} alerts onProduction={onProduction} />;
+  const { batches, error, date } = useCuringProduction(company);
+  if (error) return <p className="error" role="alert">No se pudo consultar la producción en curación.</p>;
+  if (batches === null) return <p className="empty" role="status">Consultando lotes en curación…</p>;
+  if (batches.length === 0) return <p className="empty">No hay lotes en curación.</p>;
+
+  const products = summarizeCuringProducts(batches);
+  const due = batches.filter((batch) => batch.available_on && batch.available_on <= date).length;
+  return (
+    <>
+      <div className="table-wrap">
+        <ResponsiveTable>
+          <thead>
+            <tr><th>Producto</th><th>Lotes</th><th>Unidades teóricas</th></tr>
+          </thead>
+          <tbody>
+            {products.map(([id, product]) => (
+              <tr key={id}>
+                <td>{product.name}</td>
+                <td>{product.lots}</td>
+                <td data-sort-value={product.known ? product.total : undefined}>
+                  {product.known ? curingCount.format(product.total) : "Sin estimación"}
+                  {product.known > 0 && product.missing > 0 && <small>Total parcial</small>}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </ResponsiveTable>
+      </div>
+      {due > 0 && (
+        <div className="toolbar">
+          <p role="status">
+            <AppIcon name="status.warning" /> {due === 1
+              ? "1 lote listo para confirmar o liberar"
+              : `${due} lotes listos para confirmar o liberar`}
+          </p>
+          <AppButton className="secondary" onClick={onProduction}>Ir a Producción</AppButton>
+        </div>
+      )}
+    </>
+  );
 }
 
 export function CuringProductionTable({
   state: { batches, error, date },
-  alerts = false,
-  onProduction,
 }: {
   state: ReturnType<typeof useCuringProduction>;
-  alerts?: boolean;
-  onProduction?: () => void;
 }) {
-  const rows = (batches ?? []).filter(
-    (batch) => !alerts || (batch.available_on && batch.available_on <= date),
-  );
-
   return (
     <>
       {error ? (
         <p className="error" role="alert">No se pudo consultar la producción en curación.</p>
       ) : batches === null ? (
         <p className="empty" role="status">Consultando producción en curación…</p>
-      ) : rows.length === 0 ? (
-        <p className="empty">{alerts ? "No hay producción pendiente de confirmar." : "No hay productos en curación."}</p>
+      ) : batches.length === 0 ? (
+        <p className="empty">No hay productos en curación.</p>
       ) : (
         <div className="table-wrap">
           <ResponsiveTable>
@@ -122,7 +176,7 @@ export function CuringProductionTable({
               </tr>
             </thead>
             <tbody>
-              {rows.map((batch) => {
+              {batches.map((batch) => {
                 const pendingWeight = batch.opening_stock && !batch.confirmed;
                 const due = !!batch.available_on && batch.available_on <= date;
                 return (
@@ -145,11 +199,6 @@ export function CuringProductionTable({
               })}
             </tbody>
           </ResponsiveTable>
-        </div>
-      )}
-      {!error && rows.length > 0 && onProduction && (
-        <div className="toolbar">
-          <AppButton className="secondary" onClick={onProduction}>Ir a Producción</AppButton>
         </div>
       )}
     </>
