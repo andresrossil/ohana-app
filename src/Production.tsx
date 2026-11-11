@@ -56,7 +56,7 @@ function ProductionBatches({
     }),
     [formulas, setFormulas] = useState<Row[]>([]),
     [batches, setBatches] = useState<Row[]>([]),
-    [mode, setMode] = useState<"start" | "finish" | "release" | null>(null),
+    [mode, setMode] = useState<"start" | "finish" | "release" | "curing_edit" | null>(null),
     [selected, setSelected] = useState<Row | null>(null),
     [date, setDate] = useState(today()),
     [openingStock, setOpeningStock] = useState(false),
@@ -223,6 +223,7 @@ function ProductionBatches({
                   start: "Producción en preparación",
                   finish: "Confirmar producción",
                   release: "Liberación manual",
+                  curing_edit: "Editar lote en curación",
                 }[mode]
               }
             </h2>
@@ -300,6 +301,15 @@ function ProductionBatches({
                   if (selected!.opening_stock && payload.outputs.every((output: Row) => output.unit_weights?.length)) {
                     payload.weight = payload.outputs.reduce((sum: number, output: Row) => sum + Math.round(output.weight * 10000), 0) / 10000;
                   }
+                } else if (mode === "curing_edit") {
+                  action = "curing_edit";
+                  payload = {
+                    ...payload,
+                    id: selected!.id,
+                    previous_production_date: selected!.production_date,
+                    previous_available_on: selected!.available_on,
+                    previous_notes: selected!.notes,
+                  };
                 } else {
                   action = "batch_release";
                   payload = {
@@ -353,7 +363,7 @@ function ProductionBatches({
                       stock_proof: stock.proof,
                     };
                   }
-                  if (mode === "start")
+                  if (mode === "start" || mode === "curing_edit")
                     await keyedRequest(
                       company,
                       "production_command",
@@ -651,6 +661,24 @@ function ProductionBatches({
                     unidades dañadas son informativas. {selected?.opening_stock ? "Este lote de saldo inicial no registra consumo de materias primas." : "Los materiales se descuentan según el consumo real registrado."}
                   </p>
                 </>
+              ) : mode === "curing_edit" ? (
+                <div className="settings-grid">
+                  <p className="form-wide">{lotCode(selected!.batch_number)} · {selected!.product_name}</p>
+                  <label>
+                    Fecha de producción
+                    <input name="production_date" type="date" required max={today()}
+                      readOnly={selected!.confirmed || !selected!.opening_stock}
+                      value={date} onChange={(e) => setDate(e.target.value)} />
+                  </label>
+                  <label>
+                    Fecha de disponibilidad
+                    <input name="available_on" type="date" required min={date} defaultValue={selected!.available_on} />
+                  </label>
+                  <label className="form-wide">
+                    Notas
+                    <AutoTextarea name="notes" maxLength={1000} defaultValue={selected!.notes ?? ""} />
+                  </label>
+                </div>
               ) : (
                 <>
                   <p>
@@ -691,7 +719,9 @@ function ProductionBatches({
                       : "Confirmar producción y enviar a curado"
                     : mode === "release"
                       ? "Liberar existencias"
-                      : openingStock ? "Registrar lote en curación" : "Guardar borrador"}
+                      : mode === "curing_edit"
+                        ? "Guardar cambios"
+                        : openingStock ? "Registrar lote en curación" : "Guardar borrador"}
                 </AppButton>
                 <AppButton
                   type="button"
@@ -742,7 +772,7 @@ function ProductionBatches({
                       }
                     />
                     {
-                      {
+                      b.finalized_at ? "Terminado" : {
                         draft: "Borrador",
                         in_progress: "En preparación",
                         curing: "En curación",
@@ -764,7 +794,7 @@ function ProductionBatches({
                     >
                       Ver documento
                     </AppButton>
-                    {state.canWrite && b.state !== "cancelled" && (
+                    {state.canWrite && b.state !== "cancelled" && !b.finalized_at && (
                       <AppButton
                         className="danger"
                         disabled={state.busy}
@@ -774,6 +804,31 @@ function ProductionBatches({
                         }}
                       >
                         Cancelar documento
+                      </AppButton>
+                    )}
+                    {state.canWrite && b.state === "released" && !b.finalized_at && (
+                      <AppButton iconKey="status.success" disabled={state.busy} onClick={async () => {
+                        if (!(await confirmAction(
+                          `${lotCode(b.batch_number)} quedará cerrado y ya no se podrá cancelar.`,
+                          { title: "Terminar producción", confirmText: "Marcar como terminado" },
+                        ))) return;
+                        await state.run(async () => {
+                          await keyedRequest(company, "production_command", { id: b.id }, "finalize");
+                          await load();
+                          state.setNotice("Producción terminada.");
+                        });
+                      }}>
+                        Terminado
+                      </AppButton>
+                    )}
+                    {state.canWrite && b.state === "curing" && (
+                      <AppButton className="secondary" iconKey="action.edit" disabled={state.busy} onClick={() => {
+                        setSelected(b);
+                        setDate(b.production_date);
+                        setDirty(false);
+                        setMode("curing_edit");
+                      }}>
+                        Editar
                       </AppButton>
                     )}
                     {state.canWrite && b.state === "draft" && (
