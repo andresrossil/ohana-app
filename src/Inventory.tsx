@@ -1,6 +1,6 @@
 import MoneyInput from "./MoneyInput";
 import InventoryAdjustment from "./InventoryAdjustment";
-import CuringProduction from "./CuringProduction";
+import { CuringProductionTable, curingCount, useCuringProduction } from "./CuringProduction";
 import { useMaterialTypes, MaterialTypeLabel } from "./MaterialTypesContext";
 import { materialTypeName } from "./material-types-model";
 import SearchSelect from "./SearchSelect";
@@ -30,6 +30,8 @@ export default function Inventory({
   const types = useMaterialTypes();
   const [paymentCurrency, setPaymentCurrency] = useState(currency);
   const [showCuring, setShowCuring] = useState(false);
+  const [curingRevision, setCuringRevision] = useState(0);
+  const curing = useCuringProduction(!purchases && productionRead ? company : null, curingRevision);
   const state = useOperation(company, "inventory"),
     [data, setData] = useState<Row>({
       balances: [],
@@ -67,6 +69,28 @@ export default function Inventory({
   );
   const curingBalances = data.balances.filter(
     (row: Row) => row.item_kind === "variant" && Number(row.blocked) > 0,
+  );
+  const curingByProduct = new Map<string, { name: string; total: number; known: number; missing: number }>();
+  if (!curing.error) {
+    for (const batch of curing.batches ?? []) {
+      const summary = curingByProduct.get(batch.product_id) ?? {
+        name: batch.product_name, total: 0, known: 0, missing: 0,
+      };
+      if (batch.theoreticalQuantity == null) {
+        summary.missing += 1;
+      } else {
+        summary.total += Number(batch.theoreticalQuantity);
+        summary.known += 1;
+      }
+      curingByProduct.set(batch.product_id, summary);
+    }
+  }
+  const curingProducts = [...curingByProduct].filter(([id, product]) =>
+    product.name.toLowerCase().includes(query.toLowerCase()) ||
+    data.variants.some((variant: Row) =>
+      variant.product_id === id &&
+      [variant.name, variant.sku].join(" ").toLowerCase().includes(query.toLowerCase()),
+    ),
   );
   return (
     <>
@@ -110,7 +134,10 @@ export default function Inventory({
           <AppButton
             className="secondary"
             disabled={state.busy}
-            onClick={() => state.run(load)}
+            onClick={() => {
+              setCuringRevision((revision) => revision + 1);
+              state.run(load);
+            }}
           >
             Actualizar
           </AppButton>
@@ -131,7 +158,7 @@ export default function Inventory({
               <AppButton className="secondary" onClick={() => setShowCuring(false)}>Cerrar</AppButton>
             </header>
             {productionRead ? (
-              <CuringProduction company={company} />
+              <CuringProductionTable state={curing} />
             ) : state.busy ? (
               <p className="empty" role="status">Consultando existencias…</p>
             ) : state.error ? (
@@ -373,19 +400,37 @@ export default function Inventory({
                 onChange={(e) => setQuery(e.target.value)}
               />
             </div>
+            {productionRead && curing.error && (
+              <p className="empty" role="status">No se pudieron consultar las unidades teóricas en curación.</p>
+            )}
             <div className="table-wrap">
               <ResponsiveTable>
                 <thead>
                   <tr>
                     <th>Artículo</th>
                     <th>Físico</th>
-                    <th>En curación</th>
+                    <th>En curación (registrado)</th>
+                    {productionRead && <th>En curación (teórico)</th>}
                     <th>Reservado</th>
                     <th>Disponible</th>
                     <th>Unidad</th>
                   </tr>
                 </thead>
                 <tbody>
+                  {curingProducts.map(([id, product]) => (
+                    <tr key={`curing-${id}`}>
+                      <td>{product.name}<small>Estimación por producto</small></td>
+                      <td>—</td>
+                      <td>—</td>
+                      <td data-sort-value={product.known ? product.total : undefined}>
+                        {product.known ? curingCount.format(product.total) : "Sin estimación"}
+                        {product.known > 0 && product.missing > 0 && <small>Total parcial</small>}
+                      </td>
+                      <td>—</td>
+                      <td>—</td>
+                      <td>ud</td>
+                    </tr>
+                  ))}
                   {balances.map((r: Row) => (
                     <tr key={r.item_kind + r.item_id}>
                       <td>
@@ -401,6 +446,7 @@ export default function Inventory({
                       </td>
                       <td>{Number(r.on_hand)}</td>
                       <td>{Number(r.blocked)}</td>
+                      {productionRead && <td>—</td>}
                       <td>{Number(r.reserved)}</td>
                       <td>
                         <strong>{Number(r.available)}</strong>
@@ -410,7 +456,7 @@ export default function Inventory({
                   ))}
                 </tbody>
               </ResponsiveTable>
-              {!balances.length && (
+              {!balances.length && !curingProducts.length && (
                 <p className="empty">
                   No hay existencias para esta búsqueda. Recibe una compra o
                   registra un ajuste inicial.

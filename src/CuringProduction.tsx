@@ -4,11 +4,17 @@ import { lotCode } from "./BatchTrace";
 import { request } from "./commerce";
 import { today } from "./operations";
 import ResponsiveTable from "./ResponsiveTable";
+import { plannedProductionUnits } from "./formula-model";
 
 type CuringBatch = {
   id: string;
   batch_number: number;
   product_name: string;
+  product_id: string;
+  formula_id: string | null;
+  formula_scale: number;
+  planned_quantity: number | null;
+  theoreticalQuantity: number | null;
   state: string;
   actual_quantity: number | null;
   available_on: string | null;
@@ -16,22 +22,16 @@ type CuringBatch = {
   confirmed: boolean;
 };
 
-const count = new Intl.NumberFormat("es-GT");
+export const curingCount = new Intl.NumberFormat("es-GT", { maximumFractionDigits: 8 });
 
-export default function CuringProduction({
-  company,
-  alerts = false,
-  onProduction,
-}: {
-  company: string;
-  alerts?: boolean;
-  onProduction?: () => void;
-}) {
+export function useCuringProduction(company: string | null, revision = 0) {
   const [batches, setBatches] = useState<CuringBatch[] | null>(null);
   const [error, setError] = useState(false);
   const [date, setDate] = useState(today);
 
   useEffect(() => {
+    if (!company) return;
+    const activeCompany = company;
     let active = true;
     let requestNumber = 0;
     async function refresh() {
@@ -39,11 +39,24 @@ export default function CuringProduction({
       setDate(today());
       try {
         const rows: CuringBatch[] = await request("production_command", {
-          p_company: company,
+          p_company: activeCompany,
           p_action: "list",
         });
+        const curing = rows.filter((row) => row.state === "curing");
+        const needsEstimate = curing.some((row) => row.opening_stock && row.planned_quantity == null && row.formula_id);
+        const formulas: { id: string; estimated_units: number | null }[] = needsEstimate
+          ? await request("formula_command", { p_company: activeCompany, p_action: "list" })
+          : [];
+        const yields = new Map(formulas.map((formula) => [formula.id, formula.estimated_units]));
         if (active && current === requestNumber) {
-          setBatches(rows.filter((row) => row.state === "curing"));
+          setBatches(curing.map((row) => ({
+            ...row,
+            theoreticalQuantity: row.planned_quantity ?? (
+              row.opening_stock && row.formula_id
+                ? plannedProductionUnits(yields.get(row.formula_id), row.formula_scale)
+                : null
+            ),
+          })));
           setError(false);
         }
       } catch {
@@ -59,8 +72,30 @@ export default function CuringProduction({
       window.removeEventListener("focus", refresh);
       window.clearInterval(clock);
     };
-  }, [company]);
+  }, [company, revision]);
+  return { batches, error, date };
+}
 
+export default function CuringProduction({
+  company,
+  onProduction,
+}: {
+  company: string;
+  onProduction: () => void;
+}) {
+  const state = useCuringProduction(company);
+  return <CuringProductionTable state={state} alerts onProduction={onProduction} />;
+}
+
+export function CuringProductionTable({
+  state: { batches, error, date },
+  alerts = false,
+  onProduction,
+}: {
+  state: ReturnType<typeof useCuringProduction>;
+  alerts?: boolean;
+  onProduction?: () => void;
+}) {
   const rows = (batches ?? []).filter(
     (batch) => !alerts || (batch.available_on && batch.available_on <= date),
   );
@@ -80,7 +115,8 @@ export default function CuringProduction({
               <tr>
                 <th>Producto</th>
                 <th>Lote</th>
-                <th>Unidades</th>
+                <th>Unidades teóricas</th>
+                <th>Unidades registradas</th>
                 <th>Disponibilidad</th>
                 <th>Estado</th>
               </tr>
@@ -93,8 +129,11 @@ export default function CuringProduction({
                   <tr key={batch.id}>
                     <td>{batch.product_name}</td>
                     <td data-sort-value={batch.batch_number}>{lotCode(batch.batch_number)}</td>
+                    <td data-sort-value={batch.theoreticalQuantity ?? undefined}>
+                      {batch.theoreticalQuantity == null ? "Sin estimación" : curingCount.format(batch.theoreticalQuantity)}
+                    </td>
                     <td data-sort-value={batch.actual_quantity ?? undefined}>
-                      {pendingWeight ? "Pendiente de pesaje" : batch.actual_quantity == null ? "—" : count.format(batch.actual_quantity)}
+                      {pendingWeight ? "Pendiente de pesaje" : batch.actual_quantity == null ? "—" : curingCount.format(batch.actual_quantity)}
                     </td>
                     <td>{batch.available_on ?? "—"}</td>
                     <td>

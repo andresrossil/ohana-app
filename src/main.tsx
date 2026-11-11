@@ -920,7 +920,6 @@ function App() {
                   <CuringProduction
                     key={company}
                     company={company}
-                    alerts
                     onProduction={async () => {
                       if (await leaveSheet()) setSection("production");
                     }}
