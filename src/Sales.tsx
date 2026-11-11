@@ -1,3 +1,4 @@
+import { saleDiscountAmount } from "./sale-form-model";
 import { useEffect, useState } from "react";
 import { confirmAction } from "./ConfirmDialog";
 import ResponsiveTable from "./ResponsiveTable";
@@ -106,7 +107,7 @@ export default function Sales({company,customersOnly=false,currency="GTQ"}:{comp
                     </td>
                     <td>
                       {money(o.total, o.currency)}
-                      <small>Descuento: {money(o.discount, o.currency)}</small>
+                      <small>Descuento: {money(saleDiscountAmount(o), o.currency)}</small>
                       <small>Envío: {money(o.shipping, o.currency)}</small>
                     </td>
                     <td data-sort-value={invoiceBalance(o)}>
