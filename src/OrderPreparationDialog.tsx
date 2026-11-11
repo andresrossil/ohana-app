@@ -24,8 +24,7 @@ export default function OrderPreparationDialog({company,orderId,onClose,onSaved}
  });
  return <div className="overlay"><section className="modal operations-dialog order-preparation" role="dialog" aria-modal="true" aria-label="Ver factura" data-navigation-dirty={reverting&&reason!==""}><header className="hierarchy-toolbar"><h2>Factura · #{data?.order.number||"…"}</h2><div className="actions">
  {data&&<AppButton iconKey="action.print" disabled={state.busy} onClick={()=>{
-  const status=data.order.status==="cancelled"?"Cancelado":data.order.status==="expired"?"Vencido":fulfillmentLabels[stage];
-  if(!openSaleDocument(data,status))state.setError("Permite las ventanas emergentes para abrir la vista de impresión.");
+  if(!openSaleDocument(data))state.setError("Permite las ventanas emergentes para abrir la vista de impresión.");
  }}>Imprimir</AppButton>}
  <AppButton className="secondary" disabled={state.busy} onClick={close}>Cerrar</AppButton></div></header>
  {state.error&&<p className="error"><AppIcon name="status.error"/>{state.error}</p>}

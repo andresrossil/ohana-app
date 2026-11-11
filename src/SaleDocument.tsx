@@ -15,7 +15,7 @@ const documentDate = new Intl.DateTimeFormat("es-GT", {
   year: "numeric",
 });
 
-export function openSaleDocument(data: Row, status: string) {
+export function openSaleDocument(data: Row) {
   const preview = window.open("", "_blank");
   if (!preview) return false;
   preview.opener = null;
@@ -31,12 +31,12 @@ export function openSaleDocument(data: Row, status: string) {
   const container = doc.createElement("div");
   doc.body.replaceChildren(container);
   const root = createRoot(container);
-  root.render(<SaleDocument data={data} status={status} onPrint={() => preview.print()} />);
+  root.render(<SaleDocument data={data} onPrint={() => preview.print()} />);
   preview.addEventListener("pagehide", () => root.unmount(), { once: true });
   return true;
 }
 
-function SaleDocument({ data, status, onPrint }: { data: Row; status: string; onPrint: () => void }) {
+function SaleDocument({ data, onPrint }: { data: Row; onPrint: () => void }) {
   const { order, document_brand: brand } = data;
   const delivery = data.delivery ?? {};
   const customer = order.customer_snapshot ?? {};
@@ -55,7 +55,8 @@ function SaleDocument({ data, status, onPrint }: { data: Row; status: string; on
     return () => { active = false; };
   }, [brand?.logo_path]);
 
-  const isDraft = order.fulfillment_stage === "draft" && order.status === "pending";
+  const isDraft = order.fulfillment_stage === "draft";
+  const closed = order.status === "cancelled" || order.status === "expired";
   const currency = order.currency;
   const subtotal = roundMoney(lines.reduce((sum, line) => sum + saleLineTotals(line).gross, 0));
   const discount = saleDiscountAmount({ ...order, lines });
@@ -71,16 +72,16 @@ function SaleDocument({ data, status, onPrint }: { data: Row; status: string; on
         <button type="button" disabled={loadingLogo} onClick={onPrint}><Printer size={16} aria-hidden="true" /> Imprimir / guardar PDF</button>
       </div>
       <article className="document">
-        <div className="document-brand">
-          {logo ? (
-            <img src={logo} alt={brand?.name ?? "Logo de empresa"} onLoad={() => setLoadingLogo(false)}
-              onError={() => { setLogo(""); setLoadingLogo(false); }} />
-          ) : <p>{brand?.name ?? ""}</p>}
-        </div>
-        <div className="document-heading">
-          <div><h1>Resumen de pedido</h1><span className="document-state">{status}</span></div>
+        <header className="document-heading">
+          <div className="document-brand">
+            {logo ? (
+              <img src={logo} alt={brand?.name ?? "Logo de empresa"} onLoad={() => setLoadingLogo(false)}
+                onError={() => { setLogo(""); setLoadingLogo(false); }} />
+            ) : <p>{brand?.name ?? ""}</p>}
+          </div>
+          <div className="document-title"><h1>Resumen de pedido</h1><span className="document-state">{isDraft ? "Borrador" : "Factura"}</span></div>
           <div className="document-number"><strong>No. {String(order.number).padStart(6, "0")}</strong><br />Fecha: {documentDate.format(new Date(order.created_at))}</div>
-        </div>
+        </header>
 
         <div className="document-pair">
           <section className="document-card">
@@ -123,10 +124,12 @@ function SaleDocument({ data, status, onPrint }: { data: Row; status: string; on
             <div><dt>Subtotal sin descuentos</dt><dd>{money(subtotal, currency)}</dd></div>
             <div className="document-discount"><dt>Descuento total</dt><dd>{discount > 0 ? "− " : ""}{money(discount, currency)}</dd></div>
             <div><dt>Envío</dt><dd>{money(order.shipping, currency)}</dd></div>
-            <div className="document-total"><dt>Total a pagar</dt><dd>{money(order.total, currency)}</dd></div>
+            <div className="document-total"><dt>{closed ? "Total del documento" : "Total a pagar"}</dt><dd>{money(order.total, currency)}</dd></div>
           </dl>
         </div>
-        {isDraft && <p className="document-note">Este documento es un resumen de pedido pendiente de confirmación.</p>}
+        {closed ? (
+          <p className="document-note">{order.status === "cancelled" ? "Pedido cancelado." : "Pedido vencido."}</p>
+        ) : isDraft && <p className="document-note">Este documento es un resumen de pedido pendiente de confirmación.</p>}
       </article>
     </>
   );

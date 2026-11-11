@@ -1,24 +1,24 @@
-:root { color-scheme: light; font-family: Arial, sans-serif; color: #372319; background: #eee5de; }
+:root { color-scheme: light; font-family: Arial, sans-serif; color: #372319; background: white; }
 * { box-sizing: border-box; }
 body { margin: 0; }
 .print-controls { display: flex; justify-content: center; padding: 16px; }
 .print-controls button { display: flex; align-items: center; gap: 8px; padding: 10px 16px; border: 0; border-radius: 8px; background: #735047; color: white; font: inherit; cursor: pointer; }
 .print-controls button:disabled { opacity: .5; cursor: wait; }
-.document { --paper: #fcf8f5; --line: #e7d7cb; --sand: #f0e3d8; margin: 0 auto 24px; padding: 10mm; width: min(100%, 210mm); background: var(--paper); border-bottom: 6px solid var(--sand); font-size: 11pt; }
-.document-brand { min-height: 23mm; display: flex; align-items: center; padding-bottom: 4mm; margin-bottom: 5mm; border-bottom: 4px solid var(--sand); border-radius: 0 0 50% 8%; }
-.document-brand img { display: block; width: auto; height: auto; max-width: min(75mm, 100%); max-height: 25mm; object-fit: contain; }
-.document-brand p { margin: 0; font: 30pt Georgia, serif; letter-spacing: .06em; }
-.document-heading, .document-heading > div:first-child { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.document-heading { justify-content: space-between; margin: 0 0 6mm; }
-.document h1 { margin: 0; font-size: 18pt; text-transform: uppercase; }
+.document { --paper: #fcf8f5; --line: #e7d7cb; --sand: #f0e3d8; margin: 0 auto 24px; padding: 10mm; width: min(100%, 210mm); font-size: 11pt; }
+.document-heading { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 3.2fr) auto; align-items: center; gap: 4mm; margin: 0 0 7mm; }
+.document-brand { min-width: 0; }
+.document-brand img { display: block; width: auto; height: auto; max-width: 100%; max-height: 27mm; object-fit: contain; }
+.document-brand p { margin: 0; font: 17pt Georgia, serif; overflow-wrap: anywhere; }
+.document-title { display: flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap; }
+.document h1 { margin: 0; font-size: 15pt; text-transform: uppercase; }
 .document-state { background: #e9d8c9; border-radius: 99px; padding: 4px 12px; font-weight: 700; }
 .document-number { border-left: 1px solid #a88c78; padding-left: 4mm; line-height: 1.5; }
 .document-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5mm; margin-bottom: 5mm; break-inside: avoid; }
-.document-card { border: 1px solid var(--line); border-radius: 12px; padding: 3.5mm 4mm; overflow-wrap: anywhere; }
+.document-card { border: 1px solid var(--line); border-radius: 12px; padding: 3.5mm 4mm; overflow-wrap: anywhere; background: var(--paper); }
 .document-card h2 { font-size: 12pt; display: flex; align-items: center; gap: 8px; margin: 0 0 2mm; }
 .document-card p { margin: 0; line-height: 1.45; white-space: pre-line; }
 .document-card svg { width: 16px; height: 16px; vertical-align: text-bottom; color: #886951; }
-.document table { width: 100%; table-layout: fixed; border: 1px solid var(--line); border-spacing: 0; border-radius: 10px; color: #30231b; }
+.document table { width: 100%; table-layout: fixed; border: 1px solid var(--line); border-spacing: 0; border-radius: 10px; color: #30231b; background: var(--paper); }
 .document th, .document td { padding: 2.6mm 2mm; text-align: right; overflow-wrap: anywhere; vertical-align: top; }
 .document th { background: var(--sand); }
 .document th:first-child, .document td:first-child { width: 29%; text-align: left; }
@@ -36,6 +36,10 @@ body { margin: 0; }
 .document-note { margin: 7mm 0 0; font-style: italic; text-align: center; break-inside: avoid; }
 @media screen and (max-width: 560px) {
   .document { padding: 14px; font-size: 9pt; }
+  .document-heading { grid-template-columns: minmax(0, 1fr) auto; gap: 10px; }
+  .document-title { grid-column: 1 / -1; grid-row: 2; justify-content: start; }
+  .document-brand img { max-width: min(100%, 135px); }
+  .document h1 { font-size: 13pt; }
   .document-pair { gap: 10px; }
   .document th, .document td { padding: 6px 3px; }
   .document-totals .document-total { font-size: 10pt; }
