@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { quoteDelivery, restoreShippingChoice, syncShippingCost } from "../src/delivery-address.ts";
 import { distributeSaleDiscount, saleDiscountAmount, saleLineTotals, saleTotals } from "../src/sale-form-model.ts";
 
 test("line discounts drive the invoice amount, percentage and total with shipping", () => {
@@ -30,4 +31,17 @@ test("opening a legacy invoice combines its discounts without changing its total
   assert.deepEqual(converted.map((line) => saleLineTotals(line).discount), [50, 20]);
   assert.equal(saleTotals(converted, {}).total, 50);
   assert.equal(saleDiscountAmount({ discount: 15, lines }), 70);
+});
+test("free shipping preserves the courier cost and can be toggled after reopening", () => {
+  const delivery = restoreShippingChoice({ kind: "courier", payer: "ohana", shipping_cost: 30, shipping_charged: 0, courier_id: "courier", destination: "15" });
+  assert.equal(delivery.free_shipping, true);
+  const quoted = quoteDelivery(delivery, {
+    couriers: [{ id: "courier", mode: "zone" }],
+    tariffs: [{ courier_id: "courier", mode: "zone", destination: "15", available: true, amount: 35 }],
+  });
+  assert.equal(quoted.shipping_cost, 35);
+  assert.equal(quoted.single_shipping_cost, false);
+  assert.equal(saleTotals([{ quantity: 1, unit_price: 100 }], quoted).total, 100);
+  const charged = syncShippingCost({ ...quoted, free_shipping: false });
+  assert.equal(saleTotals([{ quantity: 1, unit_price: 100 }], charged).total, 135);
 });

@@ -8,8 +8,16 @@ export function deliveryZoneLabel(value: unknown) {
 }
 
 export function syncShippingCost(value: Row): Row {
-  return { ...value, single_shipping_cost: true,
-    shipping_charged: value.payer === "customer" || value.kind === "pickup" ? "0" : value.shipping_cost ?? "" };
+  return { ...value, single_shipping_cost: !value.free_shipping,
+    shipping_charged: value.free_shipping || value.payer === "customer" || value.kind === "pickup" ? "0" : value.shipping_cost ?? "" };
+}
+
+export function restoreShippingChoice(value: Row): Row {
+  return {
+    ...value,
+    free_shipping: value.kind !== "pickup" && value.payer !== "customer" &&
+      value.shipping_charged != null && Number(value.shipping_charged) === 0,
+  };
 }
 
 export function deliveryTariff(value: Row, options: Row): Row | undefined {

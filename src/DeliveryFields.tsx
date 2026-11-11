@@ -15,7 +15,7 @@ export default function DeliveryFields({value,options,onChange,currency="GTQ",cu
     if(key==="kind" && v!=="courier") {next.courier_id="";next.destination="";next.shipping_cost="0";}
     if(key==="kind" && v==="pickup"){next.shipping_charged="0";next.payer="ohana";}
     if(key==="payer" && v==="customer")next.shipping_charged="0";
-    if(key==="shipping_cost" || key==="payer" || key==="kind")Object.assign(next,syncShippingCost(next));
+    if(key==="shipping_cost" || key==="payer" || key==="kind" || key==="free_shipping")Object.assign(next,syncShippingCost(next));
     if(key==="courier_id") Object.assign(next,applyCourierChoice(value,v,options));
     onChange(next);
   }
@@ -28,7 +28,16 @@ export default function DeliveryFields({value,options,onChange,currency="GTQ",cu
     {value.kind!=="pickup"&&<>
       {(addresses.length>0||value.address_label)&&<label className="form-wide">Dirección del cliente<SearchSelect value={value.address_id||""} onChange={e=>{const a=addresses.find((a:Row)=>a.id===e.target.value);if(a)onChange(applyDeliveryAddress(value,a,options));else onChange({...value,address_id:"",address_label:""});}}><option value="">Usar una dirección guardada</option>{value.address_id&&value.address_label&&!addresses.some((a:Row)=>a.id===value.address_id)&&<option value={value.address_id}>{value.address_label} · Histórica</option>}{addresses.map((a:Row)=><option key={a.id} value={a.id}>{a.label}</option>)}</SearchSelect></label>}
       <label className="form-wide">Dirección completa<AutoTextarea required value={value.address||""} maxLength={2000} onChange={e=>change("address",e.target.value)}/></label>
-      <label>Costo de envío<MoneyInput currency={currency} required min="0" value={value.shipping_cost??""} onChange={e=>change("shipping_cost",e.target.value)}/><small>{value.shipping_cost===""?"Sin tarifa disponible. Ingresa el costo manualmente.":"Sugerido según la mensajería y la dirección. Puedes editarlo."}</small></label>
+      <div className="form-wide delivery-shipping-choice">
+        <label>Costo de envío<MoneyInput currency={currency} required min="0" value={value.shipping_cost??""} onChange={e=>change("shipping_cost",e.target.value)}/></label>
+        <label className="delivery-free-shipping">
+          <input type="checkbox" checked={!!value.free_shipping} onChange={e=>change("free_shipping",e.target.checked)} />
+          Envío gratis
+        </label>
+        <small>{value.free_shipping
+          ? "El cliente no paga el envío. El costo se conserva para la liquidación."
+          : value.shipping_cost==="" ? "Sin tarifa disponible. Ingresa el costo manualmente." : "Sugerido según la mensajería y la dirección. Puedes editarlo."}</small>
+      </div>
       <label>Guía de envío · automática<input readOnly value={value.guide||""} placeholder="SIGLAS-DDMMAA-CLIENTE"/><small>Se genera al guardar, con la fecha del pedido y el código del cliente.</small></label>
     </>}
     <label>Estado de entrega<SearchSelect value={value.status||"pending"} onChange={e=>change("status",e.target.value)}>{Object.entries(deliveryStatus).map(([key,label])=><option key={key} value={key}>{label}</option>)}</SearchSelect></label>
