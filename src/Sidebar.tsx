@@ -26,6 +26,14 @@ export const sections = [
   ["settings", "Configuración", "☷"],
 ] as const;
 export type Section = (typeof sections)[number][0];
+const categories: { id: string; label: string; icon: Section; items: Section[] }[] = [
+  { id: "sales", label: "Ventas", icon: "sales", items: ["sales", "order-preparation", "settlements", "prices"] },
+  { id: "inventory", label: "Inventario y producción", icon: "inventory", items: ["materials", "products", "formulas", "production", "inventory"] },
+  { id: "purchases", label: "Compras y gastos", icon: "purchases", items: ["purchases", "expenses"] },
+  { id: "partners", label: "Socios de negocio", icon: "customers", items: ["customers", "suppliers", "couriers"] },
+];
+const sectionLabels = new Map<Section, string>(sections.map(([key, label]) => [key, label]));
+
 export default function Sidebar({
   section,
   onNavigate,
@@ -54,9 +62,16 @@ export default function Sidebar({
   const [open, setOpen] = useState(false),
     [collapsed, setCollapsed] = useState(false),
     [profile, setProfile] = useState({ name: "", photo: "" });
+  const activeCategory = categories.find(({ items }) => items.includes(section))?.id;
+  const [expanded, setExpanded] = useState(() => new Set(activeCategory ? [activeCategory] : []));
   const drawer = useRef<HTMLElement>(null),
     toggle = useRef<HTMLButtonElement>(null);
   useEffect(() => setOpen(false), [section, company]);
+  useEffect(() => {
+    if (activeCategory) setExpanded((previous) => previous.has(activeCategory)
+      ? previous
+      : new Set(previous).add(activeCategory));
+  }, [section, activeCategory]);
   useEffect(() => {
     const shell = document.querySelector(".shell");
     shell?.classList.toggle("chrome-collapsed", collapsed);
@@ -116,6 +131,21 @@ export default function Sidebar({
     };
   }, [open]);
   const activeCompany = companies.find((c) => c.id === company);
+  const canShow = (key: Section) => !allowedSections || allowedSections.includes(key);
+  const navigationButton = (key: Section) => (
+    <button
+      key={key}
+      type="button"
+      className={section === key ? "selected" : ""}
+      aria-current={section === key ? "page" : undefined}
+      onClick={() => {
+        if (onNavigate(key)) setOpen(false);
+      }}
+    >
+      <span aria-hidden="true"><NavIcon name={key} /></span>
+      {sectionLabels.get(key)}
+    </button>
+  );
 
   return (
     <>
@@ -268,26 +298,39 @@ export default function Sidebar({
               )}
             </SearchSelect>
           </div>
-          <nav aria-label="Navegación principal">
-            {sections
-              .filter(
-                ([key]) => !allowedSections || allowedSections.includes(key),
-              )
-              .map(([key, label, icon]) => (
+          <nav className="sidebar-navigation" aria-label="Navegación principal">
+            {canShow("dashboard") && navigationButton("dashboard")}
+            {categories.map(({ id, label, icon, items }) => {
+              const visible = items.filter(canShow);
+              if (!visible.length) return null;
+              const isExpanded = expanded.has(id);
+              const contentId = `ohana-nav-${id}`;
+              return <div className="sidebar-category" key={id}>
                 <button
-                  key={key}
-                  className={section === key ? "selected" : ""}
-                  aria-current={section === key ? "page" : undefined}
-                  onClick={() => {
-                    if (onNavigate(key)) setOpen(false);
-                  }}
+                  type="button"
+                  className={activeCategory === id && !isExpanded ? "sidebar-category-toggle selected" : "sidebar-category-toggle"}
+                  aria-expanded={isExpanded}
+                  aria-controls={contentId}
+                  onClick={() => setExpanded((previous) => {
+                    const next = new Set(previous);
+                    if (next.has(id)) next.delete(id);
+                    else next.add(id);
+                    return next;
+                  })}
                 >
-                  <span aria-hidden="true">
-                    <NavIcon name={key} />
-                  </span>
+                  <span aria-hidden="true"><NavIcon name={icon} /></span>
                   {label}
+                  <span className="sidebar-category-arrow" aria-hidden="true">
+                    <AppIcon name={isExpanded ? "action.collapse" : "action.expand"} />
+                  </span>
                 </button>
-              ))}
+                <div className="sidebar-category-items" id={contentId} hidden={!isExpanded}>
+                  {visible.map(navigationButton)}
+                </div>
+              </div>;
+            })}
+            {canShow("reports") && navigationButton("reports")}
+            {canShow("settings") && navigationButton("settings")}
           </nav>
           <div className="aside-bottom">
             <p>

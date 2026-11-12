@@ -121,6 +121,36 @@
 .shell.chrome-shell .app-sidebar .sidebar-content {
   display: block;
 }
+.shell.chrome-shell .app-sidebar .sidebar-navigation {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.shell.chrome-shell .sidebar-navigation button {
+  width: 100%;
+  min-height: 36px;
+  padding: 6px 9px;
+  gap: 8px;
+  white-space: normal;
+  text-align: start;
+}
+.shell.chrome-shell .sidebar-navigation button span {
+  flex-shrink: 0;
+}
+.shell.chrome-shell .sidebar-navigation .sidebar-category-toggle {
+  font-weight: 650;
+}
+.shell.chrome-shell .sidebar-navigation .sidebar-category-arrow {
+  margin-inline-start: auto;
+}
+.shell.chrome-shell .sidebar-category-items:not([hidden]) {
+  display: grid;
+  gap: 2px;
+  padding-inline-start: 10px;
+}
+@media (pointer: coarse) {
+  .shell.chrome-shell .sidebar-navigation button { min-height: 44px; }
+}
 .shell.chrome-shell .sidebar-top {
   display: flex;
   align-items: center;
