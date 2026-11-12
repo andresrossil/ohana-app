@@ -54,6 +54,7 @@ const Production = lazy(() => import("./Production"));
 const BusinessPartners = lazy(() => import("./BusinessPartners"));
 const Couriers = lazy(() => import("./Couriers"));
 const Sales = lazy(() => import("./Sales"));
+const OrderPreparation = lazy(() => import("./OrderPreparation"));
 const PublicStore = lazy(() => import("./PublicStore"));
 const AdditionalCostSettings = lazy(() => import("./AdditionalCostSettings"));
 const PriceLists = lazy(() => import("./PriceLists"));
@@ -633,7 +634,7 @@ function App() {
             ...(activeCompany?.production_read
               ? ["formulas", "production"]
               : []),
-            ...(activeCompany?.sales_read ? ["sales"] : []),
+            ...(activeCompany?.sales_read ? ["sales", "order-preparation"] : []),
             ...(activeCompany?.manage || activeCompany?.sales_read
               ? ["customers"]
               : []),
@@ -1018,6 +1019,7 @@ function App() {
                   currency={activeCompany?.currency}
                 />
               )}
+              {section === "order-preparation" && <OrderPreparation key={company} company={company} />}
               {(section === "customers" || section === "suppliers") && (
                 <BusinessPartners
                   key={company + section}
@@ -1042,6 +1044,7 @@ function App() {
                 "formulas",
                 "production",
                 "sales",
+                "order-preparation",
                 "customers",
                 "suppliers",
                 "couriers",

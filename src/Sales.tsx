@@ -1,200 +1,172 @@
-import { saleDiscountAmount } from "./sale-form-model";
 import { useEffect, useState } from "react";
+import { AppButton } from "./AppIcon";
 import { confirmAction } from "./ConfirmDialog";
-import ResponsiveTable from "./ResponsiveTable";
-import { SaleUnits } from "./PhysicalUnits";
-import { SearchField } from "./PoolControls";
-import { AppButton, AppIcon } from "./AppIcon";
-import { request, sales } from "./commerce";
-import { openSaleDocument } from "./SaleDocument";
+import { salesTodayRange, salesWorklist } from "./commerce";
 import { keyedRequest, money, useOperation, type Row } from "./operations";
 import OrderDeliveryDialog from "./OrderDeliveryDialog";
-import SaleEditor from "./SaleEditor";
 import OrderPreparationDialog, { fulfillmentLabels } from "./OrderPreparationDialog";
-import { deliveryStatus } from "./delivery-model";
+import ResponsiveTable from "./ResponsiveTable";
+import SaleEditor from "./SaleEditor";
+import SearchSelect from "./SearchSelect";
+import { openSaleDocument } from "./SaleDocument";
+import { paymentMethods } from "./payment-methods";
 import "./couriers.css";
-export default function Sales({company,customersOnly=false,currency="GTQ"}:{company:string;customersOnly?:boolean;currency?:string}) {
- const state=useOperation(company,"sales");
- const [data,setData]=useState<Row>({orders:[],customers:[],variants:[]}),[mode,setMode]=useState<string|null>(null),[order,setOrder]=useState<Row|null>(null),[query,setQuery]=useState(""),[managedOrder,setManagedOrder]=useState<string|null>(null),[editor,setEditor]=useState<Row|null|undefined>(),[preparing,setPreparing]=useState<string|null>(null);
- const load=async()=>setData(await sales(company));
- useEffect(()=>{void state.run(load);},[company]);
- const statusNames:Row={pending:"Pendiente",dispatched:"Entregado",cancelled:"Cancelado",expired:"Vencido"};
- const orderStage=(o:Row)=>["cancelled","expired"].includes(o.status)?statusNames[o.status]:o.settled?"Ruta liquidada":o.status==="dispatched"&&o.fulfillment_stage==="invoiced"?"Entregado":fulfillmentLabels[o.fulfillment_stage||"invoiced"];
- const invoiceBalance=(o:Row)=>["cancelled","expired"].includes(o.status)?0:o.payment_summary?.balance??(o.payment_summary?.paid!=null?Math.max(0,Number(o.total)-Number(o.payment_summary.paid)):null);
- const orders=data.orders.filter((o:Row)=>[o.number,o.customer_snapshot.name,o.customer_snapshot.phone,orderStage(o)].join(" ").toLowerCase().includes(query.toLowerCase()));
- return <>
-  <section className="intro"><div><p className="eyebrow">CADA PEDIDO, EN SU EMPRESA</p><h1>{customersOnly?"Clientes":"Ventas y pedidos"}</h1><p>Pedidos, facturas, entregas y pagos de tu empresa.</p></div><div className="actions">{state.canWrite&&!customersOnly&&<AppButton onClick={()=>setEditor(null)}>Ingresar factura</AppButton>}<AppButton className="secondary" disabled={state.busy} onClick={()=>state.run(load)}>Actualizar</AppButton></div></section>
-  {state.error&&!mode&&<p className="error" role="alert"><AppIcon name="status.error"/>{state.error}</p>}{state.notice&&<p role="status">{state.notice}</p>}
-  {editor!==undefined&&<SaleEditor company={company} orderId={editor?.id} currency={editor?.currency||currency} onClose={()=>setEditor(undefined)} onSaved={load}/>}
-  {mode&&order&&<div className="overlay"><section className="modal operations-dialog" role="dialog" aria-modal="true" aria-label="Confirmar operación de venta"><h2>{mode==="dispatch"?"Entregar pedido":"Cancelar pedido"}</h2>{state.error&&<p className="error">{state.error}</p>}<p>Pedido #{order.number} · {order.customer_snapshot.name} · {money(order.total,order.currency)}</p><form onSubmit={e=>{e.preventDefault();const f=new FormData(e.currentTarget);void state.run(async()=>{await keyedRequest(company,"sales",{order:order.id,...(mode==="cancel"?{reason:f.get("reason")}:{})},mode);setMode(null);await load();});}}>
-   <p>El saldo del documento quedará en cero. Si el inventario ya salió, se devolverá; si no, se liberarán las reservas. Los pagos y saldos aplicados deben revertirse antes de cancelar.</p>{mode==="cancel"&&<label>Motivo de cancelación<input name="reason" required minLength={5} maxLength={500}/></label>}<label><input type="checkbox" required/> Confirmo esta operación</label><div className="form-actions"><AppButton disabled={state.busy}>Confirmar</AppButton><AppButton type="button" className="secondary" disabled={state.busy} onClick={()=>setMode(null)}>Volver</AppButton></div>
-  </form></section></div>}
-      <section className="catalog">
-        <div className="toolbar">
-          <h2>{customersOnly ? "Contactos" : "Pedidos recientes"}</h2>
-          {!customersOnly && (
-            <SearchField
-              aria-label="Buscar pedido"
-              placeholder="Pedido, nombre, teléfono o estado"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-            />
-          )}
-        </div>
-        <div className="table-wrap">
-          {customersOnly ? (
-            <ResponsiveTable>
-              <thead>
-                <tr>
-                  <th>Nombre</th>
-                  <th>Teléfono</th>
-                  <th>Correo</th>
-                  <th>Dirección</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.customers.map((c: Row) => (
-                  <tr key={c.id}>
-                    <td>{c.name}</td>
-                    <td>{c.phone}</td>
-                    <td>{c.email || "—"}</td>
-                    <td>{c.address || "—"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </ResponsiveTable>
-          ) : (
-            <ResponsiveTable>
-              <thead>
-                <tr>
-                  <th>Pedido</th>
-                  <th>Cliente</th>
-                  <th>Artículos vendidos</th>
-                  <th>Total</th>
-                  <th>Saldo de factura</th>
-                  <th>Entrega / pago</th>
-                  <th>Estado</th>
-                  <th>Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {orders.map((o: Row) => (
-                  <tr key={o.id}>
-                    <td>
-                      #{o.number}
-                      <small>
-                        {new Date(o.created_at).toLocaleString("es-GT")}
-                      </small>
-                    </td>
-                    <td>
-                      {o.customer_snapshot.name}
-                      <small>{o.customer_snapshot.phone}</small>
-                      <small>{o.customer_snapshot.email}</small>
-                      <small>{o.customer_snapshot.address}</small>
-                    </td>
-                    <td>
-                      {o.lines?.map((l: Row) => (
-                        <div key={l.id} className="sale-line">
-                          {l.quantity} × {l.description} ·{" "}
-                          {money(l.unit_price, o.currency)} / ud
-                          {l.is_gift && <strong className="sale-gift-label"> · Regalo</strong>}
-                          <SaleUnits units={l.physical_units || []} />
-                        </div>
-                      ))}
-                      {o.gift && <small>Regalo: {o.gift}</small>}
-                      {o.gift_message && (
-                        <small>Mensaje: {o.gift_message}</small>
-                      )}
-                    </td>
-                    <td>
-                      {money(o.total, o.currency)}
-                      <small>Descuento: {money(saleDiscountAmount(o), o.currency)}</small>
-                      <small>Envío: {money(o.shipping, o.currency)}</small>
-                    </td>
-                    <td data-sort-value={invoiceBalance(o)}>
-                      <strong className={Number(invoiceBalance(o))>0?"balance-debt":"balance-zero"}>{money(invoiceBalance(o),o.currency)}</strong>
-                      {Number(o.payment_summary?.excess)>0&&<small className="balance-credit">A favor disponible: {money(o.payment_summary.excess,o.currency)}</small>}
-                    </td>
-                    <td>
-                      {o.delivery_info?.courier_snapshot?.name || (o.delivery === "delivery" ? "Domicilio" : "Retiro")}
-                      {o.delivery_info&&<small>{deliveryStatus[o.delivery_info.status]} · Costo real: {money(o.delivery_info.shipping_cost,o.currency)}{o.delivery_info.payer==="customer"?" · Pagado directamente al transportista":""}</small>}
-                      <small>
-                        {
-                          {
-                            cash: "Efectivo",
-                            transfer: "Transferencia",
-                            cod: "Contra entrega",
-                          }[o.payment as string]
-                        }
-                      </small>
-                      <small>
-                        {o.paid_at ? "Pagado por el cliente" : o.payment==="cash"&&!o.settled ? "Efectivo pendiente de liquidación de ruta" : "Pendiente de pago"}
-                      </small>
-                      {o.payment_summary&&<small>En mensajero, pendiente de liquidar: {money(o.payment_summary.courier_pending,o.currency)}</small>}
-                      {Number(o.payment_summary?.pending_confirmation)>0&&<small>Transferencia por confirmar: {money(o.payment_summary.pending_confirmation,o.currency)}</small>}{o.refund_pending && (
-                        <small className="error">Reembolso pendiente</small>
-                      )}
-                    </td>
-                    <td>
-                      <AppIcon
-                        name={
-                          o.status === "dispatched"
-                            ? "status.success"
-                            : o.status === "pending"
-                              ? "status.pending"
-                              : "status.info"
-                        }
-                      />
-                      {orderStage(o)}
-                      {o.status === "pending" && o.fulfillment_stage==="invoiced" && (
-                        <small>
-                          Vence:{" "}
-                          {new Date(o.expires_at).toLocaleString("es-GT")}
-                        </small>
-                      )}
-                    </td>
-                    <td className="actions"><AppButton className="secondary" iconKey="action.expand" onClick={()=>setPreparing(o.id)}>Ver factura</AppButton><AppButton className="secondary" iconKey="action.print" onClick={()=>{
-                      if(!openSaleDocument(()=>request("sales_fulfillment",{p_company:company,p_action:"detail",p_data:{order:o.id}})))
-                        state.setError("Permite las ventanas emergentes para abrir la vista de impresión.");
-                    }}>Imprimir</AppButton>{state.canWrite&&!["cancelled","expired"].includes(o.status)&&!o.settled&&o.status==="pending"&&["draft","invoiced"].includes(o.fulfillment_stage)&&<AppButton className="secondary" onClick={()=>setEditor(o)}>Editar factura</AppButton>}{o.settled&&<small>Liquidada por mensajería</small>}
-                      {o.fulfillment_stage!=="draft"&&<AppButton className="secondary" onClick={()=>setManagedOrder(o.id)}>{invoiceBalance(o)!==null&&Number(invoiceBalance(o))>0?"Pagar factura":"Ver pagos"}</AppButton>}
-                      {state.canWrite && ["pending","dispatched"].includes(o.status) && !o.settled && (
-                        <>
-                          {o.status==="pending"&&o.fulfillment_stage==="draft"&&<AppButton iconKey="action.confirm" disabled={state.busy} onClick={()=>state.run(async()=>{
-                            if(!(await confirmAction("¿El cliente confirmó el pedido? Se reservarán las unidades disponibles para esta factura.",{title:"Confirmación del cliente",confirmText:"Confirmar pedido"})))return;
-                            await keyedRequest(company,"sales_fulfillment",{order:o.id,expected_stage:"draft",expected_revision:o.revision},"confirm_customer");
-                            await load();
-                          })}>Confirmación del cliente</AppButton>}
-                          {(o.status==="pending"&&o.fulfillment_stage==="invoiced")&&<AppButton iconKey="action.edit" disabled={state.busy} onClick={()=>setPreparing(o.id)}>{o.fulfillment_stage==="preparing"?"Ver preparación":o.fulfillment_stage==="finished"?"Ver pedido terminado":"Preparar pedido"}</AppButton>}
-                          {["preparing","finished"].includes(o.fulfillment_stage)&&<AppButton iconKey="action.confirm" disabled={state.busy} onClick={()=>state.run(async()=>{
-                            const action=o.fulfillment_stage==="preparing"?"finish":"handoff";
-                            if(!(await confirmAction(action==="finish"?"¿Confirmas que el pedido está terminado? Se descontarán las existencias de sus productos.":"¿Confirmas la entrega al mensajero o cliente? El inventario ya se descontó al terminar el pedido.")))return;
-                            await keyedRequest(company,"sales_fulfillment",{order:o.id,expected_stage:o.fulfillment_stage},action);await load();
-                          })}>{o.fulfillment_stage==="preparing"?"Pedido terminado":o.delivery_info?.kind==="courier"?"Entregado a mensajería":"Entregar al cliente"}</AppButton>}
-                          <AppButton
-                            className="secondary"
-                            onClick={() => {
-                              setOrder(o);
-                              setMode("cancel");
-                            }}
-                          >
-                            Cancelar pedido
-                          </AppButton>
-                        </>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </ResponsiveTable>
-          )}
-          {!(customersOnly ? data.customers : orders).length && (
-            <p className="empty">Todavía no hay registros.</p>
-          )}
-        </div>
-      </section>
+import "./sales-worklist.css";
 
-  {preparing&&<OrderPreparationDialog company={company} orderId={preparing} onClose={()=>setPreparing(null)} onSaved={load}/>}
-  {managedOrder&&<OrderDeliveryDialog company={company} orderId={managedOrder} onClose={()=>setManagedOrder(null)} onSaved={load}/>}
- </>;
+const statusLabels: Record<string, string> = {
+  ...fulfillmentLabels, settled: "Ruta liquidada", cancelled: "Cancelado", expired: "Vencido",
+};
+const pageSize = 50;
+const orderDate = new Intl.DateTimeFormat("es-GT", {
+  timeZone: "America/Guatemala", dateStyle: "short", timeStyle: "short",
+});
+
+export default function Sales({ company, currency = "GTQ" }: { company: string; currency?: string }) {
+  const state = useOperation(company, "sales");
+  const [filters, setFilters] = useState(() => ({ ...salesTodayRange(), customer: "", status: "" }));
+  const [applied, setApplied] = useState(filters);
+  const [customers, setCustomers] = useState<Row[]>([]);
+  const [orders, setOrders] = useState<Row[]>([]);
+  const [hasMore, setHasMore] = useState(false);
+  const [page, setPage] = useState(0);
+  const [cancelOrder, setCancelOrder] = useState<Row | null>(null);
+  const [editor, setEditor] = useState<Row | null | undefined>();
+  const [viewOrder, setViewOrder] = useState<string | null>(null);
+  const [managedOrder, setManagedOrder] = useState<string | null>(null);
+
+  async function load(next = applied, nextPage = page) {
+    const result = await salesWorklist(company, "invoice_headers", { ...next, offset: nextPage * pageSize });
+    if (nextPage > 0 && result.orders.length === 0) {
+      await load(next, nextPage - 1);
+      return;
+    }
+    setOrders(result.orders);
+    setHasMore(result.has_more);
+    setApplied(next);
+    setPage(nextPage);
+  }
+
+  useEffect(() => {
+    void state.run(async () => {
+      const [clients] = await Promise.all([salesWorklist(company, "invoice_customers"), load(filters, 0)]);
+      setCustomers(clients);
+    });
+  }, [company]);
+
+  const reload = () => load();
+
+  return <>
+    <section className="intro">
+      <div><h1>Ventas y pedidos</h1></div>
+      <div className="actions">
+        {state.canWrite && <AppButton onClick={() => setEditor(null)}>Ingresar factura</AppButton>}
+        <AppButton className="secondary" disabled={state.busy} onClick={() => state.run(reload)}>Actualizar</AppButton>
+      </div>
+    </section>
+    {state.error && !cancelOrder && <p className="error" role="alert">{state.error}</p>}
+    <section className="catalog">
+      <div className="toolbar"><h2>Facturas</h2></div>
+      <form className="settings-grid worklist-filters" onSubmit={(event) => {
+        event.preventDefault();
+        void state.run(() => load(filters, 0));
+      }}>
+        <label>Desde<input required type="date" value={filters.from} max={filters.to}
+          onChange={(e) => setFilters({ ...filters, from: e.target.value })} /></label>
+        <label>Hasta<input required type="date" value={filters.to} min={filters.from}
+          onChange={(e) => setFilters({ ...filters, to: e.target.value })} /></label>
+        <label>Cliente<SearchSelect value={filters.customer} onChange={(e) => setFilters({ ...filters, customer: e.target.value })}>
+          <option value="">Todos los clientes</option>
+          {customers.map((client) => <option key={client.id} value={client.id}>{client.name}{client.code ? ` · ${client.code}` : ""}</option>)}
+        </SearchSelect></label>
+        <label>Estado<SearchSelect value={filters.status} onChange={(e) => setFilters({ ...filters, status: e.target.value })}>
+          <option value="">Todos los estados</option>
+          {Object.entries(statusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+        </SearchSelect></label>
+        <div className="form-actions">
+          <AppButton iconKey="action.search" disabled={state.busy}>Filtrar</AppButton>
+          <AppButton type="button" className="secondary" disabled={state.busy} onClick={() => {
+            const next = { ...salesTodayRange(), customer: "", status: "" };
+            setFilters(next);
+            void state.run(() => load(next, 0));
+          }}>Hoy</AppButton>
+        </div>
+      </form>
+      <div className="table-wrap" aria-busy={state.busy}>
+        <ResponsiveTable>
+          <thead><tr><th>Pedido</th><th>Fecha</th><th>Cliente</th><th>Total</th><th>Saldo</th><th>Entrega / pago</th><th>Estado</th><th>Acciones</th></tr></thead>
+          <tbody>{orders.map((order) => {
+            const editable = state.canWrite && order.status === "pending" && !order.settled &&
+              ["draft", "invoiced"].includes(order.fulfillment_stage);
+            const active = state.canWrite && ["pending", "dispatched"].includes(order.status) && !order.settled;
+            return <tr key={order.id}>
+              <td data-sort-value={order.number}>#{order.number}</td>
+              <td data-sort-value={order.created_at}>{orderDate.format(new Date(order.created_at))}</td>
+              <td>{order.customer_snapshot.name}</td>
+              <td data-sort-value={order.total}>{money(order.total, order.currency)}</td>
+              <td data-sort-value={order.balance}>
+                {order.fulfillment_stage === "draft" ? "—" : <strong className={Number(order.balance) > 0 ? "balance-debt" : "balance-zero"}>{money(order.balance, order.currency)}</strong>}
+              </td>
+              <td>{order.courier_name || (order.delivery === "delivery" ? "Domicilio" : "Retiro")}
+                <small>{paymentMethods.find((method) => method.value === order.payment)?.label}</small>
+              </td>
+              <td>{statusLabels[order.display_status] ?? order.display_status}</td>
+              <td className="actions">
+                <AppButton className="secondary" iconKey="action.expand" onClick={() => setViewOrder(order.id)}>Ver factura</AppButton>
+                <AppButton className="secondary" iconKey="action.print" onClick={() => {
+                  if (!openSaleDocument(() => salesWorklist(company, "detail", { order: order.id }))) {
+                    state.setError("Permite las ventanas emergentes para abrir la vista de impresión.");
+                  }
+                }}>Imprimir</AppButton>
+                {editable && <AppButton className="secondary" onClick={() => setEditor(order)}>Editar factura</AppButton>}
+                {order.fulfillment_stage !== "draft" && <AppButton className="secondary" onClick={() => setManagedOrder(order.id)}>
+                  {Number(order.balance) > 0 ? "Pagar factura" : "Ver pagos"}
+                </AppButton>}
+                {active && order.status === "pending" && order.fulfillment_stage === "draft" && <AppButton iconKey="action.confirm" disabled={state.busy}
+                  onClick={() => state.run(async () => {
+                    if (!await confirmAction("¿El cliente confirmó el pedido? Se reservarán las unidades disponibles para esta factura.",
+                      { title: "Confirmación del cliente", confirmText: "Confirmar pedido" })) return;
+                    await keyedRequest(company, "sales_fulfillment", { order: order.id, expected_stage: "draft", expected_revision: order.revision }, "confirm_customer");
+                    await reload();
+                  })}>Confirmación del cliente</AppButton>}
+                {active && <AppButton className="secondary" onClick={() => setCancelOrder(order)}>Cancelar pedido</AppButton>}
+              </td>
+            </tr>;
+          })}</tbody>
+        </ResponsiveTable>
+        {!orders.length && <p className="empty">{state.busy ? "Consultando facturas…" : "No hay facturas para los filtros seleccionados."}</p>}
+      </div>
+      {(page > 0 || hasMore) && <div className="toolbar">
+        <AppButton className="secondary" disabled={state.busy || page === 0} onClick={() => state.run(() => load(applied, page - 1))}>Anterior</AppButton>
+        <span>Página {page + 1}</span>
+        <AppButton className="secondary" disabled={state.busy || !hasMore} onClick={() => state.run(() => load(applied, page + 1))}>Siguiente</AppButton>
+      </div>}
+    </section>
+    {editor !== undefined && <SaleEditor company={company} orderId={editor?.id} currency={editor?.currency || currency} onClose={() => setEditor(undefined)} onSaved={reload} />}
+    {viewOrder && <OrderPreparationDialog company={company} orderId={viewOrder} onClose={() => setViewOrder(null)} onSaved={reload} />}
+    {managedOrder && <OrderDeliveryDialog company={company} orderId={managedOrder} onClose={() => setManagedOrder(null)} onSaved={reload} />}
+    {cancelOrder && <div className="overlay">
+      <section className="modal operations-dialog" role="dialog" aria-modal="true" aria-label="Cancelar pedido">
+        <h2>Cancelar pedido</h2>
+        {state.error && <p className="error" role="alert">{state.error}</p>}
+        <p>Pedido #{cancelOrder.number} · {cancelOrder.customer_snapshot.name} · {money(cancelOrder.total, cancelOrder.currency)}</p>
+        <form onSubmit={(event) => {
+          event.preventDefault();
+          const reason = new FormData(event.currentTarget).get("reason");
+          void state.run(async () => {
+            await keyedRequest(company, "sales", { order: cancelOrder.id, reason }, "cancel");
+            setCancelOrder(null);
+            await reload();
+          });
+        }}>
+          <p>El saldo del documento quedará en cero. Si el inventario ya salió, se devolverá. Si hay reservas, se liberarán. Revierte los pagos y saldos aplicados antes de cancelar.</p>
+          <label>Motivo de cancelación<input name="reason" required minLength={5} maxLength={500} /></label>
+          <label><input type="checkbox" required /> Confirmo esta operación</label>
+          <div className="form-actions">
+            <AppButton disabled={state.busy}>Confirmar</AppButton>
+            <AppButton type="button" className="secondary" disabled={state.busy} onClick={() => setCancelOrder(null)}>Volver</AppButton>
+          </div>
+        </form>
+      </section>
+    </div>}
+  </>;
 }

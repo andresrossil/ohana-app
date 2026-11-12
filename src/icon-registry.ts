@@ -51,6 +51,7 @@ export const iconRegistry: IconEntry[] = [
     ["production", "Producción", "factory"],
     ["inventory", "Inventario", "warehouse"],
     ["sales", "Ventas", "trending-up"],
+    ["order-preparation", "Preparación de pedidos", "package-check"],
     ["customers", "Clientes", "users"],
     ["suppliers", "Proveedores", "truck"],
     ["couriers", "Mensajerías", "truck"],

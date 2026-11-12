@@ -15,6 +15,7 @@ export const sections = [
   ["production", "Producción", "⚙"],
   ["inventory", "Inventario", "▤"],
   ["sales", "Ventas", "↗"],
+  ["order-preparation", "Preparación de pedidos", ""],
   ["customers", "Clientes", "♧"],
   ["suppliers", "Proveedores", ""],
   ["couriers", "Mensajerías", ""],
