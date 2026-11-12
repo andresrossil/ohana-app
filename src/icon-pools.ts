@@ -1,6 +1,10 @@
 export type IconPool = { options: string[]; active: string };
 export type IconPools = Record<string, IconPool>;
 export const defaultIconPools: IconPools = {
+  "module.funds": {
+    options: ["wallet", "coins", "banknote", "calculator", "receipt"],
+    active: "wallet",
+  },
   "module.prices": {
     options: ["tags", "tag", "badge-dollar-sign", "coins", "list-ordered"],
     active: "tags",

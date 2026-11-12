@@ -57,6 +57,7 @@ const Sales = lazy(() => import("./Sales"));
 const OrderPreparation = lazy(() => import("./OrderPreparation"));
 const PublicStore = lazy(() => import("./PublicStore"));
 const AdditionalCostSettings = lazy(() => import("./AdditionalCostSettings"));
+const Funds = lazy(() => import("./Funds"));
 const PriceLists = lazy(() => import("./PriceLists"));
 const CourierSettlements = lazy(() => import("./CourierSettlements"));
 const MaterialCreateForm = lazy(() => import("./MaterialCreateForm"));
@@ -641,7 +642,7 @@ function App() {
             ...(activeCompany?.manage || activeCompany?.sales_read ? ["couriers", "settlements"] : []),
             ...(activeCompany?.manage || activeCompany?.catalog_read || activeCompany?.inventory_read ? ["suppliers"] : []),
             ...(activeCompany?.reports_read ? ["reports"] : []),
-            ...(activeCompany?.manage ? ["prices", "expenses"] : []),
+            ...(activeCompany?.manage ? ["prices", "expenses", "funds"] : []),
             ...(activeCompany && (activeCompany.manage || canCreate)
               ? ["settings"]
               : []),
@@ -934,6 +935,7 @@ function App() {
                   onDirty={setSettingsDirty}
                 />
               )}
+              {section === "funds" && activeCompany?.manage && <Funds key={company} company={company} />}
               {section === "expenses" && activeCompany?.manage && (
                 <>
                   <section className="intro">
@@ -1052,6 +1054,7 @@ function App() {
                 "reports",
                 "prices",
                 "expenses",
+                "funds",
               ].includes(section) && (
                 <section className="empty module-pending">
                   <p className="eyebrow">PRÓXIMAMENTE EN OHANA</p>

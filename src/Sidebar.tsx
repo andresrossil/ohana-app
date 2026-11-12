@@ -22,6 +22,7 @@ export const sections = [
   ["settlements", "Liquidaciones de mensajería", ""],
   ["prices", "Listas de precios", ""],
   ["expenses", "Gastos", ""],
+  ["funds", "Fondos", ""],
   ["reports", "Reportes", "▥"],
   ["settings", "Configuración", "☷"],
 ] as const;
@@ -29,7 +30,7 @@ export type Section = (typeof sections)[number][0];
 const categories: { id: string; label: string; icon: Section; items: Section[] }[] = [
   { id: "sales", label: "Ventas", icon: "sales", items: ["sales", "order-preparation", "settlements", "prices"] },
   { id: "inventory", label: "Inventario y producción", icon: "inventory", items: ["materials", "products", "formulas", "production", "inventory"] },
-  { id: "purchases", label: "Compras y gastos", icon: "purchases", items: ["purchases", "expenses"] },
+  { id: "purchases", label: "Compras y gastos", icon: "purchases", items: ["purchases", "expenses", "funds"] },
   { id: "partners", label: "Socios de negocio", icon: "customers", items: ["customers", "suppliers", "couriers"] },
 ];
 const sectionLabels = new Map<Section, string>(sections.map(([key, label]) => [key, label]));
