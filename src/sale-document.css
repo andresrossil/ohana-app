@@ -34,16 +34,26 @@ body { margin: 0; }
 .document-discount { background: var(--sand); border-radius: 9px; font-weight: 700; }
 .document-totals .document-total { margin-top: 2mm; border-radius: 9px; background: #75514a; color: white; padding: 3mm; font-size: 14pt; font-weight: 700; }
 .document-note { margin: 7mm 0 0; font-style: italic; text-align: center; break-inside: avoid; }
-.document.shipping-label { width: min(100%, 100mm); min-height: 149mm; padding: 7mm; }
-.shipping-label-header { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; gap: 4mm; padding-bottom: 5mm; border-bottom: 1px solid var(--line); }
-.shipping-label .document-brand img { max-height: 24mm; transform: none; }
-.shipping-label-guide { display: grid; gap: 2mm; text-align: right; overflow-wrap: anywhere; }
-.shipping-label-guide span, .shipping-label-fields dt { font-weight: 700; }
-.shipping-label-fields { margin: 0; }
-.shipping-label-fields > div { padding: 4mm 0; border-bottom: 1px solid var(--line); break-inside: avoid; }
-.shipping-label-fields dd { margin: 1.5mm 0 0; font-size: 13pt; overflow-wrap: anywhere; white-space: pre-line; }
-.shipping-label-fields .shipping-label-amount { padding: 4mm; margin-top: 4mm; background: var(--sand); border: 0; border-radius: 8px; }
-.shipping-label-amount dd { font-size: 17pt; font-weight: 700; }
+.document.shipping-label { width: min(100%, 100mm); min-height: 149mm; padding: 5mm; color: #000; background: #fff; }
+.shipping-label-header { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: center; gap: 4mm; margin-bottom: 9mm; }
+.shipping-label .document-brand img { max-height: 12mm; transform: none; filter: grayscale(1); }
+.shipping-label-guide { text-align: right; overflow-wrap: anywhere; }
+.shipping-label-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-areas: "client amount" "phone amount" "address address";
+  align-items: start;
+  gap: 3mm 4mm;
+  margin: 0;
+}
+.shipping-label-client { grid-area: client; }
+.shipping-label-phone { grid-area: phone; }
+.shipping-label-address { grid-area: address; margin-top: 1mm; }
+.shipping-label-amount { grid-area: amount; }
+.shipping-label-fields dd { margin: 0; font-size: 13pt; line-height: 1.25; overflow-wrap: anywhere; white-space: pre-line; }
+.shipping-label-amount dt { font-weight: 700; }
+.shipping-label-amount dd { margin-top: 1mm; font-size: 17pt; font-weight: 700; }
+.label-visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 @media screen and (max-width: 560px) {
   .document { padding: 14px; font-size: 9pt; }
   .document-heading { grid-template-columns: minmax(0, 1fr) auto; gap: 10px; }

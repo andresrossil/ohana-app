@@ -116,6 +116,17 @@ function SaleDocument({ data, format, onPrint }: { data: Row; format: "invoice" 
         useCORS: true,
         logging: false,
       });
+      if (isLabel) {
+        const context = canvas.getContext("2d");
+        if (context) {
+          const image = context.getImageData(0, 0, canvas.width, canvas.height);
+          for (let i = 0; i < image.data.length; i += 4) {
+            const gray = 0.2126 * image.data[i] + 0.7152 * image.data[i + 1] + 0.0722 * image.data[i + 2];
+            image.data[i] = image.data[i + 1] = image.data[i + 2] = gray;
+          }
+          context.putImageData(image, 0, 0);
+        }
+      }
       const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
       if (!blob) throw new Error("No se generó la imagen");
       const url = URL.createObjectURL(blob);
@@ -146,12 +157,12 @@ function SaleDocument({ data, format, onPrint }: { data: Row; format: "invoice" 
         {isLabel ? <>
           <header className="shipping-label-header">
             <div className="document-brand">{documentLogo}</div>
-            <div className="shipping-label-guide"><span>Guía de envío</span><strong>{delivery.guide || "Sin guía"}</strong></div>
+            <div className="shipping-label-guide"><span className="label-visually-hidden">Guía de envío</span><strong>{delivery.guide || "Sin guía"}</strong></div>
           </header>
           <dl className="shipping-label-fields">
-            <div><dt>Cliente</dt><dd>{customer.name || "—"}</dd></div>
-            <div><dt>Teléfono</dt><dd>{customer.phone || "—"}</dd></div>
-            <div><dt>Dirección</dt><dd>{deliveryKind === "pickup" ? "Recoger pedido" : address || "—"}</dd></div>
+            <div className="shipping-label-client"><dt className="label-visually-hidden">Cliente</dt><dd>{customer.name || "—"}</dd></div>
+            <div className="shipping-label-phone"><dt className="label-visually-hidden">Teléfono</dt><dd>{customer.phone || "—"}</dd></div>
+            <div className="shipping-label-address"><dt className="label-visually-hidden">Dirección</dt><dd>{deliveryKind === "pickup" ? "Recoger pedido" : address || "—"}</dd></div>
             <div className="shipping-label-amount"><dt>Monto a cobrar</dt><dd>{amountToCollect}</dd></div>
           </dl>
         </> : <>
