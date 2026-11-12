@@ -16,6 +16,7 @@ const documentDate = new Intl.DateTimeFormat("es-GT", {
 });
 
 const grams = new Intl.NumberFormat("es-GT", { maximumFractionDigits: 8 });
+const productOrder = new Intl.Collator("es-GT", { sensitivity: "base", numeric: true });
 
 export function saleDocumentLine(line: Row) {
   const [product, ...size] = String(line.description ?? "").split(" · ");
@@ -61,6 +62,10 @@ function SaleDocument({ data, onPrint }: { data: Row; onPrint: () => void }) {
   const delivery = data.delivery ?? {};
   const customer = order.customer_snapshot ?? {};
   const lines: Row[] = data.lines ?? [];
+  const documentLines = lines
+    .map((line) => ({ line, product: saleDocumentLine(line).product }))
+    .sort((a, b) => productOrder.compare(a.product, b.product) ||
+      Number(a.line.unit_price) - Number(b.line.unit_price));
   const [logo, setLogo] = useState("");
   const [loadingLogo, setLoadingLogo] = useState(!!brand?.logo_path);
   const article = useRef<HTMLElement>(null);
@@ -157,8 +162,7 @@ function SaleDocument({ data, onPrint }: { data: Row; onPrint: () => void }) {
         <table aria-label="Productos del pedido">
           <thead><tr><th>Producto</th><th>Cant.</th><th>Precio</th><th>Desc.</th><th>Importe</th></tr></thead>
           <tbody>
-            {lines.map((line) => {
-              const { product } = saleDocumentLine(line);
+            {documentLines.map(({ line, product }) => {
               const amounts = saleLineTotals(line);
               return <tr key={line.id}>
                 <td>{product}{line.is_gift && <small>Regalo</small>}</td>
