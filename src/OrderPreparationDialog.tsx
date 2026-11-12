@@ -26,6 +26,9 @@ export default function OrderPreparationDialog({company,orderId,onClose,onSaved}
  {data&&<AppButton iconKey="action.print" disabled={state.busy} onClick={()=>{
   if(!openSaleDocument(data))state.setError("Permite las ventanas emergentes para abrir la vista de impresión.");
  }}>Imprimir</AppButton>}
+ {data&&<AppButton className="secondary" iconKey="action.print" disabled={state.busy} onClick={()=>{
+  if(!openSaleDocument(data,"label"))state.setError("Permite las ventanas emergentes para abrir la vista de impresión.");
+ }}>Imprimir etiqueta</AppButton>}
  <AppButton className="secondary" disabled={state.busy} onClick={close}>Cerrar</AppButton></div></header>
  {state.error&&<p className="error"><AppIcon name="status.error"/>{state.error}</p>}
  {data&&<><p><strong>{data.order.customer_snapshot.name}</strong> · {data.order.customer_snapshot.phone}</p><p>{fulfillmentLabels[stage]}</p><OrderDeliverySummary order={data.order} delivery={data.delivery}/><CustomerCommercialInfo info={data.commercial_info}/>

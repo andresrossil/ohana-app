@@ -54,6 +54,11 @@ export default function Sales({ company, currency = "GTQ" }: { company: string; 
   }, [company]);
 
   const reload = () => load();
+  function printOrder(orderId: string, format: "invoice" | "label") {
+    if (!openSaleDocument(() => salesWorklist(company, "detail", { order: orderId }), format)) {
+      state.setError("Permite las ventanas emergentes para abrir la vista de impresión.");
+    }
+  }
 
   return <>
     <section className="intro">
@@ -112,11 +117,8 @@ export default function Sales({ company, currency = "GTQ" }: { company: string; 
               <td>{statusLabels[order.display_status] ?? order.display_status}</td>
               <td className="actions">
                 <AppButton className="secondary" iconKey="action.expand" onClick={() => setViewOrder(order.id)}>Ver factura</AppButton>
-                <AppButton className="secondary" iconKey="action.print" onClick={() => {
-                  if (!openSaleDocument(() => salesWorklist(company, "detail", { order: order.id }))) {
-                    state.setError("Permite las ventanas emergentes para abrir la vista de impresión.");
-                  }
-                }}>Imprimir</AppButton>
+                <AppButton className="secondary" iconKey="action.print" onClick={() => printOrder(order.id, "invoice")}>Imprimir</AppButton>
+                <AppButton className="secondary" iconKey="action.print" onClick={() => printOrder(order.id, "label")}>Imprimir etiqueta</AppButton>
                 {editable && <AppButton className="secondary" onClick={() => setEditor(order)}>Editar factura</AppButton>}
                 {order.fulfillment_stage !== "draft" && <AppButton className="secondary" onClick={() => setManagedOrder(order.id)}>
                   {Number(order.balance) > 0 ? "Pagar factura" : "Ver pagos"}

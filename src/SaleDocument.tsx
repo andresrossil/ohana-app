@@ -26,26 +26,27 @@ export function saleDocumentLine(line: Row) {
   return { product, size: [size.join(" · "), range].filter(Boolean).join(" · ") || "—" };
 }
 
-export function openSaleDocument(source: Row | (() => Promise<Row>)) {
+export function openSaleDocument(source: Row | (() => Promise<Row>), format: "invoice" | "label" = "invoice") {
   const preview = window.open("", "_blank");
   if (!preview) return false;
   preview.opener = null;
   const doc = preview.document;
   doc.documentElement.lang = "es";
-  doc.title = "Resumen de pedido";
+  const title = format === "label" ? "Etiqueta de envío" : "Resumen de pedido";
+  doc.title = title;
   const viewport = doc.createElement("meta");
   viewport.name = "viewport";
   viewport.content = "width=device-width, initial-scale=1";
   const stylesheet = doc.createElement("style");
-  stylesheet.textContent = styles;
+  stylesheet.textContent = styles + (format === "label" ? "@page { size: 100mm 150mm; margin: 0; }" : "");
   doc.head.append(viewport, stylesheet);
   const container = doc.createElement("div");
   doc.body.replaceChildren(container);
   const root = createRoot(container);
   const show = (data: Row) => {
     if (preview.closed) return;
-    doc.title = `Resumen de pedido · #${data.order.number}`;
-    root.render(<SaleDocument data={data} onPrint={() => preview.print()} />);
+    doc.title = `${title} · #${data.order.number}`;
+    root.render(<SaleDocument data={data} format={format} onPrint={() => preview.print()} />);
   };
   if (typeof source === "function") {
     root.render(<p className="print-controls" role="status">Cargando documento…</p>);
@@ -57,7 +58,7 @@ export function openSaleDocument(source: Row | (() => Promise<Row>)) {
   return true;
 }
 
-function SaleDocument({ data, onPrint }: { data: Row; onPrint: () => void }) {
+function SaleDocument({ data, format, onPrint }: { data: Row; format: "invoice" | "label"; onPrint: () => void }) {
   const { order, document_brand: brand } = data;
   const delivery = data.delivery ?? {};
   const customer = order.customer_snapshot ?? {};
@@ -93,6 +94,14 @@ function SaleDocument({ data, onPrint }: { data: Row; onPrint: () => void }) {
   const address = [delivery.address || customer.address, deliveryZoneLabel(delivery.zone), delivery.department]
     .filter(Boolean).join(" · ");
   const schedule = delivery.tariff_snapshot?.delivery_schedule;
+  const isLabel = format === "label";
+  const amountToCollect = closed || order.payment === "transfer" ? money(0, currency)
+    : isDraft ? "Pendiente de confirmación"
+    : money(data.summary?.balance, currency);
+  const documentLogo = logo ? (
+    <img src={logo} alt={brand?.name ?? "Logo de empresa"} onLoad={() => setLoadingLogo(false)}
+      onError={() => { setLogo(""); setLoadingLogo(false); }} />
+  ) : <p>{brand?.name ?? ""}</p>;
 
   async function downloadImage() {
     const documentNode = article.current;
@@ -112,7 +121,7 @@ function SaleDocument({ data, onPrint }: { data: Row; onPrint: () => void }) {
       const url = URL.createObjectURL(blob);
       const link = documentNode.ownerDocument.createElement("a");
       link.href = url;
-      link.download = `${isDraft ? "Borrador" : "Factura"}-${String(order.number).padStart(6, "0")}.png`;
+      link.download = `${isLabel ? "Etiqueta" : isDraft ? "Borrador" : "Factura"}-${String(order.number).padStart(6, "0")}.png`;
       documentNode.ownerDocument.body.append(link);
       link.click();
       link.remove();
@@ -133,14 +142,21 @@ function SaleDocument({ data, onPrint }: { data: Row; onPrint: () => void }) {
         </button>
         {exportError && <p role="alert">{exportError}</p>}
       </div>
-      <article ref={article} className="document">
+      <article ref={article} className={isLabel ? "document shipping-label" : "document"}>
+        {isLabel ? <>
+          <header className="shipping-label-header">
+            <div className="document-brand">{documentLogo}</div>
+            <div className="shipping-label-guide"><span>Guía de envío</span><strong>{delivery.guide || "Sin guía"}</strong></div>
+          </header>
+          <dl className="shipping-label-fields">
+            <div><dt>Cliente</dt><dd>{customer.name || "—"}</dd></div>
+            <div><dt>Teléfono</dt><dd>{customer.phone || "—"}</dd></div>
+            <div><dt>Dirección</dt><dd>{deliveryKind === "pickup" ? "Recoger pedido" : address || "—"}</dd></div>
+            <div className="shipping-label-amount"><dt>Monto a cobrar</dt><dd>{amountToCollect}</dd></div>
+          </dl>
+        </> : <>
         <header className="document-heading">
-          <div className="document-brand">
-            {logo ? (
-              <img src={logo} alt={brand?.name ?? "Logo de empresa"} onLoad={() => setLoadingLogo(false)}
-                onError={() => { setLogo(""); setLoadingLogo(false); }} />
-            ) : <p>{brand?.name ?? ""}</p>}
-          </div>
+          <div className="document-brand">{documentLogo}</div>
           <div className="document-title"><h1>Resumen de pedido</h1><span className="document-state">{isDraft ? "Borrador" : "Factura"}</span></div>
           <div className="document-number"><strong>No. {String(order.number).padStart(6, "0")}</strong><br />Fecha: {documentDate.format(new Date(order.created_at))}</div>
         </header>
@@ -190,6 +206,7 @@ function SaleDocument({ data, onPrint }: { data: Row; onPrint: () => void }) {
         {closed ? (
           <p className="document-note">{order.status === "cancelled" ? "Pedido cancelado." : "Pedido vencido."}</p>
         ) : isDraft && <p className="document-note">Este documento es un resumen de pedido pendiente de confirmación.</p>}
+        </>}
       </article>
     </>
   );
