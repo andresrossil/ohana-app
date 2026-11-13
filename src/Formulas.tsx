@@ -180,6 +180,7 @@ export default function Formulas({
         catalog,
         referenceVariant,
         referenceVariant,
+        formulas,
       )
     : null;
   const extraQuote = additionalCosts(
@@ -1010,7 +1011,9 @@ export default function Formulas({
                   catalog,
                   presentation,
                   presentation,
+                  formulas,
                 );
+                const shownCost = f.intermediates?.length ? estimate.productionCost : estimate.cost;
                 const margin =
                   price != null && estimate.cost != null
                     ? price - estimate.cost
@@ -1079,9 +1082,7 @@ export default function Formulas({
                       data-sort-value={price ?? ""}
                     >
                       {price == null
-                        ? f.production_mode === "variable_weight"
-                          ? "Pendiente"
-                          : "Pendiente"
+                        ? "Pendiente"
                         : money(price, catalog.currency)}
                       {presentation && (
                         <small>
@@ -1100,20 +1101,18 @@ export default function Formulas({
                     </td>
                     <td
                       className="formula-amount"
-                      data-sort-value={estimate.cost ?? ""}
+                      data-sort-value={shownCost ?? ""}
                     >
-                      {estimate.cost == null
-                        ? f.production_mode === "variable_weight"
-                          ? "Pendiente"
-                          : "Pendiente"
-                        : money(estimate.cost, catalog.currency)}
+                      {shownCost == null
+                        ? "Pendiente"
+                        : money(shownCost, catalog.currency)}
                       {estimate.costPerGram != null && (
                         <small>
                           {money(estimate.costPerGram, catalog.currency)} / g ·
                           fabricación
                         </small>
                       )}
-                      {estimate.reason && <small>{estimate.reason}</small>}
+                      {f.intermediates?.length && shownCost != null ? <small>Costo de fabricación</small> : estimate.reason && <small>{estimate.reason}</small>}
                     </td>
                     <td
                       data-sort-value={margin ?? ""}
@@ -1837,7 +1836,7 @@ export default function Formulas({
                   packaging: math.packagingCost,
                   supplies: math.suppliesCost,
                   ...(draft.intermediates?.length ? { intermediates: estimateIntermediateCost(
-                    draft.intermediates, catalog, readOnly ? Number(scale) : 1,
+                    draft.intermediates, catalog, readOnly ? Number(scale) : 1, formulas,
                   ) } : {}),
                 }}
                 quote={extraQuote}

@@ -12,6 +12,7 @@ export function priceCost(
   formulas: Row[],
   catalog: Row,
   saleReference?: Row,
+  visited = new Set<string>(),
 ): Row {
   const hasRange = variant.weight_min != null && variant.weight_max != null;
   const candidates = formulas.filter(
@@ -35,7 +36,7 @@ export function priceCost(
   const formula = [...eligible].sort(
     (a, b) => Number(b.version) - Number(a.version),
   )[0];
-  return formulaCost(formula, catalog, saleReference, variant);
+  return formulaCost(formula, catalog, saleReference, variant, formulas, visited);
 }
 
 export function formulaCost(
@@ -43,7 +44,11 @@ export function formulaCost(
   catalog: Row,
   saleReference?: Row,
   weightVariant?: Row,
+  formulas: Row[] = [],
+  visited = new Set<string>(),
 ): Row {
+  if (visited.has(formula.id)) return { cost: null };
+  const ancestors = new Set(visited).add(formula.id);
   const source = `${formula.code} · v${formula.version}${formula.state === "testing" ? " · En pruebas" : ""}`;
   if (
     !(Number(formula.estimated_units) > 0) &&
@@ -79,9 +84,9 @@ export function formulaCost(
   if (math.totalCost == null || math.errors.some((error) =>
     !formula.intermediates?.length || error !== "Añade al menos una materia prima."))
     return { cost: null, reason: "Costo de materiales incompleto", source };
-  const intermediateCost = estimateIntermediateCost(formula.intermediates || [], catalog);
+  const intermediateCost = estimateIntermediateCost(formula.intermediates || [], catalog, 1, formulas, ancestors);
   if (intermediateCost == null)
-    return { cost: null, reason: "Costo FIFO de productos intermedios pendiente", source };
+    return { cost: null, reason: "Costo de fabricación de productos intermedios pendiente", source };
 
   if (
     formula.production_mode === "variable_weight" ||
@@ -151,6 +156,8 @@ export function formulaCost(
         : null;
     return {
       ...estimate,
+      productionCost: estimate.manufacturingCost != null && overheadUnit != null
+        ? estimate.manufacturingCost + overheadUnit : null,
       commonMaterials,
       referenceMaterials: {
         intermediates: estimate.midpoint == null ? null : intermediateCost * estimate.midpoint / Number(formula.estimated_final_weight_g),
@@ -213,6 +220,9 @@ export function formulaCost(
         );
   return {
     cost,
+    productionCost: extra.overhead_total == null ? null : estimatedUnitCost(
+      math.totalCost + intermediateCost + extra.overhead_total, formula.estimated_units,
+    ),
     referenceMaterials: {
       intermediates: estimatedUnitCost(intermediateCost, formula.estimated_units),
       ingredients: estimatedUnitCost(
@@ -241,7 +251,7 @@ export function formulaCost(
   };
 }
 
-export function estimateIntermediateCost(lines: Row[], catalog: Row, scale = 1): number | null {
+export function estimateIntermediateCost(lines: Row[], catalog: Row, scale = 1, formulas: Row[] = [], visited = new Set<string>()): number | null {
   let total = 0;
   for (const line of lines) {
     const option = catalog.intermediate_options?.find((item: Row) => item.id === line.variant_id);
@@ -249,15 +259,25 @@ export function estimateIntermediateCost(lines: Row[], catalog: Row, scale = 1):
     const base = catalog.units.find((item: Row) => item.id === option?.unit_id);
     if (!option || !unit || !base || unit.dimension !== base.dimension) return null;
     let needed = Number(line.quantity) * scale * Number(unit.base_factor) / Number(base.base_factor);
-    if (!(needed > 0) || needed > Number(option.available)) return null;
-    for (const entry of option.stock_entries || []) {
-      if (entry.cost == null) return null;
+    if (!Number.isFinite(needed) || needed <= 0) return null;
+    const quantity = needed;
+    let fifo = 0;
+    for (const entry of (quantity <= Number(option.available) ? option.stock_entries || [] : [])) {
+      if (entry.cost == null) break;
       const used = Math.min(needed, Number(entry.remaining));
-      total += used * Number(entry.cost);
+      fifo += used * Number(entry.cost);
       needed -= used;
       if (needed < 1e-8) break;
     }
-    if (needed >= 1e-8) return null;
+    if (needed < 1e-8) {
+      total += fifo;
+      continue;
+    }
+    const variant = (catalog.presentations || []).find((item: Row) => item.id === option.id)
+      || option;
+    const estimate = priceCost(variant, formulas, catalog, undefined, visited);
+    if (estimate.productionCost == null) return null;
+    total += quantity * estimate.productionCost;
   }
   return total;
 }
