@@ -38,7 +38,7 @@ export default function DeliveryFields({value,options,onChange,currency="GTQ",cu
           ? "El cliente no paga el envío. El costo se conserva para la liquidación."
           : value.shipping_cost==="" ? "Sin tarifa disponible. Ingresa el costo manualmente." : "Sugerido según la mensajería y la dirección. Puedes editarlo."}</small>
       </div>
-      <label>Guía de envío · automática<input readOnly value={value.guide||""} placeholder="SIGLAS-DDMMAA-CLIENTE"/><small>Se genera al guardar, con la fecha del pedido y el código del cliente.</small></label>
+      <label>Guía de envío · automática<input readOnly value={value.guide||""} placeholder="SIGLAS-NÚMERO DE PEDIDO"/><small>Usa las siglas de la empresa y el número definitivo del pedido al confirmarlo.</small></label>
     </>}
     <label>Estado de entrega<SearchSelect value={value.status||"pending"} onChange={e=>change("status",e.target.value)}>{Object.entries(deliveryStatus).map(([key,label])=><option key={key} value={key}>{label}</option>)}</SearchSelect></label>
     <label className="form-wide">Observaciones de entrega<AutoTextarea maxLength={2000} value={value.notes||""} onChange={e=>change("notes",e.target.value)}/></label>
