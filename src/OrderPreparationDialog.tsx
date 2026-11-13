@@ -3,6 +3,7 @@ import { request } from "./commerce";
 import { keyedRequest, money, useOperation, type Row } from "./operations";
 import { AppButton, AppIcon } from "./AppIcon";
 import ResponsiveTable from "./ResponsiveTable";
+import SearchSelect from "./SearchSelect";
 import { confirmAction } from "./ConfirmDialog";
 import OrderDeliverySummary from "./OrderDeliverySummary";
 import CustomerCommercialInfo from "./CustomerCommercialInfo";
@@ -49,13 +50,18 @@ export default function OrderPreparationDialog({company,orderId,onClose,onSaved,
  });}}>
   <h3>¿Qué empaque adicional usaste?</h3>
   <p className="muted">Indica las cantidades utilizadas o continúa sin agregar insumos. Al terminar se descontarán los productos y el empaque registrado.</p>
-  <label>Agregar insumo<select value="" disabled={state.busy} onChange={e=>{const id=e.target.value;if(id)setPackaging(previous=>({...previous,[id]:"1"}));}}>
+  <label>Agregar insumo<SearchSelect value="" disabled={state.busy} onChange={e=>{const id=e.target.value;if(id)setPackaging(previous=>({...previous,[id]:"1"}));}}>
     <option value="">Seleccionar</option>
     {(data.packaging_options||[]).filter((item:Row)=>!(item.id in packaging)).map((item:Row)=><option key={item.id} value={item.id}>{item.sku ? item.sku+" · " : ""}{item.name} · {item.available} {item.unit} disponibles</option>)}
-  </select></label>
+  </SearchSelect></label>
   <div className="form-grid">{(data.packaging_options||[]).filter((item:Row)=>item.id in packaging).map((item:Row)=><div key={item.id} className="form-actions">
     <label>{item.name} · {item.unit}<input type="number" inputMode="decimal" required min={0.00000001} max={item.available} step="any" disabled={state.busy}
-      value={packaging[item.id]} onChange={e=>setPackaging({...packaging,[item.id]:e.target.value})}/></label>
+      value={packaging[item.id]} onChange={e=>setPackaging({...packaging,[item.id]:e.target.value})}/>
+      <small>{item.unit_cost == null ? "Sin costo de compra vigente" :
+        <>Costo de compra por {item.unit}: {money(item.unit_cost,item.cost_currency)}
+          {Number(packaging[item.id]) > 0 && <> · Importe estimado: {money(Number(packaging[item.id])*Number(item.unit_cost),item.cost_currency)}</>}</>}
+      </small>
+    </label>
     <AppButton type="button" className="secondary" disabled={state.busy} onClick={()=>setPackaging(previous=>Object.fromEntries(Object.entries(previous).filter(([id])=>id!==item.id)))}>Quitar</AppButton>
   </div>)}</div>
   <div className="form-actions"><AppButton type="submit" iconKey="action.confirm" disabled={state.busy}>Confirmar pedido terminado</AppButton>
