@@ -1738,9 +1738,10 @@ export default function Formulas({
                           .map((option) => <option key={option.id} value={option.id}>{option.name}</option>)}
                       </SearchSelect>
                     </label>
-                    <label>Cantidad<input type="number" min="0.00000001" step="any" required readOnly={readOnly}
+                    <label>Cantidad<input type="number" min={selected?.whole_units ? 1 : 0.00000001} step={selected?.whole_units ? 1 : "any"} required readOnly={readOnly}
                       value={line.quantity} onChange={(event) => update({ quantity: event.target.value })} /></label>
                     <label>Unidad
+                      {selected?.whole_units && <small>Esta variante se consume en unidades enteras.</small>}
                       <SearchSelect value={line.unit_id} required disabled={readOnly || !selected}
                         onChange={(event) => update({ unit_id: event.target.value })}>
                         <option value="">Seleccionar</option>
