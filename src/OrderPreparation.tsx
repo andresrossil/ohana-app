@@ -97,7 +97,7 @@ export default function OrderPreparation({ company }: { company: string }) {
             <ResponsiveTable>
               <thead><tr><th>Pedido</th><th>Confirmado</th><th>Productos y variantes</th><th>Estado</th><th>Acciones</th></tr></thead>
               <tbody>{customer.orders.map((order) => <tr key={order.id}>
-                <td data-sort-value={order.number}>#{order.number}</td>
+                <td data-sort-value={order.invoice_number || order.number}>#{order.invoice_number || order.number}</td>
                 <td data-sort-value={order.confirmed_at}>{confirmationDate.format(new Date(order.confirmed_at))}</td>
                 <td><ul className="preparation-items">
                   {(order.lines as Row[]).map((line) => {

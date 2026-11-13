@@ -24,6 +24,7 @@ export default function Funds({ company }: { company: string }) {
   const [applied, setApplied] = useState(initialFilters);
   const [page, setPage] = useState(0);
   const [more, setMore] = useState(false);
+  const [historyLoaded, setHistoryLoaded] = useState(false);
   const [mode, setMode] = useState<"expense" | "transfer" | "">("");
   const [entry, setEntry] = useState(initialEntry);
   const [busy, setBusy] = useState(false);
@@ -33,7 +34,7 @@ export default function Funds({ company }: { company: string }) {
   const origin = balances.find((fund) => fundId(fund) === entry.origin);
   const currencies = [...new Set(balances.map((fund) => fund.currency))];
 
-  async function load(next = applied, nextPage = page) {
+  async function load(next = applied, nextPage = page, includeHistory = historyLoaded) {
     let query = db.from("fund_movements").select("*").eq("company_id", company);
     if (next.from) query = query.gte("occurred_on", next.from);
     if (next.to) query = query.lte("occurred_on", next.to);
@@ -50,12 +51,14 @@ export default function Funds({ company }: { company: string }) {
     }
     const [summary, rows] = await Promise.all([
       db.from("fund_balances").select("*").eq("company_id", company).order("fund_name"),
-      query.order("occurred_on", { ascending: false }).order("created_at", { ascending: false })
-        .order("id").range(nextPage * pageSize, (nextPage + 1) * pageSize),
+      includeHistory ? query.order("occurred_on", { ascending: false }).order("created_at", { ascending: false })
+        .order("id").range(nextPage * pageSize, (nextPage + 1) * pageSize) : null,
     ]);
     if (summary.error) throw summary.error;
-    if (rows.error) throw rows.error;
+    if (rows?.error) throw rows.error;
     setBalances(summary.data);
+    if (!rows) return;
+    setHistoryLoaded(true);
     setHistory(rows.data.slice(0, pageSize));
     setMore(rows.data.length > pageSize);
     setPage(nextPage);
@@ -90,8 +93,7 @@ export default function Funds({ company }: { company: string }) {
         setEntry(initialEntry());
         setMode("");
         setNotice(mode === "transfer" ? "Transferencia registrada." : "Salida registrada.");
-        await load(initialFilters, 0);
-        setFilters(initialFilters);
+        await load();
       } finally {
         operationFinished(saved);
       }
@@ -150,7 +152,7 @@ export default function Funds({ company }: { company: string }) {
     </section>
     <section className="catalog">
       <div className="catalog-head"><h2>Historial de movimientos</h2></div>
-      <form className="form-grid" data-dirty-managed onSubmit={(e) => { e.preventDefault(); void run(() => load(filters, 0)); }}>
+      <form className="form-grid" data-dirty-managed onSubmit={(e) => { e.preventDefault(); void run(() => load(filters, 0, true)); }}>
         <label>Desde<input type="date" value={filters.from} onChange={(e) => setFilters({ ...filters, from: e.target.value })} /></label>
         <label>Hasta<input type="date" min={filters.from || undefined} value={filters.to} onChange={(e) => setFilters({ ...filters, to: e.target.value })} /></label>
         <label>Fondo<select value={filters.fund} onChange={(e) => setFilters({ ...filters, fund: e.target.value })}>
@@ -163,9 +165,9 @@ export default function Funds({ company }: { company: string }) {
         </select></label>
         <label>Factura o referencia exacta<input value={filters.document} onChange={(e) => setFilters({ ...filters, document: e.target.value })} /></label>
         <div className="actions"><AppButton type="submit" disabled={busy}>Filtrar</AppButton>
-          <AppButton className="secondary" disabled={busy} onClick={() => { setFilters(initialFilters); void run(() => load(initialFilters, 0)); }}>Limpiar</AppButton></div>
+          <AppButton className="secondary" disabled={busy} onClick={() => { setFilters(initialFilters); setHistoryLoaded(false); setHistory([]); setApplied(initialFilters); setPage(0); setMore(false); }}>Limpiar</AppButton></div>
       </form>
-      <ResponsiveTable>
+      {historyLoaded && <ResponsiveTable>
         <thead><tr>{["Fecha", "Tipo", "Documento", "Cliente", "Producto", "Fondo", "Concepto", "Importe", "Acciones"].map((label) => <th key={label}>{label}</th>)}</tr></thead>
         <tbody>{history.map((row) => <tr key={row.id}>
           <td>{row.occurred_on}</td><td>{labels[row.kind]}</td>
@@ -175,12 +177,12 @@ export default function Funds({ company }: { company: string }) {
           <td>{row.kind === "pending" ? "Pendiente" : money(row.amount, row.currency)}</td>
           <td><AppButton className="secondary" onClick={() => setDetail(row)}>Ver detalle</AppButton></td>
         </tr>)}</tbody>
-      </ResponsiveTable>
-      {!history.length && <p className="muted">No hay movimientos para esta consulta.</p>}
-      <div className="actions">
+      </ResponsiveTable>}
+      {!history.length && <p className="muted">{historyLoaded ? "No hay movimientos para esta consulta." : "Pulsa Filtrar para cargar el historial."}</p>}
+      {historyLoaded && <div className="actions">
         <AppButton className="secondary" disabled={busy || page === 0} onClick={() => run(() => load(applied, page - 1))}>Anterior</AppButton>
         <AppButton className="secondary" disabled={busy || !more} onClick={() => run(() => load(applied, page + 1))}>Siguiente</AppButton>
-      </div>
+      </div>}
     </section>
     {detail && <div className="modal-backdrop"><section className="modal" role="dialog" aria-modal="true" aria-label="Detalle del movimiento">
       <h2>{labels[detail.kind]} · {detail.fund_name}</h2>

@@ -32,7 +32,7 @@ export function openSaleDocument(source: Row | (() => Promise<Row>), format: "in
   preview.opener = null;
   const doc = preview.document;
   doc.documentElement.lang = "es";
-  const title = format === "label" ? "Etiqueta de envío" : "Resumen de pedido";
+  const title = format === "label" ? "Etiqueta de envío" : "Pedido";
   doc.title = title;
   const viewport = doc.createElement("meta");
   viewport.name = "viewport";
@@ -45,7 +45,7 @@ export function openSaleDocument(source: Row | (() => Promise<Row>), format: "in
   const root = createRoot(container);
   const show = (data: Row) => {
     if (preview.closed) return;
-    doc.title = `${title} · #${data.order.number}`;
+    doc.title = `${title} · #${data.order.invoice_number || data.order.number}`;
     root.render(<SaleDocument data={data} format={format} onPrint={() => preview.print()} />);
   };
   if (typeof source === "function") {
@@ -132,7 +132,7 @@ function SaleDocument({ data, format, onPrint }: { data: Row; format: "invoice" 
       const url = URL.createObjectURL(blob);
       const link = documentNode.ownerDocument.createElement("a");
       link.href = url;
-      link.download = `${isLabel ? "Etiqueta" : isDraft ? "Borrador" : "Factura"}-${String(order.number).padStart(6, "0")}.png`;
+      link.download = `${isLabel ? "Etiqueta" : isDraft ? "Borrador" : "Confirmado"}-${(order.invoice_number || String(order.number).padStart(6, "0"))}.png`;
       documentNode.ownerDocument.body.append(link);
       link.click();
       link.remove();
@@ -168,8 +168,8 @@ function SaleDocument({ data, format, onPrint }: { data: Row; format: "invoice" 
         </> : <>
         <header className="document-heading">
           <div className="document-brand">{documentLogo}</div>
-          <div className="document-title"><h1>Resumen de pedido</h1><span className="document-state">{isDraft ? "Borrador" : "Factura"}</span></div>
-          <div className="document-number"><strong>No. {String(order.number).padStart(6, "0")}</strong><br />Fecha: {documentDate.format(new Date(order.created_at))}</div>
+          <div className="document-title"><h1>Pedido</h1><span className="document-state">{isDraft ? "Borrador" : "Confirmado"}</span></div>
+          <div className="document-number"><strong>No. {(order.invoice_number || String(order.number).padStart(6, "0"))}</strong><br />Fecha: {documentDate.format(new Date(order.created_at))}</div>
         </header>
 
         <div className="document-pair">

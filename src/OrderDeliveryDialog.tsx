@@ -54,7 +54,7 @@ export default function OrderDeliveryDialog({company,orderId,onClose,onSaved}:{c
  });
  const availableCredit=Math.max(0,Number(data?.account?.find((a:Row)=>a.currency===currency)?.credit||0)-Number(data?.summary.excess||0));
  return <div className="overlay"><section className="modal operations-dialog courier-dialog" role="dialog" aria-modal="true" aria-label="Pagar factura" data-navigation-dirty={payment.amount!==""||credit!==""||!!voiding}>
-  <header className="hierarchy-toolbar"><h2>Pagar factura · #{data?.order.number||"…"}</h2><AppButton className="secondary" disabled={state.busy} onClick={close}>Cerrar</AppButton></header>
+  <header className="hierarchy-toolbar"><h2>Pagar factura · #{data?.order.invoice_number||data?.order.number||"…"}</h2><AppButton className="secondary" disabled={state.busy} onClick={close}>Cerrar</AppButton></header>
   {state.error&&<p className="error" role="alert"><AppIcon name="status.error"/>{state.error}</p>}
   {data&&<>
    <p>{data.order.customer_snapshot.name} · Total del pedido: <strong>{money(data.order.total,currency)}</strong></p>

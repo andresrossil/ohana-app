@@ -104,7 +104,7 @@ export default function Sales({ company, currency = "GTQ" }: { company: string; 
               ["draft", "invoiced"].includes(order.fulfillment_stage);
             const active = state.canWrite && ["pending", "dispatched"].includes(order.status) && !order.settled;
             return <tr key={order.id}>
-              <td data-sort-value={order.number}>#{order.number}</td>
+              <td data-sort-value={order.invoice_number || order.number}>#{order.invoice_number || order.number}</td>
               <td data-sort-value={order.created_at}>{orderDate.format(new Date(order.created_at))}</td>
               <td>{order.customer_snapshot.name}</td>
               <td data-sort-value={order.total}>{money(order.total, order.currency)}</td>
