@@ -147,6 +147,8 @@ export default function ProductsCatalog({
         notes: String(f.get("notes") || ""),
         description: String(f.get("description") || ""),
         published: f.get("published") === "on",
+        is_intermediate: f.get("is_intermediate") === "on",
+        available_for_sale: f.get("available_for_sale") === "on",
         unit_id: f.get("unit_id") || null,
         active: f.get("active") !== "false",
         ...metadata,
@@ -369,6 +371,14 @@ export default function ProductsCatalog({
                   defaultChecked={edit?.published ?? false}
                 />{" "}
                 Publicar producto en tienda
+              </label>
+              <label className="check">
+                <input name="is_intermediate" type="checkbox" defaultChecked={edit?.is_intermediate ?? false} />
+                Producto intermedio
+              </label>
+              <label className="check">
+                <input name="available_for_sale" type="checkbox" defaultChecked={edit?.available_for_sale ?? true} />
+                Disponible para venta
               </label>
               <label>
                 Notas

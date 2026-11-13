@@ -16,7 +16,7 @@ import { useEffect, useRef, useState } from "react";
 import { AppButton, AppIcon } from "./AppIcon";
 import { request } from "./commerce";
 import { usePriceRefresh, pricesChanged } from "./price-events";
-import { formulaCost } from "./price-cost";
+import { estimateIntermediateCost, formulaCost } from "./price-cost";
 import { keyedRequest, money, useOperation, type Row } from "./operations";
 import { recipeMath, roundQuantity, type RecipeLine } from "./formula-model";
 import "./formulas.css";
@@ -449,8 +449,10 @@ export default function Formulas({
       );
       return;
     }
-    if (math.errors.length) {
-      state.setError(math.errors.join(" "));
+    const formulaErrors = math.errors.filter((error) =>
+      !draft.intermediates?.length || error !== "Añade al menos una materia prima.");
+    if (formulaErrors.length) {
+      state.setError(formulaErrors.join(" "));
       return;
     }
     await state.run(async () => {
@@ -467,6 +469,7 @@ export default function Formulas({
         advertising_level_id: "",
         kind: mode,
         confirm_duplicate: confirmDuplicate,
+        intermediates: draft.intermediates || [],
         ingredients: lines.map((line, i) => ({
           ...line,
           quantity: math.rows[i].quantity,
@@ -1714,6 +1717,46 @@ export default function Formulas({
                 <summary>Materias primas</summary>
                 {rowsTable("ingredient")}
               </IconDetails>
+              <IconDetails className="formula-disclosure" open={Boolean(draft.intermediates?.length)}>
+                <summary>Productos intermedios</summary>
+                {(draft.intermediates || []).map((line: Row, index: number) => {
+                  const options = (catalog.intermediate_options || []) as Row[];
+                  const selected = options.find((option) => option.id === line.variant_id);
+                  const update = (value: Row) => field("intermediates", draft.intermediates.map(
+                    (item: Row, i: number) => i === index ? { ...item, ...value } : item,
+                  ));
+                  return <div className="settings-grid" key={line.key || line.variant_id}>
+                    <label>Producto intermedio
+                      <SearchSelect value={line.variant_id} disabled={readOnly} required onChange={(event) => {
+                        const option = options.find((item) => item.id === event.target.value);
+                        update({ variant_id: option?.id || "", unit_id: option?.unit_id || "" });
+                      }}>
+                        <option value="">Seleccionar</option>
+                        {line.variant_id && !selected && <option value={line.variant_id}>{line.name || "Variante guardada"}</option>}
+                        {options.filter((option) => option.product_id !== draft.product &&
+                          (option.id === line.variant_id || !draft.intermediates.some((item: Row) => item.variant_id === option.id)))
+                          .map((option) => <option key={option.id} value={option.id}>{option.name}</option>)}
+                      </SearchSelect>
+                    </label>
+                    <label>Cantidad<input type="number" min="0.00000001" step="any" required readOnly={readOnly}
+                      value={line.quantity} onChange={(event) => update({ quantity: event.target.value })} /></label>
+                    <label>Unidad
+                      <SearchSelect value={line.unit_id} required disabled={readOnly || !selected}
+                        onChange={(event) => update({ unit_id: event.target.value })}>
+                        <option value="">Seleccionar</option>
+                        {catalog.units.filter((unit: Row) => unit.id === line.unit_id || (unit.active && unit.dimension === selected?.dimension))
+                          .map((unit: Row) => <option key={unit.id} value={unit.id}>{unit.name} ({unit.symbol})</option>)}
+                      </SearchSelect>
+                    </label>
+                    {!readOnly && <AppButton type="button" className="secondary" onClick={() =>
+                      field("intermediates", draft.intermediates.filter((_: Row, i: number) => i !== index))}>Quitar</AppButton>}
+                  </div>;
+                })}
+                {!readOnly && <AppButton type="button" className="secondary" onClick={() => field("intermediates",
+                  [...(draft.intermediates || []), { key: crypto.randomUUID(), variant_id: "", unit_id: "", quantity: "" }])}>
+                  Agregar producto intermedio
+                </AppButton>}
+              </IconDetails>
               <IconDetails className="formula-disclosure">
                 <summary>
                   Materiales de empaque ·{" "}
@@ -1792,6 +1835,9 @@ export default function Formulas({
                   ingredients: math.ingredientCost,
                   packaging: math.packagingCost,
                   supplies: math.suppliesCost,
+                  ...(draft.intermediates?.length ? { intermediates: estimateIntermediateCost(
+                    draft.intermediates, catalog, readOnly ? Number(scale) : 1,
+                  ) } : {}),
                 }}
                 quote={extraQuote}
                 variable={draft.production_mode === "variable_weight"}

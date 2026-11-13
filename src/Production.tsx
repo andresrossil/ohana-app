@@ -273,6 +273,10 @@ function ProductionBatches({
                     expected_revision: formula!.edit_revision,
                     scrap: Number(f.get("scrap") || 0),
                     capture_mode: selected!.opening_stock ? "weights" : "variant_units",
+                    intermediates: (selected!.opening_stock ? [] : formula!.intermediates || []).map((r: Row) => ({
+                      variant_id: r.variant_id,
+                      quantity: f.get("consume_variant_" + r.variant_id),
+                    })),
                     consumptions: (selected!.opening_stock ? [] : formula!.ingredients).map((r: Row) => ({
                       material: r.material_id,
                       unit: r.unit_id,
@@ -573,6 +577,14 @@ function ProductionBatches({
                         required
                         value={consumed[r.material_id] ?? suggested(r) ?? ""}
                       />
+                    </label>
+                  ))}
+                  {(formula?.intermediates || []).map((r: Row) => (
+                    <label key={r.variant_id}>
+                      {r.name} ({r.unit}) <small>Producto intermedio</small>
+                      <input name={"consume_variant_" + r.variant_id} type="number" min="0" step="any" required
+                        value={consumed[r.variant_id] ?? suggested(r) ?? ""}
+                        onChange={(event) => setConsumed((previous) => ({ ...previous, [r.variant_id]: event.target.value }))} />
                     </label>
                   ))}</>}
                   <h3>Variantes obtenidas</h3>

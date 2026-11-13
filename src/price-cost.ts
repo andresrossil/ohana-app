@@ -62,7 +62,7 @@ export function formulaCost(
     reference_notes: i.reference_notes || "",
     density_g_ml: i.density_g_ml ?? "",
   }));
-  if (!lines.some((l) => l.line_kind === "ingredient"))
+  if (!lines.some((l) => l.line_kind === "ingredient") && !formula.intermediates?.length)
     return { cost: null, reason: "Composición pendiente", source };
   const math = recipeMath(
     lines,
@@ -76,8 +76,13 @@ export function formulaCost(
     Number(formula.loss_percent),
     formula.estimated_units,
   );
-  if (math.totalCost == null || math.errors.length)
+  if (math.totalCost == null || math.errors.some((error) =>
+    !formula.intermediates?.length || error !== "Añade al menos una materia prima."))
     return { cost: null, reason: "Costo de materiales incompleto", source };
+  const intermediateCost = estimateIntermediateCost(formula.intermediates || [], catalog);
+  if (intermediateCost == null)
+    return { cost: null, reason: "Costo FIFO de productos intermedios pendiente", source };
+
   if (
     formula.production_mode === "variable_weight" ||
     weightVariant?.weight_min != null
@@ -126,7 +131,7 @@ export function formulaCost(
           : validUnits
             ? amount / units
             : null;
-    const commonMaterials = math.totalCost - packagingTotal - suppliesTotal;
+    const commonMaterials = math.totalCost - packagingTotal - suppliesTotal + intermediateCost;
     const estimate = estimatedWeightCost(
       commonMaterials,
       formula.estimated_final_weight_g,
@@ -148,6 +153,7 @@ export function formulaCost(
       ...estimate,
       commonMaterials,
       referenceMaterials: {
+        intermediates: estimate.midpoint == null ? null : intermediateCost * estimate.midpoint / Number(formula.estimated_final_weight_g),
         ingredients:
           estimate.costPerGram != null &&
           estimate.midpoint != null &&
@@ -202,12 +208,13 @@ export function formulaCost(
     extra.additional_total == null
       ? null
       : estimatedUnitCost(
-          math.totalCost + extra.additional_total,
+          math.totalCost + intermediateCost + extra.additional_total,
           formula.estimated_units,
         );
   return {
     cost,
     referenceMaterials: {
+      intermediates: estimatedUnitCost(intermediateCost, formula.estimated_units),
       ingredients: estimatedUnitCost(
         math.ingredientCost,
         formula.estimated_units,
@@ -225,11 +232,32 @@ export function formulaCost(
       additional_total: extra.additional_unit,
     },
     manufacturingCost: estimatedUnitCost(
-      math.totalCost,
+      math.totalCost + intermediateCost,
       formula.estimated_units,
     ),
     expenses: extra.additional_unit,
     reason: cost == null ? "Costo pendiente" : "",
     source,
   };
+}
+
+export function estimateIntermediateCost(lines: Row[], catalog: Row, scale = 1): number | null {
+  let total = 0;
+  for (const line of lines) {
+    const option = catalog.intermediate_options?.find((item: Row) => item.id === line.variant_id);
+    const unit = catalog.units.find((item: Row) => item.id === line.unit_id);
+    const base = catalog.units.find((item: Row) => item.id === option?.unit_id);
+    if (!option || !unit || !base || unit.dimension !== base.dimension) return null;
+    let needed = Number(line.quantity) * scale * Number(unit.base_factor) / Number(base.base_factor);
+    if (!(needed > 0) || needed > Number(option.available)) return null;
+    for (const entry of option.stock_entries || []) {
+      if (entry.cost == null) return null;
+      const used = Math.min(needed, Number(entry.remaining));
+      total += used * Number(entry.cost);
+      needed -= used;
+      if (needed < 1e-8) break;
+    }
+    if (needed >= 1e-8) return null;
+  }
+  return total;
 }

@@ -34,6 +34,7 @@ export const recipeNumber = (value: unknown): number | null => {
 export const roundQuantity = (n: number) =>
   Math.round((n + Number.EPSILON) * 1e8) / 1e8;
 export const recipeLineKinds = {
+  intermediate: "Producto intermedio",
   ingredient: "Materia prima",
   packaging: "Empaque",
   auxiliary: "Insumo adicional",

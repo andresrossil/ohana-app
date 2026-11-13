@@ -38,6 +38,7 @@ export function financialSummary(materials: Row, quote: Row) {
     materials.packaging,
     materials.ingredients,
     materials.supplies,
+    ...("intermediates" in materials ? [materials.intermediates] : []),
   ]);
   const groups = Object.fromEntries(
     ["overhead", "labor", "advertising"].map((kind) => [

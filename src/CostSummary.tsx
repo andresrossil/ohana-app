@@ -67,6 +67,11 @@ export default function CostSummary({
       row[1] = values[index] ?? null;
     });
   }
+  if ("intermediates" in materials) {
+    rows.splice(3, 0, ["Productos intermedios",
+      unitReference ? unitReference.materials.intermediates ?? null : s.unit(materials.intermediates),
+      materials.intermediates]);
+  }
   return (
     <section className="cost-summary" aria-label="Resumen de costos y utilidad">
       <header className="cost-summary-heading">

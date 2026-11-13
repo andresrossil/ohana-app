@@ -9,6 +9,17 @@ import { request } from "./commerce";
 import { AppButton, AppIcon } from "./AppIcon";
 import { type Row } from "./operations";
 import "./formulas.css";
+function snapshotMaterials(snapshot: Row) {
+  const materials = materialCosts(snapshot.lines || [], "total_cost");
+  const inputs = snapshot.intermediate_consumptions as Row[] | undefined;
+  if (!inputs?.length) return materials;
+  return {
+    ...materials,
+    intermediates: inputs.some((item) => item.cost == null)
+      ? null
+      : inputs.reduce((total, item) => total + Number(item.cost), 0),
+  };
+}
 const money = (v: any, c = "GTQ") =>
   v == null
     ? "No registrado"
@@ -250,6 +261,12 @@ export default function BatchTrace({
                     {money(snapshot.total_cost, snapshot.currency)}
                   </strong>
                 </p>
+                {!!snapshot.intermediate_consumptions?.length && (
+                  <p>Productos intermedios · {snapshot.intermediate_consumptions.some((item: Row) => item.cost == null)
+                    ? "Costo pendiente"
+                    : money(snapshot.intermediate_consumptions.reduce((total: number, item: Row) => total + Number(item.cost), 0), snapshot.currency)}
+                    {snapshot.intermediate_consumptions.some((item: Row) => item.breakdown_pending) && " · Desglose pendiente"}</p>
+                )}
                 {weightCosts && (
                   <>
                     <AdditionalCostsPanel
@@ -260,10 +277,7 @@ export default function BatchTrace({
                     />
                     <CostSummary
                       product={snapshot.product.name}
-                      materials={materialCosts(
-                        snapshot.lines || [],
-                        "total_cost",
-                      )}
+                      materials={snapshotMaterials(snapshot)}
                       quote={weightSummaryQuote(weightCosts)}
                       variable
                       historical
@@ -360,10 +374,7 @@ export default function BatchTrace({
                 {snapshot.additional_costs && !weightCosts && (
                   <CostSummary
                     product={snapshot.product.name}
-                    materials={materialCosts(
-                      snapshot.lines || [],
-                      "total_cost",
-                    )}
+                    materials={snapshotMaterials(snapshot)}
                     quote={snapshot.additional_costs}
                     historical
                   />
