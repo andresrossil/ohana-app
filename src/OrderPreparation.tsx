@@ -18,6 +18,19 @@ function preparationLine(line: Row) {
   return { product, size: variantLabel({ ...line, name: size.join(" · ") }) };
 }
 
+function customerContacts(orders: Row[]) {
+  const contacts = new Map<string, { phone: string; address: string; numbers: string[] }>();
+  for (const order of orders) {
+    const phone = String(order.phone ?? "").trim();
+    const address = [order.address, order.department, deliveryZoneLabel(order.zone)].filter(Boolean).join(" · ");
+    const key = JSON.stringify([phone, address]);
+    const contact = contacts.get(key) ?? { phone, address, numbers: [] };
+    contact.numbers.push("#" + (order.invoice_number || order.number));
+    contacts.set(key, contact);
+  }
+  return [...contacts.entries()];
+}
+
 export default function OrderPreparation({ company }: { company: string }) {
   const state = useOperation(company, "sales");
   const [filters, setFilters] = useState(salesTodayRange);
@@ -112,15 +125,24 @@ export default function OrderPreparation({ company }: { company: string }) {
         </ResponsiveTable>
       </div> : sortedCustomers.map(([id, customer]) => (
         <section key={id} className="preparation-customer">
-          <h2>{customer.name}</h2>
+          <header className="preparation-customer-header">
+            <h2>{customer.name}</h2>
+            <div className="preparation-contacts">
+              {customerContacts(customer.orders).map(([key, contact], _, contacts) => (
+                <div className="preparation-contact" key={key}>
+                  {contacts.length > 1 && <strong>{contact.numbers.join(", ")}</strong>}
+                  <span><strong>Teléfono</strong> {contact.phone || "—"}</span>
+                  <span><strong>Dirección</strong> {contact.address || "—"}</span>
+                </div>
+              ))}
+            </div>
+          </header>
           <div className="table-wrap">
             <ResponsiveTable>
-              <thead><tr><th>Pedido</th><th>Confirmado</th><th>Teléfono</th><th>Dirección</th><th>Productos y variantes</th><th>Estado</th><th>Acciones</th></tr></thead>
+              <thead><tr><th>Pedido</th><th>Confirmado</th><th>Productos y variantes</th><th>Estado</th><th>Acciones</th></tr></thead>
               <tbody>{customer.orders.map((order) => <tr key={order.id}>
                 <td data-sort-value={order.invoice_number || order.number}>#{order.invoice_number || order.number}</td>
                 <td data-sort-value={order.confirmed_at}>{confirmationDate.format(new Date(order.confirmed_at))}</td>
-                <td>{order.phone || "—"}</td>
-                <td>{[order.address, order.department, deliveryZoneLabel(order.zone)].filter(Boolean).join(" · ") || "—"}</td>
                 <td><ul className="preparation-items">
                   {(order.lines as Row[]).map((line) => {
                     const item = preparationLine(line);

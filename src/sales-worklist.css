@@ -10,5 +10,20 @@
   font-weight: 700;
 }
 .shell .preparation-customer + .preparation-customer { border-top: 1px solid var(--admin-border); }
-.shell .preparation-customer h2 { padding: 14px 16px; margin: 0; font-size: 1.05rem; }
+.shell .preparation-customer-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px 20px;
+  padding: 14px 16px;
+  overflow-wrap: anywhere;
+}
+.shell .preparation-customer-header h2 { margin: 0; font-size: 1.05rem; }
+.shell .preparation-contacts { flex: 1 1 24rem; min-width: 0; }
+.shell .preparation-contact {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+}
+.shell .preparation-contact + .preparation-contact { margin-top: 6px; }
 .shell .preparation-items { margin: 0; padding-inline-start: 1.25rem; }
