@@ -92,7 +92,6 @@ export default function InventoryAdjustment({
     [reason, setReason] = useState(countMode ? "Conteo físico de inventario" : ""),
     [notes, setNotes] = useState(""),
     [review, setReview] = useState<Row | null>(null),
-    [ack, setAck] = useState(false),
     [dirty, setDirty] = useState(false);
   useEffect(() => {
     state.run(async () => {
@@ -129,7 +128,6 @@ export default function InventoryAdjustment({
   function changed() {
     setDirty(true);
     setReview(null);
-    setAck(false);
   }
   function update(index: number, patch: Row) {
     changed();
@@ -332,7 +330,6 @@ export default function InventoryAdjustment({
       setReview(
         await inventoryRequest(company, "review", await currentPayload()),
       );
-      setAck(false);
     });
   }
   return (
@@ -695,22 +692,11 @@ export default function InventoryAdjustment({
                 </ResponsiveTable>
               </div>
               {review.warnings.length > 0 && (
-                <>
                   <ul>
                     {review.warnings.map((s: string, i: number) => (
                       <li key={i}>{s}</li>
                     ))}
                   </ul>
-                  <label className="check">
-                    <input
-                      type="checkbox"
-                      checked={ack}
-                      onChange={(e) => setAck(e.target.checked)}
-                    />
-                    Entiendo las advertencias y confirmo el registro, incluyendo
-                    los costos pendientes.
-                  </label>
-                </>
               )}
             </section>
           )}
@@ -725,7 +711,7 @@ export default function InventoryAdjustment({
             </AppButton>
             {review && (
               <AppButton
-                disabled={state.busy || (review.warnings.length > 0 && !ack)}
+                disabled={state.busy}
                 onClick={() =>
                   state.run(async () => {
                     await keyedRequest(
@@ -734,7 +720,7 @@ export default function InventoryAdjustment({
                       {
                         ...(await currentPayload()),
                         proof: review.proof,
-                        acknowledged: ack,
+                        acknowledged: true,
                       },
                       "confirm",
                     );
