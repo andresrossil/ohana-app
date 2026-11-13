@@ -114,7 +114,7 @@ export default function InventoryAdjustment({
     })),
   ];
   const outgoing = kind === "adjust_out";
-  const num=(n:any)=>n==null?"—":Number(n).toLocaleString("es-GT",{maximumFractionDigits:8});
+  const num=(n:any)=>n==null?"—":Number(n).toLocaleString("es-GT",{maximumFractionDigits:2});
   const countActions:Record<string,string>={count:"Conteo real",adjust_in:"Entrada por ajuste",adjust_out:"Salida por ajuste"};
   const displayColumns=columns;
   const exportColumns:readonly (readonly [string,string])[]=countMode?[...columns,["count_action","Acción"]]:columns;
@@ -666,7 +666,7 @@ export default function InventoryAdjustment({
               </p>
               <p>
                 {review.quantity_totals
-                  ?.map((x: Row) => `${x.quantity} ${x.unit}`)
+                  ?.map((x: Row) => `${num(x.quantity)} ${x.unit}`)
                   .join(" · ")}{" "}
               </p>
               <div className="table-wrap">
@@ -685,7 +685,7 @@ export default function InventoryAdjustment({
                           {(r.snapshot||r).sku} · {(r.snapshot||r).name}
                           <small>{(r.snapshot||r).variant}</small>
                         </td>
-                        {countMode?<><td>{countActions[r.action||"count"]}</td><td data-sort-value={r.captured_quantity??r.actual}>{num(r.captured_quantity??r.actual)}</td><td data-sort-value={r.theoretical}>{num(r.theoretical)}</td><td data-sort-value={r.actual}>{num(r.actual)}</td><td data-sort-value={r.difference}>{num(r.difference)}</td><td>{Number(r.difference)>0?"Entrada":Number(r.difference)<0?"Salida":"Sin movimiento"}</td><td>{r.unit}</td></>:<><td>{r.quantity}</td><td>{r.snapshot.input_unit}</td></>}
+                        {countMode?<><td>{countActions[r.action||"count"]}</td><td data-sort-value={r.captured_quantity??r.actual}>{num(r.captured_quantity??r.actual)}</td><td data-sort-value={r.theoretical}>{num(r.theoretical)}</td><td data-sort-value={r.actual}>{num(r.actual)}</td><td data-sort-value={r.difference}>{num(r.difference)}</td><td>{Number(r.difference)>0?"Entrada":Number(r.difference)<0?"Salida":"Sin movimiento"}</td><td>{r.unit}</td></>:<><td data-sort-value={r.quantity}>{num(r.quantity)}</td><td>{r.snapshot.input_unit}</td></>}
                       </tr>
                     ))}
                   </tbody>
