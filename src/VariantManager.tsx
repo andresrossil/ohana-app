@@ -54,6 +54,19 @@ export default function VariantManager({
   usePriceRefresh(company, () => {
     load().catch((e) => state.setError(e.message));
   });
+  async function removeVariant(row: Row) {
+    if (!(await confirmAction(
+      `¿Eliminar la variante ${variantLabel(row)}? Esta acción es permanente.`,
+      { title: "Eliminar variante", confirmText: "Eliminar" },
+    ))) return;
+    await state.run(async () => {
+      await mutate(company, "variant_delete", { product: product.id, id: row.id });
+      setRows((previous) => previous.filter((variant) => variant.id !== row.id));
+      state.setNotice("Variante eliminada.");
+      pricesChanged(company);
+      await onChanged?.();
+    });
+  }
   return (
     <div className="overlay">
       <section
@@ -361,6 +374,10 @@ export default function VariantManager({
                         <AppButton onClick={() => setBarcode(r)}>
                           Barras
                         </AppButton>
+                      )}
+                      {state.canWrite && edit === undefined && (
+                        <AppButton className="danger" iconKey="action.delete" disabled={state.busy}
+                          onClick={() => void removeVariant(r)}>Eliminar</AppButton>
                       )}
                     </td>
                   </tr>
