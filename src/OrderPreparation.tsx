@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 import { AppButton } from "./AppIcon";
 import { salesTodayRange, salesWorklist } from "./commerce";
-import { useOperation, type Row } from "./operations";
+import { keyedRequest, useOperation, type Row } from "./operations";
+import { confirmAction } from "./ConfirmDialog";
+import { deliveryZoneLabel } from "./delivery-address";
 import OrderPreparationDialog, { fulfillmentLabels } from "./OrderPreparationDialog";
 import ResponsiveTable from "./ResponsiveTable";
 import { variantLabel } from "./variant-label";
@@ -23,6 +25,7 @@ export default function OrderPreparation({ company }: { company: string }) {
   const [orders, setOrders] = useState<Row[]>([]);
   const [view, setView] = useState<"products" | "customers">("products");
   const [selected, setSelected] = useState<string | null>(null);
+  const [finishing, setFinishing] = useState<string | null>(null);
 
   async function load(range = applied) {
     const result = await salesWorklist(company, "preparation_list", range);
@@ -32,12 +35,28 @@ export default function OrderPreparation({ company }: { company: string }) {
 
   useEffect(() => { void state.run(() => load(filters)); }, [company]);
 
+  function advance(order: Row) {
+    if (order.stage === "preparing") {
+      setFinishing(order.id);
+      return;
+    }
+    const action = order.stage === "invoiced" ? "prepare" : "handoff";
+    void state.run(async () => {
+      if (!await confirmAction(action === "prepare"
+        ? "¿Confirmas iniciar la preparación? No se descontará inventario todavía."
+        : "¿Confirmas la entrega del pedido? El inventario ya se descontó al terminarlo.")) return;
+      await keyedRequest(company, "sales_fulfillment", { order: order.id, expected_stage: order.stage }, action);
+      await load();
+    });
+  }
+
   const products = new Map<string, { product: string; size: string; quantity: number }>();
   const customers = new Map<string, { name: string; orders: Row[] }>();
   for (const order of orders) {
     const customer = customers.get(order.customer_id) ?? { name: order.customer_name, orders: [] as Row[] };
     customer.orders.push(order);
     customers.set(order.customer_id, customer);
+    if (!["invoiced", "preparing"].includes(order.stage)) continue;
     for (const line of order.lines as Row[]) {
       const item = products.get(line.variant_id) ?? { ...preparationLine(line), quantity: 0 };
       item.quantity += Number(line.quantity);
@@ -46,6 +65,7 @@ export default function OrderPreparation({ company }: { company: string }) {
   }
   const sortedProducts = [...products].sort(([, a], [, b]) => names.compare(a.product, b.product) || names.compare(a.size, b.size));
   const sortedCustomers = [...customers].sort(([, a], [, b]) => names.compare(a.name, b.name));
+  const visibleCount = view === "products" ? orders.filter((order) => ["invoiced", "preparing"].includes(order.stage)).length : orders.length;
 
   return <>
     <section className="intro">
@@ -79,10 +99,10 @@ export default function OrderPreparation({ company }: { company: string }) {
           onClick={() => setView("products")}>Por producto y variante</AppButton>
         <AppButton className="secondary" iconKey="module.customers" aria-pressed={view === "customers"}
           onClick={() => setView("customers")}>Por cliente</AppButton>
-        <span>{orders.length} {orders.length === 1 ? "pedido" : "pedidos"}</span>
+        <span>{visibleCount} {visibleCount === 1 ? "pedido" : "pedidos"}</span>
       </div>
-      {orders.length === 0 ? <p className="empty" role="status">
-        {state.busy ? "Consultando pedidos…" : "No hay pedidos confirmados pendientes de preparar para esas fechas."}
+      {visibleCount === 0 ? <p className="empty" role="status">
+        {state.busy ? "Consultando pedidos…" : view === "products" ? "No hay pedidos pendientes de preparar para esas fechas." : "No hay pedidos confirmados para esas fechas."}
       </p> : view === "products" ? <div className="table-wrap">
         <ResponsiveTable>
           <thead><tr><th>Producto</th><th>Variante</th><th>Unidades a reunir</th></tr></thead>
@@ -95,10 +115,12 @@ export default function OrderPreparation({ company }: { company: string }) {
           <h2>{customer.name}</h2>
           <div className="table-wrap">
             <ResponsiveTable>
-              <thead><tr><th>Pedido</th><th>Confirmado</th><th>Productos y variantes</th><th>Estado</th><th>Acciones</th></tr></thead>
+              <thead><tr><th>Pedido</th><th>Confirmado</th><th>Teléfono</th><th>Dirección</th><th>Productos y variantes</th><th>Estado</th><th>Acciones</th></tr></thead>
               <tbody>{customer.orders.map((order) => <tr key={order.id}>
                 <td data-sort-value={order.invoice_number || order.number}>#{order.invoice_number || order.number}</td>
                 <td data-sort-value={order.confirmed_at}>{confirmationDate.format(new Date(order.confirmed_at))}</td>
+                <td>{order.phone || "—"}</td>
+                <td>{[order.address, order.department, deliveryZoneLabel(order.zone)].filter(Boolean).join(" · ") || "—"}</td>
                 <td><ul className="preparation-items">
                   {(order.lines as Row[]).map((line) => {
                     const item = preparationLine(line);
@@ -106,7 +128,14 @@ export default function OrderPreparation({ company }: { company: string }) {
                   })}
                 </ul></td>
                 <td>{fulfillmentLabels[order.stage]}</td>
-                <td><AppButton className="secondary" iconKey="action.expand" onClick={() => setSelected(order.id)}>Ver pedido</AppButton></td>
+                <td><div className="actions">
+                  {state.canWrite && ["invoiced", "preparing", "finished"].includes(order.stage) &&
+                    <AppButton iconKey="action.confirm" disabled={state.busy} onClick={() => advance(order)}>
+                      {order.stage === "invoiced" ? "Iniciar preparación" : order.stage === "preparing" ? "Pedido terminado"
+                        : order.delivery_kind === "courier" ? "Entregado a mensajería" : "Entregar al cliente"}
+                    </AppButton>}
+                  <AppButton className="secondary" iconKey="action.expand" onClick={() => setSelected(order.id)}>Ver pedido</AppButton>
+                </div></td>
               </tr>)}</tbody>
             </ResponsiveTable>
           </div>
@@ -114,5 +143,7 @@ export default function OrderPreparation({ company }: { company: string }) {
       ))}
     </section>
     {selected && <OrderPreparationDialog company={company} orderId={selected} onClose={() => setSelected(null)} onSaved={() => load()} />}
+    {finishing && <OrderPreparationDialog finishOnly company={company} orderId={finishing}
+      onClose={() => setFinishing(null)} onSaved={async () => { await load(); setFinishing(null); }} />}
   </>;
 }
