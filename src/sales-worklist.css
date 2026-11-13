@@ -29,4 +29,5 @@
   gap: 4px 16px;
 }
 .shell .preparation-contact + .preparation-contact { margin-top: 6px; }
+.shell .preparation-order-controls > .preparation-contact { align-items: center; }
 .shell .preparation-items { margin: 0; padding-inline-start: 1.25rem; }

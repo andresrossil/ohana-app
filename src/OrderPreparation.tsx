@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { AppButton } from "./AppIcon";
 import { salesTodayRange, salesWorklist } from "./commerce";
-import { keyedRequest, useOperation, type Row } from "./operations";
+import { keyedRequest, money, useOperation, type Row } from "./operations";
 import { confirmAction } from "./ConfirmDialog";
 import { deliveryZoneLabel } from "./delivery-address";
 import OrderPreparationDialog, { fulfillmentLabels } from "./OrderPreparationDialog";
@@ -136,6 +136,18 @@ export default function OrderPreparation({ company }: { company: string }) {
                 </div>
               ))}
             </div>
+            <div className="preparation-order-controls">
+              {customer.orders.map((order) => (
+                <div className="preparation-contact" key={order.id}>
+                  <strong>Pedido #{order.invoice_number || order.number} · {money(order.total, order.currency)}</strong>
+                  {state.canWrite && ["invoiced", "preparing", "finished"].includes(order.stage) &&
+                    <AppButton iconKey="action.confirm" disabled={state.busy} onClick={() => advance(order)}>
+                      {order.stage === "invoiced" ? "Iniciar preparación" : order.stage === "preparing" ? "Pedido terminado"
+                        : order.delivery_kind === "courier" ? "Entregado a mensajería" : "Entregar al cliente"}
+                    </AppButton>}
+                </div>
+              ))}
+            </div>
           </header>
           <div className="table-wrap">
             <ResponsiveTable>
@@ -150,14 +162,7 @@ export default function OrderPreparation({ company }: { company: string }) {
                   })}
                 </ul></td>
                 <td>{fulfillmentLabels[order.stage]}</td>
-                <td><div className="actions">
-                  {state.canWrite && ["invoiced", "preparing", "finished"].includes(order.stage) &&
-                    <AppButton iconKey="action.confirm" disabled={state.busy} onClick={() => advance(order)}>
-                      {order.stage === "invoiced" ? "Iniciar preparación" : order.stage === "preparing" ? "Pedido terminado"
-                        : order.delivery_kind === "courier" ? "Entregado a mensajería" : "Entregar al cliente"}
-                    </AppButton>}
-                  <AppButton className="secondary" iconKey="action.expand" onClick={() => setSelected(order.id)}>Ver pedido</AppButton>
-                </div></td>
+                <td><AppButton className="secondary" iconKey="action.expand" onClick={() => setSelected(order.id)}>Ver pedido</AppButton></td>
               </tr>)}</tbody>
             </ResponsiveTable>
           </div>
