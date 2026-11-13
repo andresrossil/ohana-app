@@ -12,3 +12,11 @@
 @media(max-width:750px){.shell .settlement-filters{grid-template-columns:repeat(2,minmax(0,1fr));}}
 @media(max-width:460px){.shell .settlement-filters{grid-template-columns:minmax(0,1fr);}.shell .settlement-summary dl>div{grid-template-columns:minmax(0,1fr);gap:3px;padding-bottom:6px;}}
 @media(max-width:650px){.shell .courier-dialog{padding:14px;}.shell .delivery-summary {flex-direction:column;}.shell .courier-dialog .hierarchy-toolbar {flex-wrap:wrap;gap:10px;}}
+.shell .settlement-dialog .settlement-invoice-balance {
+  display: block;
+  margin: 8px 0 0;
+  color: var(--company-text);
+  font-size: 1.1rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
