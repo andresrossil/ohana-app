@@ -197,6 +197,11 @@ export default function MaterialSheet({
   const reserving = useRef(new Set<string>());
   const [suggesting, setSuggesting] = useState(false);
   const [filter, setFilter] = useState("");
+  const [skuFilter, setSkuFilter] = useState("");
+  const selectedSkus = useMemo(() => new Set(
+    parseTSV(skuFilter).flat().map((cell) => cell.trim().toUpperCase())
+      .filter((code) => code && code !== "SKU"),
+  ), [skuFilter]);
   const table = useRef<HTMLDivElement>(null),
     dragging = useRef(false),
     moving = useRef(false),
@@ -582,9 +587,11 @@ export default function MaterialSheet({
     if (!canWrite || busy) return;
     e.preventDefault();
     setError("");
-    setFilter("");
-    setClassification("");
-    setOrigin("");
+    if (!selectedSkus.size) {
+      setFilter("");
+      setClassification("");
+      setOrigin("");
+    }
     try {
       const text = e.clipboardData.getData("text/plain");
       if (importing && !rows.length && !text.trim())
@@ -592,6 +599,8 @@ export default function MaterialSheet({
           "El portapapeles no contiene datos de una tabla. Copia las celdas en Excel e intenta de nuevo.",
         );
       const start = { row: selected.r0, col: selected.c0 };
+      if (selectedSkus.size && (!viewRows[start.row] || !visibleRow(viewRows[start.row])))
+        throw Error("Selecciona una celda visible antes de pegar los cambios.");
       const { matrix, mapping } = pasteLayout(
         parseTSV(text),
         start.col,
@@ -600,6 +609,11 @@ export default function MaterialSheet({
       if (!matrix.length) return;
       if (matrix.length > 500)
         throw Error("Pega como máximo 500 filas por lote.");
+      const destinations = selectedSkus.size
+        ? viewRows.flatMap((row, index) => index >= start.row && visibleRow(row) ? [index] : [])
+        : null;
+      if (destinations && destinations.length < matrix.length)
+        throw Error("El bloque supera las filas visibles desde la celda seleccionada.");
       const hasHistorical = matrix.some((line) =>
         line.some((text, ci) => [10, 11].includes(mapping[ci]) && text.trim()),
       );
@@ -607,7 +621,8 @@ export default function MaterialSheet({
       const next = viewRows.map((r) => ({ ...r, cells: [...r.cells] }));
       while (next.length < start.row + matrix.length) next.push(blankRow());
       matrix.forEach((line, ri) => {
-        let row = next[start.row + ri];
+        const index = destinations?.[ri] ?? start.row + ri;
+        let row = next[index];
         line.forEach((text, ci) => {
           const col = mapping[ci];
           if (
@@ -651,13 +666,13 @@ export default function MaterialSheet({
             row.cells[16] || "",
             !!row.barcodeCustom,
           );
-        next[start.row + ri] = row;
+        next[index] = row;
       });
       updateView(next);
       start.col = Math.min(...mapping.map((c) => visualOrder.indexOf(c)));
       setAnchor(start);
       setEnd({
-        row: start.row + matrix.length - 1,
+        row: destinations?.[matrix.length - 1] ?? start.row + matrix.length - 1,
         col: Math.max(...mapping.map((c) => visualOrder.indexOf(c))),
       });
       setNotice(
@@ -680,6 +695,7 @@ export default function MaterialSheet({
   }
   function visibleRow(r: SheetRow) {
     return (
+      (!selectedSkus.size || selectedSkus.has((r.cells[13] || "").trim().toUpperCase())) &&
       (!filter ||
         r.cells.some((c) => normalize(c).includes(normalize(filter)))) &&
       classificationMatches(r.cells[14], classification) &&
@@ -762,6 +778,14 @@ export default function MaterialSheet({
       row: Math.max(0, Math.min(rows.length - 1, end.row + move.row)),
       col: Math.max(0, Math.min(displayColumns.length - 1, end.col + move.col)),
     };
+    if (selectedSkus.size && move.row) {
+      if (viewRows[p.row] && !visibleRow(viewRows[p.row])) {
+        let index = p.row;
+        while (viewRows[index] && !visibleRow(viewRows[index])) index += move.row;
+        if (!viewRows[index]) return;
+        p.row = index;
+      }
+    }
     if (!e.shiftKey || e.key === "Tab") setAnchor(p);
     focus(p);
   }
@@ -955,6 +979,7 @@ export default function MaterialSheet({
     const index = rows.length;
     setRows((old) => [...old, blankRow()]);
     setFilter("");
+    setSkuFilter("");
     setClassification("");
     setOrigin("");
     setAnchor({ row: index, col: 0 });
@@ -1148,6 +1173,24 @@ export default function MaterialSheet({
           onOrigin={setOrigin}
           origins={origins}
         />
+      )}
+      {!importing && (
+        <div className="sheet-controls">
+          <label>
+            Filtrar por lista de SKU
+            <textarea rows={2} value={skuFilter} placeholder="Pega la columna SKU de Excel"
+              onChange={(event) => {
+                setSkuFilter(event.target.value);
+                const start = { row: -1, col: 0 };
+                setAnchor(start);
+                setEnd(start);
+              }} />
+          </label>
+          {skuFilter && <AppButton className="secondary" onClick={() => setSkuFilter("")}>Limpiar SKU</AppButton>}
+          {selectedSkus.size > 0 && <span role="status">
+            {viewRows.filter(visibleRow).length} filas visibles · {selectedSkus.size} SKU en el filtro
+          </span>}
+        </div>
       )}
       {notice && (
         <p role="status" className="sheet-notice">
