@@ -19,3 +19,28 @@
 @media (max-width: 600px) {
   .dashboard-card { grid-column: span 6; }
 }
+
+.dashboard-card,
+.admin-dashboard[aria-labelledby="dashboard-curing"] {
+  text-align: center;
+}
+
+.dashboard-metric {
+  grid-template-rows: minmax(2.75em, auto) auto;
+}
+
+.dashboard-metric > span {
+  align-self: end;
+}
+
+.dashboard-metric strong {
+  font-variant-numeric: tabular-nums;
+}
+
+.shell .admin-dashboard[aria-labelledby="dashboard-curing"] :is(th, td, .table-sort-button) {
+  text-align: center;
+}
+
+.admin-dashboard[aria-labelledby="dashboard-curing"] .toolbar {
+  justify-content: center;
+}
