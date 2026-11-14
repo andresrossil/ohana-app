@@ -1,0 +1,21 @@
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+.dashboard-card { grid-column: span 2; padding: 1rem; min-width: 0; }
+.dashboard-sales { grid-column: span 2; }
+.dashboard-orders { grid-column: span 4; }
+.dashboard-card h2 { margin: 0 0 .85rem; font-size: 1.15rem; }
+.dashboard-card > div { display: flex; flex-wrap: wrap; gap: .9rem 1.15rem; }
+.dashboard-metric { display: grid; align-content: start; gap: .25rem; flex: 1 1 7rem; min-width: 0; }
+.dashboard-metric strong { font-size: clamp(1.15rem, 2vw, 1.65rem); overflow-wrap: anywhere; }
+.dashboard-metric small { overflow-wrap: anywhere; }
+@media (max-width: 1000px) {
+  .dashboard-card { grid-column: span 3; }
+  .dashboard-orders { grid-column: span 6; }
+}
+@media (max-width: 600px) {
+  .dashboard-card { grid-column: span 6; }
+}

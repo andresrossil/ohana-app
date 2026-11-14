@@ -24,17 +24,19 @@ type CuringBatch = {
 
 export const curingCount = new Intl.NumberFormat("es-GT", { maximumFractionDigits: 8 });
 
-export function summarizeCuringProducts(batches: CuringBatch[]) {
+export function summarizeCuringProducts(batches: CuringBatch[], byDate = false) {
   const products = new Map<string, {
     name: string;
+    availableOn: string | null;
     lots: number;
     total: number;
     known: number;
     missing: number;
   }>();
   for (const batch of batches) {
-    const product = products.get(batch.product_id) ?? {
-      name: batch.product_name, lots: 0, total: 0, known: 0, missing: 0,
+    const key = byDate ? batch.product_id + ":" + (batch.available_on ?? "") : batch.product_id;
+    const product = products.get(key) ?? {
+      name: batch.product_name, availableOn: batch.available_on, lots: 0, total: 0, known: 0, missing: 0,
     };
     product.lots += 1;
     if (batch.theoreticalQuantity == null) {
@@ -43,7 +45,7 @@ export function summarizeCuringProducts(batches: CuringBatch[]) {
       product.total += Number(batch.theoreticalQuantity);
       product.known += 1;
     }
-    products.set(batch.product_id, product);
+    products.set(key, product);
   }
   return [...products];
 }
@@ -112,14 +114,16 @@ export default function CuringProduction({
   if (batches === null) return <p className="empty" role="status">Consultando lotes en curación…</p>;
   if (batches.length === 0) return <p className="empty">No hay lotes en curación.</p>;
 
-  const products = summarizeCuringProducts(batches);
+  const products = summarizeCuringProducts(batches, true).sort(([, a], [, b]) =>
+    (a.availableOn ?? "9999").localeCompare(b.availableOn ?? "9999") || a.name.localeCompare(b.name, "es-GT"),
+  );
   const due = batches.filter((batch) => batch.available_on && batch.available_on <= date).length;
   return (
     <>
       <div className="table-wrap">
         <ResponsiveTable>
           <thead>
-            <tr><th>Producto</th><th>Lotes</th><th>Unidades teóricas</th></tr>
+            <tr><th>Producto</th><th>Lotes</th><th>Unidades teóricas</th><th>Fecha disponible</th></tr>
           </thead>
           <tbody>
             {products.map(([id, product]) => (
@@ -130,6 +134,7 @@ export default function CuringProduction({
                   {product.known ? curingCount.format(product.total) : "Sin estimación"}
                   {product.known > 0 && product.missing > 0 && <small>Total parcial</small>}
                 </td>
+                <td data-sort-value={product.availableOn ?? ""}>{product.availableOn?.split("-").reverse().join("/") || "—"}</td>
               </tr>
             ))}
           </tbody>

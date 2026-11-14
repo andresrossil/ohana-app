@@ -1,3 +1,4 @@
+import Dashboard from "./Dashboard";
 import MoneyInput from "./MoneyInput";
 import MaterialMinimums from "./MaterialMinimums";
 import MaterialPhoto, { uploadMaterialPhoto } from "./MaterialPhoto";
@@ -119,6 +120,7 @@ function App() {
     [sheetDirty, setSheetDirty] = useState(false);
   const [importOpen, setImportOpen] = useState(false),
     [importNotice, setImportNotice] = useState("");
+  const [materialCosts, setMaterialCosts] = useState<Record<string, Row>>({});
   const [section, setSection] = useState<Section>("dashboard"),
     [configView, setConfigView] = useState("profile"),
     [expenseView, setExpenseView] = useState("overhead"),
@@ -181,6 +183,7 @@ function App() {
     loadVersion.current++;
     setData(emptyCatalog);
     setPrices([]);
+    setMaterialCosts({});
     setRole("viewer");
     setEdit(undefined);
     setHistory(null);
@@ -206,6 +209,7 @@ function App() {
       setCompany("");
       setData(emptyCatalog);
       setPrices([]);
+    setMaterialCosts({});
       setRole("viewer");
       setSection("dashboard");
       setConfigView("profile");
@@ -295,9 +299,10 @@ function App() {
         return collected;
       }
       const tables = [...Object.keys(labels), "products", "catalog_origins"];
-      const [results, p, r] = await Promise.all([
+      const [results, p, costs, r] = await Promise.all([
         Promise.all(tables.map(async (t) => [t, await all(t)] as const)),
         all("current_prices"),
+        db.rpc("catalog_material_costs", { p_company: company }),
         db.rpc("company_permission", { p_company: company, p_action: "write" }),
       ]);
       if (r.error) throw r.error;
@@ -305,6 +310,7 @@ function App() {
         return;
       setData(Object.fromEntries(results) as Catalog);
       setPrices(p);
+      setMaterialCosts(Object.fromEntries((costs.data || []).map((item: Row) => [item.id, item])));
       setRole(r.data ? "editor" : "viewer");
     } catch (e: any) {
       if (version === loadVersion.current) setError(e.message);
@@ -324,6 +330,7 @@ function App() {
     setQuery("");
     setSheetView(false);
     setPrices([]);
+    setMaterialCosts({});
     setRole("viewer");
     void load();
   }, [company, activeCompany?.catalog_read, activeCompany?.write]);
@@ -892,28 +899,13 @@ function App() {
                       <p>Tu negocio, en armonía.</p>
                     </div>
                   </section>
-                  {activeCompany?.catalog_read && (
-                    <section className="stats">
-                      <div>
-                        <span>Materiales</span>
-                        <strong>
-                          {data.raw_materials.filter((m) => m.active).length}
-                        </strong>
-                      </div>
-                      <div>
-                        <span>Productos</span>
-                        <strong>
-                          {data.products.filter((p) => p.active).length}
-                        </strong>
-                      </div>
-                      <div>
-                        <span>Proveedores</span>
-                        <strong>
-                          {data.suppliers.filter((p) => p.active).length}
-                        </strong>
-                      </div>
-                    </section>
-                  )}
+                  <Dashboard
+                    key={company}
+                    company={company}
+                    currency={activeCompany?.currency || "GTQ"}
+                    materials={activeCompany?.catalog_read && !loading ? data.raw_materials.filter((m) => m.active).length : undefined}
+                    products={activeCompany?.catalog_read && !loading ? data.products.filter((p) => p.active).length : undefined}
+                  />
                 </section>
               )}
               {section === "dashboard" && activeCompany?.production_read && (
@@ -1290,6 +1282,7 @@ function App() {
                                         ? "Equivalencia base"
                                         : "Proveedor / contenido"}
                                 </th>
+                                {tab === "raw_materials" && <th>Costo actual</th>}
                                 <th>
                                   {tab === "presentations"
                                     ? "Precio vigente"
@@ -1362,6 +1355,11 @@ function App() {
                                         </>
                                       )}
                                     </td>
+                                    {tab === "raw_materials" && (
+                                      <td data-sort-value={materialCosts[r.id]?.unit_cost ?? ""}>
+                                        {materialCosts[r.id]?.unit_cost == null ? "—" : money(Number(materialCosts[r.id].unit_cost), materialCosts[r.id].currency)}
+                                      </td>
+                                    )}
                                     <td>
                                       {tab === "presentations" ? (
                                         <>
