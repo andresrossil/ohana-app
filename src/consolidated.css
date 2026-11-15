@@ -199,3 +199,7 @@
 .shell .fund-balance-table tbody > tr:nth-child(even) > td {
   background: var(--admin-secondary, var(--admin-surface));
 }
+
+.shell .funds-report :is(h2, table, .table-mobile-sort) {
+  text-transform: uppercase;
+}

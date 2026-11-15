@@ -11,6 +11,7 @@ const labels: Record<string, string> = {
   sale: "Venta", expense: "Salida", transfer: "Transferencia",
   reversal: "Anulación", pending: "Pendiente de costos",
 };
+const historyFundName = (name: string) => /^servitoallas?$/i.test(name.trim()) ? "Maquinaria" : name;
 const pageSize = 50;
 const fundId = (fund: Row) => fund.currency + "/" + fund.fund_key;
 const initialFilters = { from: "", to: "", fund: "", kind: "", document: "" };
@@ -142,7 +143,7 @@ export default function Funds({ company }: { company: string }) {
           <AppButton className="secondary" disabled={busy} onClick={() => { setEntry(initialEntry()); setMode(""); }}>Cancelar</AppButton></div>
       </form>
     </section>}
-    {!showHistory && <section className="catalog">
+    {!showHistory && <section className="catalog funds-report">
       <div className="catalog-head"><h2>Resumen de fondos</h2></div>
       <ResponsiveTable className="fund-balance-table">
         <thead><tr><th>Fondo</th><th>Saldo</th></tr></thead>
@@ -157,7 +158,7 @@ export default function Funds({ company }: { company: string }) {
       </ResponsiveTable>
       {!balances.length && <p className="muted">Aún no hay fondos con movimientos.</p>}
     </section>}
-    {showHistory && <section className="catalog">
+    {showHistory && <section className="catalog funds-report">
       <div className="catalog-head"><h2>Historial de movimientos</h2></div>
       <form className="form-grid" data-dirty-managed onSubmit={(e) => { e.preventDefault(); void run(() => load(filters, 0, true)); }}>
         <label>Desde<input type="date" value={filters.from} onChange={(e) => setFilters({ ...filters, from: e.target.value })} /></label>
@@ -180,7 +181,7 @@ export default function Funds({ company }: { company: string }) {
           <td>{row.occurred_on}</td><td>{labels[row.kind]}</td>
           <td>{row.document_number != null ? "#" + row.document_number : row.reference || "—"}</td>
           <td>{row.customer_name || "—"}</td><td>{row.product_name || "—"}</td>
-          <td>{row.fund_name}</td><td>{row.description}</td>
+          <td>{historyFundName(row.fund_name)}</td><td>{row.description}</td>
           <td>{row.kind === "pending" ? "Pendiente" : money(row.amount, row.currency)}</td>
           <td><AppButton className="secondary" onClick={() => setDetail(row)}>Ver detalle</AppButton></td>
         </tr>)}</tbody>
@@ -191,8 +192,8 @@ export default function Funds({ company }: { company: string }) {
         <AppButton className="secondary" disabled={busy || !more} onClick={() => run(() => load(applied, page + 1))}>Siguiente</AppButton>
       </div>}
     </section>}
-    {detail && <div className="modal-backdrop"><section className="modal" role="dialog" aria-modal="true" aria-label="Detalle del movimiento">
-      <h2>{labels[detail.kind]} · {detail.fund_name}</h2>
+    {detail && <div className="modal-backdrop"><section className="modal funds-report" role="dialog" aria-modal="true" aria-label="Detalle del movimiento">
+      <h2>{labels[detail.kind]} · {historyFundName(detail.fund_name)}</h2>
       <p>{detail.description} · {detail.occurred_on}</p>
       {detail.kind !== "pending" && <p>{money(detail.amount, detail.currency)}</p>}
       {detail.reference && <p>Referencia · {detail.reference}</p>}
