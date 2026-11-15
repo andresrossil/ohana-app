@@ -1,3 +1,4 @@
+import remainingCuringDaysCell from "./RemainingCuringDays";
 import { plannedProductionUnits } from "./formula-model";
 import SearchSelect from "./SearchSelect";
 import MaterialRequirements from "./MaterialRequirements";
@@ -70,6 +71,11 @@ function ProductionBatches({
     [targetUnits, setTargetUnits] = useState(""),
     [consumed, setConsumed] = useState<Record<string, string>>({}),
     [outputUnits, setOutputUnits] = useState<Record<string, string>>({});
+  const [calendarDate, setCalendarDate] = useState(today);
+  useEffect(() => {
+    const timer = window.setInterval(() => setCalendarDate(today()), 60_000);
+    return () => window.clearInterval(timer);
+  }, []);
   async function load() {
     const [c, f, b] = await Promise.all([
       operation(company, "production_catalog"),
@@ -757,6 +763,7 @@ function ProductionBatches({
                 <th>Estado</th>
                 <th>Rendimiento</th>
                 <th>Disponibilidad estimada</th>
+                <th>Días restantes</th>
                 <th>Variantes / acciones</th>
               </tr>
             </thead>
@@ -799,6 +806,7 @@ function ProductionBatches({
                     <small>Merma: {b.scrap_quantity}</small>
                   </td>
                   <td>{b.available_on}</td>
+                  {remainingCuringDaysCell(b.state === "curing" ? b.available_on : null, calendarDate)}
                   <td className="actions">
                     <AppButton
                       className="secondary"

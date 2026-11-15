@@ -1,3 +1,4 @@
+import remainingCuringDaysCell from "./RemainingCuringDays";
 import { useEffect, useState } from "react";
 import { AppButton, AppIcon } from "./AppIcon";
 import { lotCode } from "./BatchTrace";
@@ -123,7 +124,7 @@ export default function CuringProduction({
       <div className="table-wrap">
         <ResponsiveTable>
           <thead>
-            <tr><th>Producto</th><th>Lotes</th><th>Unidades teóricas</th><th>Fecha disponible</th></tr>
+            <tr><th>Producto</th><th>Lotes</th><th>Unidades teóricas</th><th>Fecha disponible</th><th>Días restantes</th></tr>
           </thead>
           <tbody>
             {products.map(([id, product]) => (
@@ -135,6 +136,7 @@ export default function CuringProduction({
                   {product.known > 0 && product.missing > 0 && <small>Total parcial</small>}
                 </td>
                 <td data-sort-value={product.availableOn ?? ""}>{product.availableOn?.split("-").reverse().join("/") || "—"}</td>
+                {remainingCuringDaysCell(product.availableOn, date)}
               </tr>
             ))}
           </tbody>
@@ -177,6 +179,7 @@ export function CuringProductionTable({
                 <th>Unidades teóricas</th>
                 <th>Unidades registradas</th>
                 <th>Disponibilidad</th>
+                <th>Días restantes</th>
                 <th>Estado</th>
               </tr>
             </thead>
@@ -195,6 +198,7 @@ export function CuringProductionTable({
                       {pendingWeight ? "Pendiente de pesaje" : batch.actual_quantity == null ? "—" : curingCount.format(batch.actual_quantity)}
                     </td>
                     <td>{batch.available_on ?? "—"}</td>
+                    {remainingCuringDaysCell(batch.available_on, date)}
                     <td>
                       {due && <AppIcon name="status.warning" />}
                       {due ? pendingWeight ? "Pendiente de confirmar pesos y variantes" : "Pendiente de liberar" : "En curación"}
