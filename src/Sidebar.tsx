@@ -13,6 +13,7 @@ export const sections = [
   ["purchases", "Compras", "↙"],
   ["formulas", "Fórmulas", "⚗"],
   ["production", "Producción", "⚙"],
+  ["notes", "Notas", ""],
   ["inventory", "Inventario", "▤"],
   ["sales", "Ventas", "↗"],
   ["order-preparation", "Preparación de pedidos", ""],
@@ -29,7 +30,8 @@ export const sections = [
 export type Section = (typeof sections)[number][0];
 const categories: { id: string; label: string; icon: Section; items: Section[] }[] = [
   { id: "sales", label: "Ventas", icon: "sales", items: ["sales", "order-preparation", "settlements", "prices"] },
-  { id: "inventory", label: "Inventario y producción", icon: "inventory", items: ["materials", "products", "formulas", "production", "inventory"] },
+  { id: "inventory", label: "Inventario", icon: "inventory", items: ["materials", "products", "inventory"] },
+  { id: "production", label: "Producción y fórmulas", icon: "production", items: ["production", "formulas", "notes"] },
   { id: "purchases", label: "Compras y gastos", icon: "purchases", items: ["purchases", "expenses", "funds"] },
   { id: "partners", label: "Socios de negocio", icon: "customers", items: ["customers", "suppliers", "couriers"] },
 ];

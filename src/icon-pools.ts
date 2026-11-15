@@ -113,6 +113,10 @@ export const defaultIconPools: IconPools = {
     ],
     active: "flask-conical",
   },
+  "module.notes": {
+    options: ["notebook-pen", "notebook", "sticky-note", "file-text", "book-open"],
+    active: "notebook-pen",
+  },
   "module.production": {
     options: ["factory", "workflow", "cog", "settings-2", "hammer"],
     active: "factory",
