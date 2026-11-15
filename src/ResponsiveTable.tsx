@@ -1,3 +1,4 @@
+import TableActions from "./TableActions";
 import SearchSelect from "./SearchSelect";
 import {
   Children,
@@ -44,6 +45,9 @@ function text(children: ReactNode): string {
     .replace(/\s+/g, " ")
     .trim();
 }
+function isActionButton(node: ReactNode) {
+  return isValidElement(node) && (node.type === AppButton || node.type === "button");
+}
 function editable(children: ReactNode): boolean {
   return elements(children).some(
     (n) =>
@@ -81,6 +85,9 @@ export default forwardRef<
             .trim(),
         )
       : [];
+  const activeHeader = headerRows.at(-1);
+  const mobileDirection = mobileColumn === "" ? undefined :
+    elements(activeHeader?.props.children)[Number(mobileColumn)]?.props["aria-sort"];
   function capture(column: number) {
     const values: Record<string, string> = {};
     for (const body of Array.from(table.current?.tBodies || []))
@@ -170,7 +177,7 @@ export default forwardRef<
     }
   });
   const priority = (h: string) =>
-    /nombre|producto|materia|material(?!es)/i.test(h)
+    /nombre|producto|materia|material(?!es)|^fondo$|^artículo|^cliente|^proveedor|^concepto/i.test(h)
       ? 0
       : /estado|total|costo calculado/i.test(h)
         ? 1
@@ -183,7 +190,7 @@ export default forwardRef<
     headers
       .map((h, i) => ({ i, rank: priority(h) }))
       .sort((a, b) => a.rank - b.rank || a.i - b.i)
-      .slice(0, 4)
+      .slice(0, 3)
       .map((x) => x.i),
   );
   return (
@@ -217,7 +224,8 @@ export default forwardRef<
           <AppButton
             type="button"
             iconKey="control.sort"
-            className="secondary"
+            className="secondary mobile-sort-direction"
+            aria-label="Cambiar sentido del orden"
             disabled={mobileColumn === ""}
             onClick={() =>
               table.current?.tHead?.rows[headerRows.length - 1]?.cells[
@@ -227,7 +235,7 @@ export default forwardRef<
                 ?.click()
             }
           >
-            Cambiar sentido
+            {mobileColumn === "" ? "Sentido" : sort?.direction === "desc" || mobileDirection === "descending" ? "Desc." : "Asc."}
           </AppButton>
         </div>
       )}
@@ -352,13 +360,28 @@ export default forwardRef<
                         "data-expanded": isOpen ? "true" : "false",
                       } as {},
                       <>
-                        {cells.map((cell, i) =>
-                          cloneElement(
+                        {cells.map((cell, i) => {
+                          const header = headers[i] || "";
+                          const actions = /acciones/i.test(header);
+                          const content = Children.toArray(cell.props.children);
+                          const firstButton = actions ? content.findIndex(isActionButton) : -1;
+                          const afterButtons = firstButton < 0 ? -1 :
+                            content.findIndex((node, index) => index > firstButton && !isActionButton(node));
+                          const end = afterButtons < 0 ? content.length : afterButtons;
+                          const actionContent = firstButton >= 0 && end - firstButton > 2 ? <>
+                            {content.slice(0, firstButton)}
+                            <TableActions primary={content[firstButton]} secondary={content.slice(firstButton + 1, end)} />
+                            {content.slice(end)}
+                          </> : cell.props.children;
+                          return cloneElement(
                             cell,
                             {
                               className: [
                                 cell.props.className,
                                 !visible[i] ? "mobile-extra" : "",
+                                actions ? "mobile-actions-cell" : "",
+                                (priority(header) === 0 && !editable(cell.props.children)) ? "mobile-record-title" : "",
+                                (cell.props.colSpan || 1) > 1 ? "mobile-cell-wide" : "",
                                 /nombre|producto|materia|empaque|insumo|concepto|comentario|descripci[oó]n|acciones/i.test(
                                   headers[i] || "",
                                 )
@@ -372,15 +395,14 @@ export default forwardRef<
                               {headers[i] && (
                                 <span
                                   className="mobile-cell-label"
-                                  aria-hidden="true"
                                 >
                                   {headers[i]}
                                 </span>
                               )}
-                              {cell.props.children}
+                              {actionContent}
                             </>,
-                          ),
-                        )}
+                          );
+                        })}
                         {extra && (
                           <td
                             className="mobile-row-toggle"

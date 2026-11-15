@@ -174,57 +174,46 @@
 }
 @media (max-width: 600px) {
   .shell.chrome-shell {
-    --chrome-height: calc(88px + env(safe-area-inset-top, 0px));
+    --chrome-height: calc(56px + env(safe-area-inset-top, 0px));
   }
   .shell.chrome-shell.chrome-collapsed {
     --chrome-height: calc(44px + env(safe-area-inset-top, 0px));
   }
-  .shell .app-topbar .chrome-collapse {
-    top: auto;
-    bottom: 0;
-    transform: translateX(-50%);
-    min-height: 32px;
-    padding: 0 10px;
+  .shell .app-topbar {
+    display: grid;
+    grid-template-columns: auto 44px minmax(0, 1fr);
+    gap: 4px;
+    padding-inline: max(6px, env(safe-area-inset-left, 0px)) max(6px, env(safe-area-inset-right, 0px));
   }
-  .shell .app-topbar:not(.is-collapsed) .chrome-left,
-  .shell .app-topbar:not(.is-collapsed) .chrome-user {
-    margin-bottom: 24px;
+  .shell .app-topbar .chrome-collapse {
+    position: static;
+    transform: none;
+    padding: 0;
   }
   .shell .chrome-brand .company-logo,
   .shell .chrome-brand > img {
-    width: 72px;
-    height: 40px;
+    width: clamp(46px, 16vw, 72px);
+    height: 36px;
   }
   .shell .chrome-left,
   .shell .chrome-user {
-    gap: 6px;
+    gap: 4px;
+    max-width: none;
   }
-  .shell .chrome-user {
-    max-width: calc(60% - 22px);
-  }
+  .shell .chrome-user { justify-content: end; }
   .shell .chrome-user > span:first-child {
-    max-width: 85px;
+    min-width: 0;
     font-size: 12px;
-    white-space: normal;
-    line-height: 1.25;
-  }
-  .shell .chrome-user button {
-    font-size: 12px;
-    padding: 7px;
-    max-width: 70px;
-    white-space: normal;
-    line-height: 1.2;
   }
   .shell .chrome-avatar {
-    width: 28px;
-    height: 28px;
-    flex-basis: 28px;
+    width: 26px;
+    height: 26px;
+    flex-basis: 26px;
   }
-  .shell .app-topbar .chrome-menu-toggle {
-    padding: 8px;
-  }
-  .shell .app-topbar.is-collapsed .chrome-menu-toggle {
-    min-height: 40px;
+  .shell .app-topbar :is(.chrome-menu-toggle, .chrome-collapse, .chrome-user button) {
+    min-height: 44px;
+    padding: 6px;
+    font-size: 12px;
   }
 }
 @media (prefers-reduced-motion: reduce) {

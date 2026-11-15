@@ -318,3 +318,83 @@ body:has(dialog[open]) {
     max-height: 44px;
   }
 }
+
+.mobile-more-actions { display: none !important; }
+.table-secondary-actions { display: contents; }
+@media (max-width: 760px) {
+  .shell .responsive-table > tbody { gap: 6px; }
+  .shell .responsive-table > tbody > tr {
+    gap: 6px 10px;
+    padding: 9px;
+  }
+  .shell .responsive-table > tbody > tr > .mobile-record-title {
+    order: -1;
+    grid-column: 1 / -1;
+    font-weight: 650;
+  }
+  .shell .responsive-table .mobile-cell-label { margin-bottom: 1px; }
+  .shell .responsive-table > tbody > tr > .mobile-actions-cell {
+    grid-column: 1 / -1;
+    order: 1;
+  }
+  .shell .responsive-table .mobile-actions-cell > .mobile-cell-label { display: none; }
+  .shell .responsive-table > tbody > tr > .mobile-row-toggle {
+    order: 2;
+    padding-top: 3px !important;
+  }
+  .shell .responsive-table .mobile-row-toggle button { width: auto; }
+  .shell .responsive-table td :is(button, input, select, textarea, .actions) {
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
+  .shell .responsive-table td button,
+  .shell .responsive-table td button > span:not(.app-icon) {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  .shell .responsive-table td button { min-height: 44px; }
+  .shell .responsive-table .mobile-more-actions { display: inline-flex !important; }
+  .shell .responsive-table .table-secondary-actions[data-open="false"] { display: none; }
+  .shell .table-mobile-sort {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 6px;
+    padding: 4px 0 7px;
+    align-items: end;
+  }
+  .shell .table-mobile-sort .mobile-sort-direction { white-space: nowrap; }
+  .shell .sheet-scroll:has(.responsive-table) { overflow-x: clip; }
+  .shell .sheet-table.responsive-table > tbody > tr > :is(td, th) {
+    position: static;
+    min-height: 0;
+  }
+  .shell .sheet-table.responsive-table > tbody > tr > td :is(input, select) {
+    width: 100%;
+  }
+}
+
+@media (min-width: 761px) {
+  .shell .sheet-table .mobile-cell-label,
+  .shell .sheet-table .mobile-row-toggle { display: none; }
+}
+@media (max-width: 760px) {
+  .shell .sheet-table.responsive-table td > .mobile-cell-label {
+    height: auto;
+    min-height: 0;
+    padding: 0;
+    white-space: normal;
+  }
+  .shell .sheet-table.responsive-table td > span[data-col] {
+    height: auto;
+    min-height: 0;
+    padding: 4px 0;
+    white-space: normal;
+  }
+  .shell .responsive-table :is(td, th) input:not([type="checkbox"], [type="radio"]) { min-width: 0; }
+  .shell :is(.catalog-head, .sheet-controls, .toolbar) > * { min-width: 0; max-width: 100%; }
+}
+
+@media (max-width: 760px) {
+  .shell :is(.catalog-filters, .worklist-filters) { gap: 6px 8px; }
+  .shell :is(.catalog-filters, .worklist-filters) label { margin-bottom: 0; }
+}

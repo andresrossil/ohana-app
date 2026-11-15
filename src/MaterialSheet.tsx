@@ -1,3 +1,4 @@
+import ResponsiveTable from "./ResponsiveTable";
 import { pricesChanged } from "./price-events";
 import { money } from "./operations";
 import MoneyInput from "./MoneyInput";
@@ -1224,7 +1225,7 @@ export default function MaterialSheet({
           onCopy={copy}
           onKeyDown={key}
         >
-          <table className="sheet-table" aria-label="Hoja de materiales">
+          <ResponsiveTable className="sheet-table" aria-label="Hoja de materiales">
             <thead>
               <tr>
                 <th
@@ -1504,7 +1505,7 @@ export default function MaterialSheet({
               })}
               {importing && canWrite && placeholderRow}
             </tbody>
-          </table>
+          </ResponsiveTable>
         </div>
       )}
       {!importing && !loading && !rows.length && (
