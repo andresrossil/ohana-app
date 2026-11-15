@@ -2006,6 +2006,7 @@ export default function Formulas({
         <BatchTrace
           company={company}
           id={traceId}
+          formulas={formulas}
           onClose={() => setTraceId(null)}
         />
       )}

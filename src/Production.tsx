@@ -939,6 +939,7 @@ function ProductionBatches({
         <BatchTrace
           company={company}
           id={traceId}
+          formulas={formulas}
           showCosts={false}
           onClose={() => setTraceId(null)}
         />

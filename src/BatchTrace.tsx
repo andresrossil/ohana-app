@@ -1,4 +1,4 @@
-import { recipeLineKinds } from "./formula-model";
+import { plannedLineQuantity, plannedProductionUnits, recipeLineKinds } from "./formula-model";
 import { IconDetails } from "./PoolControls";
 import AdditionalCostsPanel from "./AdditionalCostsPanel";
 import CostSummary from "./CostSummary";
@@ -37,16 +37,62 @@ const num = (n: any) =>
     : new Intl.NumberFormat("es-GT", { maximumFractionDigits: 2 }).format(
         Number(n),
       );
+function DraftRecipe({ batch, formula }: { batch: Row; formula?: Row }) {
+  if (!formula) return <p className="muted">No se encontró la versión de fórmula vinculada a este borrador.</p>;
+  const scale = Number(batch.formula_scale ?? 1);
+  const units = batch.planned_quantity ?? plannedProductionUnits(formula.estimated_units, scale);
+  const materials = [
+    ...(formula.ingredients ?? []).map((line: Row) => ({
+      ...line, key: line.material_id,
+      kind: recipeLineKinds[(line.line_kind || "ingredient") as keyof typeof recipeLineKinds],
+    })),
+    ...(formula.intermediates ?? []).map((line: Row) => ({
+      ...line, key: line.variant_id, kind: "Producto intermedio",
+    })),
+  ];
+  return <>
+    <p><strong>{formula.code} · {formula.name} · v{formula.version}</strong></p>
+    <p className="muted">{batch.opening_stock
+      ? "Receta de referencia para el saldo inicial."
+      : "Cantidades previstas para esta producción."}</p>
+    {formula.admin_notes?.trim() && (
+      <section>
+        <h4>Apuntes de la fórmula</h4>
+        <p style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{formula.admin_notes}</p>
+      </section>
+    )}
+    {materials.length ? (
+      <div className="table-wrap">
+        <ResponsiveTable>
+          <thead><tr><th>Material / insumo</th><th>Cantidad prevista</th><th>Observaciones</th></tr></thead>
+          <tbody>
+            {materials.map((line) => {
+              const quantity = plannedLineQuantity(line.quantity, line.quantity_basis, scale, units);
+              return <tr key={line.key}>
+                <td>{line.name}<small>{line.kind}</small></td>
+                <td data-sort-value={quantity ?? ""}>{quantity == null ? "—" : `${num(quantity)} ${line.unit || ""}`}</td>
+                <td style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{line.reference_notes || "—"}</td>
+              </tr>;
+            })}
+          </tbody>
+        </ResponsiveTable>
+      </div>
+    ) : <p className="muted">Esta fórmula no tiene materiales registrados.</p>}
+  </>;
+}
+
 export default function BatchTrace({
   company,
   id,
   onClose,
   showCosts = true,
+  formulas,
 }: {
   company: string;
   id: string;
   onClose: () => void;
   showCosts?: boolean;
+  formulas: Row[];
 }) {
   const [data, setData] = useState<Row | null>(null),
     [error, setError] = useState("");
@@ -98,7 +144,7 @@ export default function BatchTrace({
         {!data && !error && <p role="status">Cargando trazabilidad…</p>}
         {data && (
           <>
-            <h3>Fórmula utilizada</h3>
+            <h3>{snapshot || data.batch.confirmed ? "Fórmula utilizada" : "Fórmula planificada"}</h3>
             {snapshot && !showCosts ? (
               <>
                 <p>
@@ -431,11 +477,7 @@ export default function BatchTrace({
                     </div>
                   </>
                 ) : (
-                  <p>
-                    Este lote aún no tiene producción confirmada. La
-                    composición, los consumos y los costos históricos se
-                    guardarán al confirmar.
-                  </p>
+                  <DraftRecipe batch={data.batch} formula={formulas.find((formula) => formula.id === data.batch.formula_id)} />
                 )}
               </>
             )}
