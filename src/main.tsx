@@ -1041,6 +1041,7 @@ function App() {
                 "purchases",
                 "formulas",
                 "production",
+                "notes",
                 "sales",
                 "order-preparation",
                 "customers",

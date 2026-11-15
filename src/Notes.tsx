@@ -7,6 +7,14 @@ import "./notes.css";
 type Note = { id: string; title: string; body: string };
 const blank: Note = { id: "", title: "", body: "" };
 
+function notePreview(body: string) {
+  const characters = Array.from(body.trim().replace(/\s+/gu, " "));
+  if (!characters.length) return "Nota vacía";
+  return characters.length > 100
+    ? characters.slice(0, 100).join("") + "…"
+    : characters.join("");
+}
+
 export default function Notes({ company, onDirty }: {
   company: string;
   onDirty: (dirty: boolean) => void;
@@ -96,7 +104,7 @@ export default function Notes({ company, onDirty }: {
       {notes.map((note) => <article className="notes-card" key={note.id}>
         <button className="notes-open" type="button" onClick={() => open(note)}>
           <strong>{note.title || "Sin título"}</strong>
-          <span>{note.body || "Nota vacía"}</span>
+          <span>{notePreview(note.body)}</span>
         </button>
         <AppButton className="secondary notes-delete" iconKey="action.delete" disabled={busy}
           aria-label={"Eliminar " + (note.title || "nota sin título")} onClick={() => remove(note)} />

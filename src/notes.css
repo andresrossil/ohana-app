@@ -16,8 +16,8 @@
   justify-content: stretch;
   gap: .45rem;
   width: 100%;
-  min-height: 8rem;
-  padding: .85rem 2.9rem .85rem .85rem;
+  min-height: 5rem;
+  padding: .65rem 2.9rem .65rem .75rem;
   border: 0;
   background: transparent;
   color: inherit;
@@ -25,13 +25,15 @@
   white-space: normal;
   overflow-wrap: anywhere;
 }
-.notes-open span {
-  display: -webkit-box;
-  -webkit-line-clamp: 4;
-  -webkit-box-orient: vertical;
+.notes-open strong {
   overflow: hidden;
-  white-space: pre-line;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.notes-open span {
+  font-size: .9rem;
   font-weight: normal;
+  line-height: 1.35;
 }
 .shell .notes-delete {
   position: absolute;
