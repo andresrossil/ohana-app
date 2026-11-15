@@ -195,3 +195,7 @@
 .shell .material-create-modal > header { display: flex; align-items: start; justify-content: space-between; gap: 12px; }
 .shell .material-create-modal .catalog-fields { grid-column: 1/-1; }
 .shell .material-create-vs { min-height: 42px; display: flex; align-items: center; gap: 8px; padding: 8px; border: 1px solid var(--admin-border); border-radius: 8px; }
+
+.shell .fund-balance-table tbody > tr:nth-child(even) > td {
+  background: var(--admin-secondary, var(--admin-surface));
+}
