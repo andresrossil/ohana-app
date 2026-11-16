@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { Clock3, CreditCard, Download, MapPin, Phone, Printer, Truck, UserRound } from "lucide-react";
 import { supabase } from "./client";
-import { deliveryZoneLabel } from "./delivery-address";
+import { deliveryTariff, deliveryZoneLabel } from "./delivery-address";
+import { courierRead } from "./delivery-model";
 import { money, type Row } from "./operations";
 import { paymentMethods } from "./payment-methods";
 import { roundMoney, saleDiscountAmount, saleLineTotals } from "./sale-form-model";
@@ -44,22 +45,35 @@ export function openSaleDocument(source: Row | (() => Promise<Row>), format: "in
   if (format === "label") container.className = "shipping-label-sheet";
   doc.body.replaceChildren(container);
   const root = createRoot(container);
-  const show = (data: Row) => {
+  const show = async (data: Row) => {
+    if (preview.closed) return;
+    const delivery = data.delivery;
+    let schedule = delivery?.tariff_snapshot?.delivery_schedule?.trim() || "";
+    if (format === "invoice" && delivery?.kind === "courier" && !schedule && data.order.company_id) {
+      try {
+        const options = await courierRead(data.order.company_id, "options");
+        const courier = options.couriers?.find((item: Row) => item.id === delivery.courier_id);
+        const destination = delivery.destination || (courier?.mode === "zone" ? delivery.zone : delivery.department);
+        schedule = deliveryTariff({ ...delivery, destination }, options)?.delivery_schedule?.trim() || "";
+      } catch {
+        // The document can still be printed if the current timetable is unavailable.
+      }
+    }
     if (preview.closed) return;
     doc.title = `${title} · #${data.order.invoice_number || data.order.number}`;
-    root.render(<SaleDocument data={data} format={format} onPrint={() => preview.print()} />);
+    root.render(<SaleDocument data={data} schedule={schedule} format={format} onPrint={() => preview.print()} />);
   };
   if (typeof source === "function") {
     root.render(<p className="print-controls" role="status">Cargando documento…</p>);
     void source().then(show, () => {
       if (!preview.closed) root.render(<p className="print-controls" role="alert">No se pudo cargar el documento. Cierra esta ventana y vuelve a intentarlo.</p>);
     });
-  } else show(source);
+  } else void show(source);
   preview.addEventListener("pagehide", () => root.unmount(), { once: true });
   return true;
 }
 
-function SaleDocument({ data, format, onPrint }: { data: Row; format: "invoice" | "label"; onPrint: () => void }) {
+function SaleDocument({ data, format, onPrint, schedule }: { data: Row; schedule: string; format: "invoice" | "label"; onPrint: () => void }) {
   const { order, document_brand: brand } = data;
   const delivery = data.delivery ?? {};
   const customer = order.customer_snapshot ?? {};
@@ -94,7 +108,6 @@ function SaleDocument({ data, format, onPrint }: { data: Row; format: "invoice" 
   const deliveryLabel = deliveryKind === "courier" ? "Mensajería" : deliveryKind === "own" ? "Entrega propia" : "Recoger pedido";
   const address = [delivery.address || customer.address, deliveryZoneLabel(delivery.zone), delivery.department]
     .filter(Boolean).join(" · ");
-  const schedule = delivery.tariff_snapshot?.delivery_schedule;
   const isLabel = format === "label";
   const amountToCollect = closed || order.payment === "transfer" ? money(0, currency)
     : isDraft ? "Pendiente de confirmación"
@@ -183,7 +196,7 @@ function SaleDocument({ data, format, onPrint }: { data: Row; format: "invoice" 
             <h2><Truck aria-hidden="true" /> Entrega</h2>
             <p>{[deliveryLabel, delivery.courier_snapshot?.name].filter(Boolean).join(" · ")}</p>
             {deliveryKind !== "pickup" && address && <p><MapPin aria-hidden="true" /> {address}</p>}
-            {deliveryKind === "courier" && schedule && <p><Clock3 aria-hidden="true" /> {schedule}</p>}
+            {deliveryKind === "courier" && <p><Clock3 aria-hidden="true" /> <strong>Horario de entrega</strong> · {schedule || "Por coordinar"}</p>}
           </section>
         </div>
 
