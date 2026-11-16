@@ -68,7 +68,7 @@ export default function Sales({ company, currency = "GTQ" }: { company: string; 
         <AppButton className="secondary" disabled={state.busy} onClick={() => state.run(reload)}>Actualizar</AppButton>
       </div>
     </section>
-    {state.error && !cancelOrder && <p className="error" role="alert">{state.error}</p>}
+    {state.error && !cancelOrder && <p className="error" role="alert" style={{ whiteSpace: "pre-line", overflowWrap: "anywhere" }}>{state.error}</p>}
     <section className="catalog">
       <div className="toolbar"><h2>Facturas</h2></div>
       <form className="settings-grid worklist-filters" onSubmit={(event) => {
@@ -125,7 +125,7 @@ export default function Sales({ company, currency = "GTQ" }: { company: string; 
                 </AppButton>}
                 {active && order.status === "pending" && order.fulfillment_stage === "draft" && <AppButton iconKey="action.confirm" disabled={state.busy}
                   onClick={() => state.run(async () => {
-                    if (!await confirmAction("¿El cliente confirmó el pedido? Se reservarán las unidades disponibles para esta factura.",
+                    if (!await confirmAction("¿El cliente confirmó el pedido? Se comprobarán las existencias y, si alcanzan, se reservarán las unidades del pedido.",
                       { title: "Confirmación del cliente", confirmText: "Confirmar pedido" })) return;
                     await keyedRequest(company, "sales_fulfillment", { order: order.id, expected_stage: "draft", expected_revision: order.revision }, "confirm_customer");
                     await reload();
@@ -149,7 +149,7 @@ export default function Sales({ company, currency = "GTQ" }: { company: string; 
     {cancelOrder && <div className="overlay">
       <section className="modal operations-dialog" role="dialog" aria-modal="true" aria-label="Cancelar pedido">
         <h2>Cancelar pedido</h2>
-        {state.error && <p className="error" role="alert">{state.error}</p>}
+        {state.error && <p className="error" role="alert" style={{ whiteSpace: "pre-line", overflowWrap: "anywhere" }}>{state.error}</p>}
         <p>Pedido #{cancelOrder.number} · {cancelOrder.customer_snapshot.name} · {money(cancelOrder.total, cancelOrder.currency)}</p>
         <form onSubmit={(event) => {
           event.preventDefault();
