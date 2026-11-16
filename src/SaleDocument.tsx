@@ -38,9 +38,10 @@ export function openSaleDocument(source: Row | (() => Promise<Row>), format: "in
   viewport.name = "viewport";
   viewport.content = "width=device-width, initial-scale=1";
   const stylesheet = doc.createElement("style");
-  stylesheet.textContent = styles + (format === "label" ? "@page { size: 100mm 150mm; margin: 0; }" : "");
+  stylesheet.textContent = styles + (format === "label" ? "@page { size: auto; margin: 0; }" : "");
   doc.head.append(viewport, stylesheet);
   const container = doc.createElement("div");
+  if (format === "label") container.className = "shipping-label-sheet";
   doc.body.replaceChildren(container);
   const root = createRoot(container);
   const show = (data: Row) => {

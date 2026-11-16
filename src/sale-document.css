@@ -70,4 +70,18 @@ body { margin: 0; }
   .print-controls { display: none; }
   .document { margin: 0; width: 100%; padding: 5mm; }
   .document thead { display: table-header-group; }
+  .shipping-label-sheet {
+    margin: 0;
+    padding: 0;
+    text-align: left;
+    font-size: 0;
+  }
+  .document.shipping-label {
+    display: inline-block;
+    vertical-align: top;
+    width: 100mm;
+    margin: 0;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
 }
