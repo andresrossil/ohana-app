@@ -34,7 +34,7 @@ body { margin: 0; }
 .document-discount { background: var(--sand); border-radius: 9px; font-weight: 700; }
 .document-totals .document-total { margin-top: 2mm; border-radius: 9px; background: #75514a; color: white; padding: 3mm; font-size: 14pt; font-weight: 700; }
 .document-note { margin: 7mm 0 0; font-style: italic; text-align: center; break-inside: avoid; }
-.document.shipping-label { width: min(100%, 100mm); padding: 3mm 5mm; font-size: 9pt; color: #000; background: #fff; }
+.document.shipping-label { --label-width: 85mm; width: min(100%, var(--label-width)); padding: 3mm 5mm; font-size: 9pt; color: #000; background: #fff; }
 .shipping-label-header { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: center; gap: 4mm; margin-bottom: 1mm; }
 .shipping-label .document-brand img { max-height: 15mm; transform: none; filter: grayscale(1); }
 .shipping-label-guide { text-align: right; overflow-wrap: anywhere; }
@@ -79,7 +79,7 @@ body { margin: 0; }
   .document.shipping-label {
     display: inline-block;
     vertical-align: top;
-    width: 100mm;
+    width: var(--label-width);
     margin: 0;
     break-inside: avoid;
     page-break-inside: avoid;
