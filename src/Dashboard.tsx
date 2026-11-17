@@ -2,10 +2,11 @@ import { useEffect, useState } from "react";
 import { supabase } from "./client";
 import { money } from "./operations";
 import ResponsiveTable from "./ResponsiveTable";
+import { AppButton } from "./AppIcon";
 import "./dashboard.css";
 
 type StockQuantity = number | string;
-type AvailableProduct = { id: string; product: string; variant: string; available: StockQuantity };
+type AvailableProduct = { id: string; product: string; variant: string; available: StockQuantity; general_price?: StockQuantity | null };
 type ReorderMaterial = { id: string; sku: string | null; name: string; unit: string | null; minimum: StockQuantity; available: StockQuantity };
 type DashboardData = Record<string, unknown> & {
   available_products?: AvailableProduct[];
@@ -24,6 +25,7 @@ export default function Dashboard({ company, currency, materials, products }: {
 }) {
   const [data, setData] = useState<DashboardData>();
   const [failed, setFailed] = useState(false);
+  const [stockExpanded, setStockExpanded] = useState(false);
   useEffect(() => {
     let active = true;
     async function load() {
@@ -55,21 +57,32 @@ export default function Dashboard({ company, currency, materials, products }: {
     {failed && <p className="error" role="alert">No se pudieron cargar los indicadores del dashboard.</p>}
     {data?.available_products && (
       <section className="catalog dashboard-stock-list" aria-labelledby="dashboard-stock-title">
-        <h2 id="dashboard-stock-title">Productos disponibles</h2>
-        {data.available_products.length ? (
-          <div className="table-wrap">
-            <ResponsiveTable showAllMobileFields>
-              <thead><tr><th>Producto</th><th>Variante</th><th>Disponible</th></tr></thead>
-              <tbody>{data.available_products.map(item => (
-                <tr key={item.id}>
-                  <td>{item.product}</td>
-                  <td>{item.variant || "—"}</td>
-                  <td data-sort-value={item.available}><strong>{number(item.available)} ud</strong></td>
-                </tr>
-              ))}</tbody>
-            </ResponsiveTable>
-          </div>
-        ) : <p className="empty">No hay productos con existencias disponibles.</p>}
+        <header className="dashboard-stock-heading">
+          <h2 id="dashboard-stock-title">Productos disponibles</h2>
+          <AppButton type="button" className="secondary"
+            iconKey={stockExpanded ? "action.collapse" : "action.expand"}
+            aria-expanded={stockExpanded} aria-controls="dashboard-stock-content"
+            onClick={() => setStockExpanded(expanded => !expanded)}>
+            {stockExpanded ? "Contraer" : "Expandir"}
+          </AppButton>
+        </header>
+        <div id="dashboard-stock-content" hidden={!stockExpanded}>
+          {stockExpanded && (data.available_products.length ? (
+            <div className="table-wrap">
+              <ResponsiveTable showAllMobileFields>
+                <thead><tr><th>Producto</th><th>Variante</th><th>Disponible</th><th>Precio General</th></tr></thead>
+                <tbody>{data.available_products.map(item => (
+                  <tr key={item.id}>
+                    <td>{item.product}</td>
+                    <td>{item.variant || "—"}</td>
+                    <td data-sort-value={item.available}><strong>{number(item.available)} ud</strong></td>
+                    <td data-sort-value={item.general_price ?? ""}>{item.general_price == null ? "Sin precio" : money(item.general_price, currency)}</td>
+                  </tr>
+                ))}</tbody>
+              </ResponsiveTable>
+            </div>
+          ) : <p className="empty">No hay productos con existencias disponibles.</p>)}
+        </div>
       </section>
     )}
     <div className="dashboard-grid" aria-busy={!data && !failed}>
