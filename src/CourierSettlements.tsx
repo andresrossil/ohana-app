@@ -39,6 +39,12 @@ export default function CourierSettlements({company,onDirty}:{company:string;onD
  const preview=draft&&(!document?.id||dirty);
  const collected=preview?chosen.reduce((sum,p)=>sum+(p.payment_method==="transfer"?0:Number(p.collected)+(choices[p.order_id]?.mark_collected?Number(choices[p.order_id].extra_cash||0):0)),0):Number(document?.collected||0);
  const cost=preview?chosen.reduce((sum,p)=>sum+Number(p.shipping_cost),0):Number(document?.shipping_cost||0),net=collected-cost;
+ // Cash due at delivery can cover the shipping charged on the invoice.
+ const dueAtHandoff=chosen.filter(p=>p.pending_handoff).reduce((sum,p)=>{
+  const shipping=Number(p.shipping_cost);
+  const expectedShippingCash=Math.min(Number(p.shipping_charged??0),Number(p.expected_cash));
+  return sum+Math.max(0,shipping-Number(p.collected)-expectedShippingCash);
+ },0);
  const remaining=draft?net:Number(document?.remaining||0),paidTotal=draft?0:Number(document?.paid_total||0);
 
 
@@ -86,7 +92,7 @@ export default function CourierSettlements({company,onDirty}:{company:string;onD
    </form>
    <section className="settlement-summary"><h3>Resumen</h3><dl>
     <div><dt>Efectivo cobrado por el mensajero</dt><dd>{money(collected)}</dd></div><div><dt>Costo de envíos</dt><dd>{money(cost)}</dd></div>
-    <div className="settlement-final"><dt>{draft?"Resultado del borrador":"Importe original"}</dt><dd>{courierBalanceText(net,courierName)}</dd></div>
+    <div className="settlement-final"><dt>{awaitingHandoff?"A pagar al entregar a mensajería":draft?"Resultado del borrador":"Importe original"}</dt><dd>{awaitingHandoff?money(dueAtHandoff):courierBalanceText(net,courierName)}</dd></div>
     {!draft&&document.state!=="cancelled"&&<><div><dt>Importe pagado</dt><dd>{money(paidTotal)}</dd></div><div className="settlement-final"><dt>Saldo pendiente</dt><dd className={courierBalanceClass(remaining)}>{courierBalanceText(remaining,courierName)}</dd></div></>}
    </dl></section>
    <p className="muted">Saldo acumulado de {courierName}: {courierBalanceText(balance,courierName)}</p>
