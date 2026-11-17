@@ -60,10 +60,11 @@ function editable(children: ReactNode): boolean {
 export default forwardRef<
   HTMLTableElement,
   TableHTMLAttributes<HTMLTableElement> & {
+    showAllMobileFields?: boolean;
     onSortRows?: (indexes: number[]) => void;
   }
 >(function ResponsiveTable(
-  { children, className, onInvalidCapture, onSortRows, ...props },
+  { children, className, onInvalidCapture, onSortRows, showAllMobileFields, ...props },
   ref,
 ) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set()),
@@ -346,7 +347,7 @@ export default forwardRef<
                       isOpen = expanded.has(key),
                       visible = cells.map(
                         (c, i) =>
-                          primary.has(i) ||
+                          showAllMobileFields || primary.has(i) ||
                           /acciones/i.test(headers[i] || "") ||
                           editable(c.props.children) ||
                           (c.props.colSpan || 1) > 1,

@@ -90,7 +90,7 @@ export default function MaterialRequirements({
           ) : (
             !error && (
               <div className="table-wrap">
-                <ResponsiveTable>
+                <ResponsiveTable showAllMobileFields>
                   <thead>
                     <tr>
                       <th>Material</th>
@@ -102,7 +102,7 @@ export default function MaterialRequirements({
                   </thead>
                   <tbody>
                     {rows.map((r) => (
-                      <tr key={r.material_id}>
+                      <tr key={r.material_id} data-stock={r.shortage == null ? "pending" : Number(r.shortage) > 0 ? "short" : "enough"}>
                         <td>
                           {r.sku && `${r.sku} · `}
                           {r.name}

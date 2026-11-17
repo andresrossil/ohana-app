@@ -238,3 +238,12 @@
   background: var(--admin-secondary);
   color: var(--admin-heading);
 }
+
+@media (max-width: 760px) {
+  .shell .material-requirements .responsive-table > tbody > tr[data-stock="enough"] {
+    border: 2px solid #16803c;
+  }
+  .shell .material-requirements .responsive-table > tbody > tr[data-stock="short"] {
+    border: 2px solid #b4232c;
+  }
+}
