@@ -44,3 +44,18 @@
 .admin-dashboard[aria-labelledby="dashboard-curing"] .toolbar {
   justify-content: center;
 }
+
+.shell .admin-dashboard.curing-ready {
+  border: 2px solid var(--functional-success, #166534);
+}
+
+.curing-ready-notice p {
+  display: inline-flex;
+  align-items: center;
+  gap: .5rem;
+  font-weight: 700;
+}
+
+.shell .admin-dashboard :is(.curing-ready-notice p, .curing-ready-row td, .curing-ready-row td small) {
+  color: var(--functional-success, #166534);
+}

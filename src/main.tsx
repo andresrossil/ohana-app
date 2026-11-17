@@ -910,16 +910,13 @@ function App() {
                 </section>
               )}
               {section === "dashboard" && activeCompany?.production_read && (
-                <section className="catalog admin-dashboard" aria-labelledby="dashboard-curing">
-                  <h2 id="dashboard-curing">Lotes en curación</h2>
-                  <CuringProduction
-                    key={company}
-                    company={company}
-                    onProduction={async () => {
-                      if (await leaveSheet()) setSection("production");
-                    }}
-                  />
-                </section>
+                <CuringProduction
+                  key={company}
+                  company={company}
+                  onProduction={async () => {
+                    if (await leaveSheet()) setSection("production");
+                  }}
+                />
               )}
               {section === "prices" && activeCompany?.manage && (
                 <PriceLists
