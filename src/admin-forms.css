@@ -247,3 +247,15 @@
     border: 2px solid #b4232c;
   }
 }
+
+.shell .material-requirements .material-added-check {
+  display: inline-flex;
+  gap: .5rem;
+  align-items: center;
+  min-height: 44px;
+  margin: 0;
+}
+.shell .material-requirements tr[data-added="true"] .material-added-check {
+  font-weight: 700;
+  color: #16803c;
+}

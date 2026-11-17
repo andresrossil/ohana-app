@@ -723,6 +723,8 @@ function ProductionBatches({
               )}
               {estimating && mode === "start" && !openingStock && (
                 <MaterialRequirements
+                  key={JSON.stringify([company, estimating.id, factor, draftUnits])}
+                  checklist
                   company={company}
                   formula={estimating.id}
                   scale={factor}

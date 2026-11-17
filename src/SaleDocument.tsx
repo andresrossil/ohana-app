@@ -27,26 +27,56 @@ export function saleDocumentLine(line: Row) {
   return { product, size: [size.join(" · "), range].filter(Boolean).join(" · ") || "—" };
 }
 
-export function openSaleDocument(source: Row | (() => Promise<Row>), format: "invoice" | "label" = "invoice") {
+function ShippingLabelContent({ data, logo }: { data: Row; logo: React.ReactNode }) {
+  const { order } = data;
+  const delivery = data.delivery ?? {};
+  const customer = order.customer_snapshot ?? {};
+  const deliveryKind = delivery.kind ?? (order.delivery === "pickup" ? "pickup" : "own");
+  const address = [delivery.address || customer.address, deliveryZoneLabel(delivery.zone), delivery.department]
+    .filter(Boolean).join(" · ");
+  const amountToCollect = ["cancelled", "expired"].includes(order.status) || order.payment === "transfer"
+    ? money(0, order.currency)
+    : order.fulfillment_stage === "draft" ? "Pendiente de confirmación"
+    : money(data.summary?.balance, order.currency);
+  return <>
+          <header className="shipping-label-header">
+            <div className="document-brand">{logo}</div>
+            <div className="shipping-label-guide"><span className="label-visually-hidden">Guía de envío</span><strong>{delivery.guide || "Sin guía"}</strong></div>
+          </header>
+          <dl className="shipping-label-fields">
+            <div className="shipping-label-client"><dt className="label-visually-hidden">Cliente</dt><dd>{customer.name || "—"}</dd></div>
+            <div className="shipping-label-phone"><dt className="label-visually-hidden">Teléfono</dt><dd>{customer.phone || "—"}</dd></div>
+            <div className="shipping-label-address"><dt className="label-visually-hidden">Dirección</dt><dd>{deliveryKind === "pickup" ? "Recoger pedido" : address || "—"}</dd></div>
+            <div className="shipping-label-amount"><dt>Monto a cobrar</dt><dd>{amountToCollect}</dd></div>
+          </dl>
+  </>;
+}
+
+export function openSaleDocument(source: Row | (() => Promise<Row | Row[]>), format: "invoice" | "label" | "labels" = "invoice") {
   const preview = window.open("", "_blank");
   if (!preview) return false;
   preview.opener = null;
   const doc = preview.document;
   doc.documentElement.lang = "es";
-  const title = format === "label" ? "Etiqueta de envío" : "Pedido";
+  const title = format === "labels" ? "Etiquetas de envío" : format === "label" ? "Etiqueta de envío" : "Pedido";
   doc.title = title;
   const viewport = doc.createElement("meta");
   viewport.name = "viewport";
   viewport.content = "width=device-width, initial-scale=1";
   const stylesheet = doc.createElement("style");
-  stylesheet.textContent = styles + (format === "label" ? "@page { size: auto; margin: 0; }" : "");
+  stylesheet.textContent = styles + (format !== "invoice" ? "@page { size: auto; margin: 0; }" : "");
   doc.head.append(viewport, stylesheet);
   const container = doc.createElement("div");
-  if (format === "label") container.className = "shipping-label-sheet";
+  if (format !== "invoice") container.className = "shipping-label-sheet";
   doc.body.replaceChildren(container);
   const root = createRoot(container);
-  const show = async (data: Row) => {
+  const show = async (data: Row | Row[]) => {
     if (preview.closed) return;
+    if (Array.isArray(data)) {
+      root.render(<ShippingLabelBatch orders={data} onPrint={() => preview.print()} />);
+      return;
+    }
+    if (format === "labels") return;
     const delivery = data.delivery;
     let schedule = delivery?.tariff_snapshot?.delivery_schedule?.trim() || "";
     if (format === "invoice" && delivery?.kind === "courier" && !schedule && data.order.company_id) {
@@ -65,7 +95,7 @@ export function openSaleDocument(source: Row | (() => Promise<Row>), format: "in
   };
   if (typeof source === "function") {
     root.render(<p className="print-controls" role="status">Cargando documento…</p>);
-    void source().then(show, () => {
+    void source().then(show).catch(() => {
       if (!preview.closed) root.render(<p className="print-controls" role="alert">No se pudo cargar el documento. Cierra esta ventana y vuelve a intentarlo.</p>);
     });
   } else void show(source);
@@ -109,9 +139,6 @@ function SaleDocument({ data, format, onPrint, schedule }: { data: Row; schedule
   const address = [delivery.address || customer.address, deliveryZoneLabel(delivery.zone), delivery.department]
     .filter(Boolean).join(" · ");
   const isLabel = format === "label";
-  const amountToCollect = closed || order.payment === "transfer" ? money(0, currency)
-    : isDraft ? "Pendiente de confirmación"
-    : money(data.summary?.balance, currency);
   const documentLogo = logo ? (
     <img src={logo} alt={brand?.name ?? "Logo de empresa"} onLoad={() => setLoadingLogo(false)}
       onError={() => { setLogo(""); setLoadingLogo(false); }} />
@@ -169,16 +196,7 @@ function SaleDocument({ data, format, onPrint, schedule }: { data: Row; schedule
       </div>
       <article ref={article} className={isLabel ? "document shipping-label" : "document"}>
         {isLabel ? <>
-          <header className="shipping-label-header">
-            <div className="document-brand">{documentLogo}</div>
-            <div className="shipping-label-guide"><span className="label-visually-hidden">Guía de envío</span><strong>{delivery.guide || "Sin guía"}</strong></div>
-          </header>
-          <dl className="shipping-label-fields">
-            <div className="shipping-label-client"><dt className="label-visually-hidden">Cliente</dt><dd>{customer.name || "—"}</dd></div>
-            <div className="shipping-label-phone"><dt className="label-visually-hidden">Teléfono</dt><dd>{customer.phone || "—"}</dd></div>
-            <div className="shipping-label-address"><dt className="label-visually-hidden">Dirección</dt><dd>{deliveryKind === "pickup" ? "Recoger pedido" : address || "—"}</dd></div>
-            <div className="shipping-label-amount"><dt>Monto a cobrar</dt><dd>{amountToCollect}</dd></div>
-          </dl>
+          <ShippingLabelContent data={data} logo={documentLogo} />
         </> : <>
         <header className="document-heading">
           <div className="document-brand">{documentLogo}</div>
@@ -235,4 +253,40 @@ function SaleDocument({ data, format, onPrint, schedule }: { data: Row; schedule
       </article>
     </>
   );
+}
+
+function ShippingLabelBatch({ orders, onPrint }: { orders: Row[]; onPrint: () => void }) {
+  const brand = orders[0]?.document_brand;
+  const [logo, setLogo] = useState("");
+  const [ready, setReady] = useState(!brand?.logo_path);
+  useEffect(() => {
+    if (!brand?.logo_path) return;
+    let active = true;
+    void (async () => {
+      try {
+        const { data } = await supabase.storage.from("company-logos").createSignedUrl(brand.logo_path, 300);
+        if (!data?.signedUrl) return;
+        const image = new Image();
+        image.src = data.signedUrl;
+        await image.decode();
+        if (active) setLogo(data.signedUrl);
+      } finally {
+        if (active) setReady(true);
+      }
+    })().catch(() => {});
+    return () => { active = false; };
+  }, [brand?.logo_path]);
+
+  if (!orders.length) return <p className="print-controls" role="status">No hay pedidos confirmados pendientes de envío para esta fecha.</p>;
+  const rows = Array.from({ length: Math.ceil(orders.length / 2) }, (_, row) => orders.slice(row * 2, row * 2 + 2));
+  return <>
+    <div className="print-controls"><button type="button" onClick={onPrint} disabled={!ready}>
+      <Printer size={16} aria-hidden="true" /> Imprimir / guardar PDF
+    </button></div>
+    {rows.map((pair) => <div className="shipping-label-row" key={pair[0].order.id}>
+      {pair.map((data) => <article className="document shipping-label" key={data.order.id}>
+        <ShippingLabelContent data={data} logo={logo ? <img src={logo} alt={brand?.name || "Logo de empresa"} /> : <p>{brand?.name || ""}</p>} />
+      </article>)}
+    </div>)}
+  </>;
 }

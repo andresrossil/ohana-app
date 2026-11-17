@@ -32,6 +32,7 @@ export default function Sales({ company, currency = "GTQ" }: { company: string; 
   const [cancelOrder, setCancelOrder] = useState<Row | null>(null);
   const [editor, setEditor] = useState<Row | null | undefined>();
   const [viewOrder, setViewOrder] = useState<string | null>(null);
+  const [labelDate, setLabelDate] = useState("");
   const [managedOrder, setManagedOrder] = useState<string | null>(null);
 
   async function load(next = applied, nextPage = page) {
@@ -60,14 +61,53 @@ export default function Sales({ company, currency = "GTQ" }: { company: string; 
     }
   }
 
+  function printDayLabels(date: string) {
+    if (!openSaleDocument(async () => {
+      const candidates: Row[] = [];
+      for (let offset = 0; ; offset += pageSize) {
+        const result = await salesWorklist(company, "invoice_headers", { from: date, to: date, offset });
+        candidates.push(...result.orders.filter((order: Row) =>
+          order.courier_name && !order.settled &&
+          ["invoiced", "preparing", "finished", "courier"].includes(order.display_status)));
+        if (!result.has_more) break;
+      }
+      const labels: Row[] = [];
+      for (let offset = 0; offset < candidates.length; offset += 8) {
+        const details = await Promise.all(candidates.slice(offset, offset + 8).map((order) =>
+          salesWorklist(company, "detail", { order: order.id })));
+        labels.push(...details.filter(({ delivery, order, settled }) =>
+          delivery?.kind === "courier" && ["pending", "in_transit"].includes(delivery.status) &&
+          ["pending", "dispatched"].includes(order.status) && order.fulfillment_stage !== "draft" && !settled));
+      }
+      return labels.reverse();
+    }, "labels")) {
+      state.setError("Permite las ventanas emergentes para imprimir las etiquetas.");
+      return;
+    }
+    setLabelDate("");
+  }
+
   return <>
     <section className="intro">
       <div><h1>Ventas y pedidos</h1></div>
       <div className="actions">
         {state.canWrite && <AppButton onClick={() => setEditor(null)}>Ingresar factura</AppButton>}
+        <AppButton className="secondary" iconKey="action.print" onClick={() => setLabelDate(salesTodayRange().from)}>Imprimir etiquetas del día</AppButton>
         <AppButton className="secondary" disabled={state.busy} onClick={() => state.run(reload)}>Actualizar</AppButton>
       </div>
     </section>
+    {labelDate && <div className="overlay"><section className="modal operations-dialog" role="dialog" aria-modal="true" aria-labelledby="bulk-label-title"
+      onKeyDown={(event) => { if (event.key === "Escape") setLabelDate(""); }}>
+      <h2 id="bulk-label-title">Imprimir etiquetas del día</h2>
+      <form onSubmit={(event) => { event.preventDefault(); printDayLabels(labelDate); }}>
+        <label>Fecha del pedido<input type="date" required autoFocus value={labelDate}
+          onChange={(event) => { if (event.target.value) setLabelDate(event.target.value); }} /></label>
+        <div className="form-actions">
+          <AppButton type="submit" iconKey="action.print">Abrir vista de impresión</AppButton>
+          <AppButton type="button" className="secondary" onClick={() => setLabelDate("")}>Cancelar</AppButton>
+        </div>
+      </form>
+    </section></div>}
     {state.error && !cancelOrder && <p className="error" role="alert" style={{ whiteSpace: "pre-line", overflowWrap: "anywhere" }}>{state.error}</p>}
     <section className="catalog">
       <div className="toolbar"><h2>Facturas</h2></div>

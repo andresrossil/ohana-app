@@ -85,3 +85,16 @@ body { margin: 0; }
     page-break-inside: avoid;
   }
 }
+
+.shipping-label-row { display: flex; align-items: flex-start; justify-content: flex-start; }
+.shipping-label-row .shipping-label { margin: 0; }
+@media screen and (max-width: 680px) {
+  .shipping-label-row { flex-wrap: wrap; }
+}
+@media print {
+  .shipping-label-row {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  .shipping-label-row .shipping-label { flex: 0 0 var(--label-width); }
+}

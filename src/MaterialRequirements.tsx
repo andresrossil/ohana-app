@@ -11,18 +11,21 @@ export default function MaterialRequirements({
   scale = 1,
   units = null,
   initialOpen = false,
+  checklist = false,
 }: {
   company: string;
   formula?: string;
   scale?: number;
   units?: number | null;
   initialOpen?: boolean;
+  checklist?: boolean;
 }) {
   const [open, setOpen] = useState(initialOpen),
     [rows, setRows] = useState<Row[]>([]),
     [error, setError] = useState(""),
     [loading, setLoading] = useState(false),
-    [revision, setRevision] = useState(0);
+    [revision, setRevision] = useState(0),
+    [added, setAdded] = useState<Set<string>>(new Set());
   useEffect(() => {
     if (!open) return;
     let live = true;
@@ -98,11 +101,12 @@ export default function MaterialRequirements({
                       <th>Requerido</th>
                       <th>Disponible</th>
                       <th>Faltante / comprar</th>
+                      {checklist && <th>Preparación</th>}
                     </tr>
                   </thead>
                   <tbody>
                     {rows.map((r) => (
-                      <tr key={r.material_id} data-stock={r.shortage == null ? "pending" : Number(r.shortage) > 0 ? "short" : "enough"}>
+                      <tr key={r.material_id} data-added={checklist && added.has(r.material_id)} data-stock={r.shortage == null ? "pending" : Number(r.shortage) > 0 ? "short" : "enough"}>
                         <td>
                           {r.sku && `${r.sku} · `}
                           {r.name}
@@ -143,6 +147,23 @@ export default function MaterialRequirements({
                             </span>
                           )}
                         </td>
+                        {checklist && <td data-sort-value={added.has(r.material_id) ? 1 : 0}>
+                          <label className="material-added-check">
+                            <input type="checkbox" checked={added.has(r.material_id)}
+                              aria-label={"Ya agregado: " + r.name}
+                              onChange={(event) => {
+                                event.stopPropagation();
+                                const checked = event.target.checked;
+                                setAdded((current) => {
+                                  const next = new Set(current);
+                                  if (checked) next.add(r.material_id);
+                                  else next.delete(r.material_id);
+                                  return next;
+                                });
+                              }} />
+                            {added.has(r.material_id) ? "Agregado" : "Ya agregado"}
+                          </label>
+                        </td>}
                       </tr>
                     ))}
                   </tbody>
