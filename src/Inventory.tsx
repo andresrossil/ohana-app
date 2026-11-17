@@ -1,9 +1,8 @@
-import MoneyInput from "./MoneyInput";
+import PurchaseReceiptEditor from "./PurchaseReceiptEditor";
 import InventoryAdjustment from "./InventoryAdjustment";
 import { CuringProductionTable, curingCount, summarizeCuringProducts, useCuringProduction } from "./CuringProduction";
 import { useMaterialTypes, MaterialTypeLabel } from "./MaterialTypesContext";
 import { materialTypeName } from "./material-types-model";
-import SearchSelect from "./SearchSelect";
 import ResponsiveTable from "./ResponsiveTable";
 import { SearchField } from "./PoolControls";
 import { AppButton, AppIcon } from "./AppIcon";
@@ -13,7 +12,6 @@ import {
   mutate,
   useOperation,
   money,
-  today,
   type Row,
 } from "./operations";
 export default function Inventory({
@@ -28,7 +26,7 @@ export default function Inventory({
   productionRead?: boolean;
 }) {
   const types = useMaterialTypes();
-  const [paymentCurrency, setPaymentCurrency] = useState(currency);
+  const [viewReceipt, setViewReceipt] = useState<Row | null>(null);
   const [showCuring, setShowCuring] = useState(false);
   const [curingRevision, setCuringRevision] = useState(0);
   const curing = useCuringProduction(!purchases && productionRead ? company : null, curingRevision);
@@ -43,24 +41,18 @@ export default function Inventory({
     }),
     [receipts, setReceipts] = useState<Row[]>([]),
     [form, setForm] = useState<"receive" | "adjust" | "count" | null>(null),
-    [material, setMaterial] = useState(""),
     [query, setQuery] = useState("");
-  useEffect(() => setPaymentCurrency(currency), [company, currency, form]);
   async function load() {
     const [d, r] = await Promise.all([
       operation(company, "inventory"),
-      operation(company, "receipts"),
+      purchases ? operation(company, "purchase_documents") : Promise.resolve([]),
     ]);
     setData(d);
     setReceipts(r);
   }
   useEffect(() => {
     state.run(load);
-  }, [company]);
-  const baseUnit = data.units.find(
-    (u: Row) =>
-      u.id === data.materials.find((m: Row) => m.id === material)?.unit_id,
-  );
+  }, [company, purchases]);
   const balances = data.balances.filter((r: Row) =>
     [r.name, r.sku, r.barcode, materialTypeName(r.classification, types)]
       .join(" ")
@@ -99,7 +91,7 @@ export default function Inventory({
             <>
               <AppButton
                 onClick={() => {
-                  setMaterial("");
+                  state.setError("");
                   setForm("receive");
                 }}
               >
@@ -176,164 +168,34 @@ export default function Inventory({
         />
       )}
       {form === "receive" && (
+        <PurchaseReceiptEditor key={company} data={data} currency={currency} busy={state.busy} error={state.error}
+          onClose={() => setForm(null)}
+          onSave={values => state.run(async () => {
+            await mutate(company, "receive_document", values);
+            setForm(null);
+            state.setNotice("Compra guardada. Las existencias están actualizadas.");
+            await load();
+          })}
+        />
+      )}
+      {purchases && viewReceipt && (
         <div className="overlay">
-          <section
-            className="modal operations-dialog"
-            role="dialog"
-            aria-modal="true"
-            aria-label={
-              form === "receive" ? "Recibir compra" : "Ajustar existencias"
-            }
-          >
-            <h2>
-              {form === "receive" ? "Compra recibida" : "Ajuste de existencias"}
-            </h2>
-            {state.error && (
-              <p className="error" role="alert">
-                <AppIcon name="status.error" />
-                {state.error}
-              </p>
-            )}
-            <form
-              className="settings-grid"
-              onSubmit={(e) => {
-                e.preventDefault();
-                const values: Row = Object.fromEntries(
-                  new FormData(e.currentTarget),
-                );
-                state.run(async () => {
-                  await mutate(company, form, values);
-                  setForm(null);
-                  state.setNotice(
-                    "Movimiento guardado. Las existencias están actualizadas.",
-                  );
-                  await load();
-                });
-              }}
-            >
-              {
-                <>
-                  <label>
-                    Material
-                    <SearchSelect
-                      name="material"
-                      required
-                      value={material}
-                      onChange={(e) => setMaterial(e.target.value)}
-                    >
-                      <option value="">Seleccionar</option>
-                      {data.materials.map((m: Row) => (
-                        <option key={m.id} value={m.id}>
-                          {m.sku ? m.sku + " · " : ""}
-                          {m.name}
-                        </option>
-                      ))}
-                    </SearchSelect>
-                  </label>
-                  <label>
-                    Proveedor
-                    <SearchSelect name="supplier">
-                      <option value="">Sin proveedor</option>
-                      {data.suppliers.map((s: Row) => (
-                        <option key={s.id} value={s.id}>
-                          {s.name}
-                        </option>
-                      ))}
-                    </SearchSelect>
-                  </label>
-                  <label>
-                    Cantidad recibida
-                    <input
-                      name="quantity"
-                      type="number"
-                      min="0.00000001"
-                      step="any"
-                      required
-                    />
-                  </label>
-                  <label>
-                    Unidad
-                    <SearchSelect
-                      name="unit"
-                      key={material}
-                      defaultValue={baseUnit?.id || ""}
-                      required
-                    >
-                      <option value="">Seleccionar</option>
-                      {data.units
-                        .filter(
-                          (u: Row) =>
-                            !baseUnit || u.dimension === baseUnit.dimension,
-                        )
-                        .map((u: Row) => (
-                          <option key={u.id} value={u.id}>
-                            {u.name} ({u.symbol})
-                          </option>
-                        ))}
-                    </SearchSelect>
-                  </label>
-                  <label>
-                    Importe total pagado
-                    <MoneyInput
-                      currency={paymentCurrency}
-                      name="amount"
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      required
-                    />
-                  </label>
-                  <label>
-                    Moneda
-                    <input
-                      name="currency"
-                      required
-                      pattern="[A-Z]{3}"
-                      maxLength={3}
-                      value={paymentCurrency}
-                      onChange={(e) =>
-                        setPaymentCurrency(e.target.value.toUpperCase())
-                      }
-                    />
-                  </label>
-                  <label>
-                    Tipo de cambio hacia {currency}
-                    <input
-                      name="exchange_rate"
-                      type="number"
-                      min="0.00000001"
-                      step="any"
-                      placeholder="Obligatorio si la compra usa otra moneda"
-                    />
-                  </label>
-                  <label>
-                    Fecha de recepción
-                    <input
-                      name="date"
-                      type="date"
-                      defaultValue={today()}
-                      max={today()}
-                      required
-                    />
-                  </label>
-                  <label>
-                    Factura o referencia
-                    <input name="reference" maxLength={250} />
-                  </label>
-                </>
-              }
-              <div className="form-actions">
-                <AppButton disabled={state.busy}>Guardar movimiento</AppButton>
-                <AppButton
-                  type="button"
-                  className="secondary"
-                  disabled={state.busy}
-                  onClick={() => setForm(null)}
-                >
-                  Cancelar
-                </AppButton>
-              </div>
-            </form>
+          <section className="modal operations-dialog" role="dialog" aria-modal="true" aria-labelledby="purchase-detail-title">
+            <header className="hierarchy-toolbar">
+              <h2 id="purchase-detail-title">Compra recibida{viewReceipt.reference ? ` · ${viewReceipt.reference}` : ""}</h2>
+              <AppButton className="secondary" onClick={() => setViewReceipt(null)}>Cerrar</AppButton>
+            </header>
+            <p>{viewReceipt.received_on} · {data.suppliers.find((s: Row) => s.id === viewReceipt.supplier_id)?.name || viewReceipt.supplier_name || "Sin proveedor"}</p>
+            <div className="table-wrap"><ResponsiveTable>
+              <thead><tr><th>Material</th><th>Cantidad recibida</th><th>Importe</th><th>Estado</th></tr></thead>
+              <tbody>{viewReceipt.lines.map((line: Row) => <tr key={line.id}>
+                <td>{line.material_name}</td>
+                <td>{line.quantity} {data.units.find((u: Row) => u.id === line.unit_id)?.symbol}</td>
+                <td>{money(line.amount, line.currency)}</td>
+                <td>{line.cancelled_at ? "Cancelada" : "Confirmada"}</td>
+              </tr>)}</tbody>
+            </ResponsiveTable></div>
+            <p><strong>Total registrado {money(viewReceipt.total, viewReceipt.currency)}</strong></p>
           </section>
         </div>
       )}
@@ -345,25 +207,24 @@ export default function Inventory({
               <thead>
                 <tr>
                   <th>Fecha</th>
-                  <th>Material</th>
-                  <th>Cantidad</th>
+                  <th>Proveedor</th>
+                  <th>Líneas</th>
                   <th>Importe real</th>
                   <th>Referencia</th>
                   <th>Estado</th>
+                  <th>Acciones</th>
                 </tr>
               </thead>
               <tbody>
                 {receipts.map((r) => (
                   <tr key={r.id}>
                     <td>{r.received_on}</td>
-                    <td>{r.material_name}</td>
-                    <td>
-                      {r.quantity}{" "}
-                      {data.units.find((u: Row) => u.id === r.unit_id)?.symbol}
-                    </td>
-                    <td>{money(r.amount, r.currency)}</td>
+                    <td>{data.suppliers.find((s: Row) => s.id === r.supplier_id)?.name || r.supplier_name || "Sin proveedor"}</td>
+                    <td>{r.lines.length}</td>
+                    <td>{money(r.total, r.currency)}</td>
                     <td>{r.reference || "—"}</td>
-                    <td>{r.cancelled_at ? "Cancelada" : "Confirmada"}</td>
+                    <td>{r.cancelled_count === r.lines.length ? "Cancelada" : r.cancelled_count > 0 ? "Parcialmente cancelada" : "Confirmada"}</td>
+                    <td><AppButton className="secondary" iconKey="action.expand" onClick={() => setViewReceipt(r)}>Ver compra</AppButton></td>
                   </tr>
                 ))}
               </tbody>
