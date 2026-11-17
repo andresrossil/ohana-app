@@ -59,3 +59,8 @@
 .shell .admin-dashboard :is(.curing-ready-notice p, .curing-ready-row td, .curing-ready-row td small) {
   color: var(--functional-success, #166534);
 }
+
+.dashboard-stock-list { margin-bottom: 1rem; }
+.dashboard-stock-list > h2 { margin: 0; padding: 1rem; font-size: 1.15rem; }
+.dashboard-reorder { grid-column: span 6; }
+.dashboard-reorder > .table-wrap { display: block; margin-top: 1rem; }

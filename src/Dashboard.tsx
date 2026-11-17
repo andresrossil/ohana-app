@@ -1,9 +1,23 @@
 import { useEffect, useState } from "react";
 import { supabase } from "./client";
 import { money } from "./operations";
+import ResponsiveTable from "./ResponsiveTable";
 import "./dashboard.css";
 
-type DashboardData = Record<string, number | string | null>;
+type StockQuantity = number | string;
+type AvailableProduct = { id: string; product: string; variant: string; available: StockQuantity };
+type ReorderMaterial = { id: string; sku: string | null; name: string; unit: string | null; minimum: StockQuantity; available: StockQuantity };
+type DashboardData = Record<string, unknown> & {
+  available_products?: AvailableProduct[];
+  reorder_materials?: ReorderMaterial[];
+  price_list?: string | null;
+  suppliers?: number;
+  customers?: number;
+  drafts?: number;
+  invoices?: number;
+  active_customers?: number;
+  reorder?: number;
+};
 
 export default function Dashboard({ company, currency, materials, products }: {
   company: string; currency: string; materials?: number; products?: number;
@@ -29,16 +43,35 @@ export default function Dashboard({ company, currency, materials, products }: {
 
   const number = (value: number | string | null | undefined) =>
     value == null ? "—" : Number(value).toLocaleString("es-GT", { maximumFractionDigits: 2 });
-  const amount = (key: string) => data?.[key] == null ? "—" : money(data[key], currency);
+  const amount = (key: string) => data?.[key] == null ? "—" : money(Number(data[key]), currency);
   const previous = Number(data?.sales_previous);
   const variation = previous > 0 ? number((Number(data?.sales_current) / previous - 1) * 100) + " %" : "—";
   const metric = (label: string, value: string, note?: string) => (
     <div className="dashboard-metric"><span>{label}</span><strong>{value}</strong>{note && <small>{note}</small>}</div>
   );
-  const missing = (key: string) => Number(data?.[key]) > 0 ? "Valor parcial · " + number(data?.[key]) + " sin precio o costo" : undefined;
+  const missing = (key: string) => Number(data?.[key]) > 0 ? "Valor parcial · " + number(Number(data?.[key])) + " sin precio o costo" : undefined;
 
   return <>
     {failed && <p className="error" role="alert">No se pudieron cargar los indicadores del dashboard.</p>}
+    {data?.available_products && (
+      <section className="catalog dashboard-stock-list" aria-labelledby="dashboard-stock-title">
+        <h2 id="dashboard-stock-title">Productos disponibles</h2>
+        {data.available_products.length ? (
+          <div className="table-wrap">
+            <ResponsiveTable showAllMobileFields>
+              <thead><tr><th>Producto</th><th>Variante</th><th>Disponible</th></tr></thead>
+              <tbody>{data.available_products.map(item => (
+                <tr key={item.id}>
+                  <td>{item.product}</td>
+                  <td>{item.variant || "—"}</td>
+                  <td data-sort-value={item.available}><strong>{number(item.available)} ud</strong></td>
+                </tr>
+              ))}</tbody>
+            </ResponsiveTable>
+          </div>
+        ) : <p className="empty">No hay productos con existencias disponibles.</p>}
+      </section>
+    )}
     <div className="dashboard-grid" aria-busy={!data && !failed}>
       {materials != null && <section className="catalog dashboard-card">
         <h2>Materiales</h2><div>{metric("Materiales activos", number(materials))}
@@ -71,8 +104,24 @@ export default function Dashboard({ company, currency, materials, products }: {
           </div>
         </section>
       </>}
-      {data?.reorder != null && <section className="catalog dashboard-card">
-        <h2>Reorden</h2><div>{metric("SKU con disponible menor al mínimo", number(data.reorder))}</div>
+      {data?.reorder != null && <section className="catalog dashboard-card dashboard-reorder">
+        <h2>Reorden</h2>
+        <div>{metric("Materiales con disponible menor al mínimo", number(data.reorder_materials?.length ?? data.reorder))}</div>
+        {data.reorder_materials?.length ? (
+          <div className="table-wrap">
+            <ResponsiveTable showAllMobileFields>
+              <thead><tr><th>Material</th><th>SKU</th><th>Disponible</th><th>Mínimo</th></tr></thead>
+              <tbody>{data.reorder_materials.map(item => (
+                <tr key={item.id}>
+                  <td>{item.name}</td>
+                  <td>{item.sku || "—"}</td>
+                  <td data-sort-value={item.available}>{number(item.available)} {item.unit}</td>
+                  <td data-sort-value={item.minimum}>{number(item.minimum)} {item.unit}</td>
+                </tr>
+              ))}</tbody>
+            </ResponsiveTable>
+          </div>
+        ) : null}
       </section>}
     </div>
   </>;
