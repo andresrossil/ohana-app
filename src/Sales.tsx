@@ -167,7 +167,16 @@ export default function Sales({ company, currency = "GTQ" }: { company: string; 
                   onClick={() => state.run(async () => {
                     if (!await confirmAction("¿El cliente confirmó el pedido? Se comprobarán las existencias y, si alcanzan, se reservarán las unidades del pedido.",
                       { title: "Confirmación del cliente", confirmText: "Confirmar pedido" })) return;
-                    await keyedRequest(company, "sales_fulfillment", { order: order.id, expected_stage: "draft", expected_revision: order.revision }, "confirm_customer");
+                    try {
+                      await keyedRequest(company, "sales_fulfillment", { order: order.id, expected_stage: "draft", expected_revision: order.revision }, "confirm_customer");
+                    } catch (error) {
+                      const message = (error as { message?: string }).message;
+                      const stockWarning = "El pedido sigue en borrador. Revisa estas existencias:";
+                      if (!message?.startsWith(stockWarning)) throw error;
+                      await confirmAction("El pedido sigue en borrador.\n\n" + message.slice(stockWarning.length).trim(),
+                        { title: "Inventario insuficiente", confirmText: "Cerrar", cancelText: null });
+                      return;
+                    }
                     await reload();
                   })}>Confirmación del cliente</AppButton>}
                 {active && <AppButton className="secondary" onClick={() => setCancelOrder(order)}>Cancelar pedido</AppButton>}

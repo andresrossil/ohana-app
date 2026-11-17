@@ -66,15 +66,12 @@ export default function Sidebar({
     [collapsed, setCollapsed] = useState(false),
     [profile, setProfile] = useState({ name: "", photo: "" });
   const activeCategory = categories.find(({ items }) => items.includes(section))?.id;
-  const [expanded, setExpanded] = useState(() => new Set(activeCategory ? [activeCategory] : []));
+  const [expanded, setExpanded] = useState<string | undefined>();
   const drawer = useRef<HTMLElement>(null),
     toggle = useRef<HTMLButtonElement>(null);
-  useEffect(() => setOpen(false), [section, company]);
-  useEffect(() => {
-    if (activeCategory) setExpanded((previous) => previous.has(activeCategory)
-      ? previous
-      : new Set(previous).add(activeCategory));
-  }, [section, activeCategory]);
+  const closeMenu = () => { setOpen(false); setExpanded(undefined); };
+  const toggleMenu = () => { if (open) closeMenu(); else setOpen(true); };
+  useEffect(closeMenu, [section, company]);
   useEffect(() => {
     const shell = document.querySelector(".shell");
     shell?.classList.toggle("chrome-collapsed", collapsed);
@@ -116,11 +113,11 @@ export default function Sidebar({
         !drawer.current?.contains(target) &&
         !toggle.current?.contains(target)
       )
-        setOpen(false);
+        closeMenu();
     };
     const escape = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        setOpen(false);
+        closeMenu();
         toggle.current?.focus();
       }
     };
@@ -142,7 +139,7 @@ export default function Sidebar({
       className={section === key ? "selected" : ""}
       aria-current={section === key ? "page" : undefined}
       onClick={() => {
-        if (onNavigate(key)) setOpen(false);
+        if (onNavigate(key)) closeMenu();
       }}
     >
       <span aria-hidden="true"><NavIcon name={key} /></span>
@@ -160,7 +157,7 @@ export default function Sidebar({
             aria-label={open ? "Cerrar menú" : "Abrir menú"}
             aria-expanded={open}
             aria-controls="ohana-drawer"
-            onClick={() => setOpen(!open)}
+            onClick={() => toggleMenu()}
           >
             <AppIcon name={open ? "navigation.close" : "navigation.menu"} />
           </button>
@@ -169,7 +166,7 @@ export default function Sidebar({
             aria-label="Ir al Dashboard de la empresa actual"
             onClick={() => {
               onNavigate("dashboard", true);
-              setOpen(false);
+              closeMenu();
             }}
           >
             {activeCompany ? (
@@ -190,7 +187,7 @@ export default function Sidebar({
             collapsed ? "Mostrar cinta superior" : "Ocultar cinta superior"
           }
           aria-expanded={!collapsed}
-          onClick={() => setCollapsed(!collapsed)}
+          onClick={() => { closeMenu(); setCollapsed(!collapsed); }}
         >
           <AppIcon name="action.collapse" />
         </button>
@@ -224,7 +221,7 @@ export default function Sidebar({
         <button
           className="drawer-backdrop"
           aria-label="Cerrar menú"
-          onClick={() => setOpen(false)}
+          onClick={closeMenu}
         />
       )}
       <aside
@@ -246,7 +243,7 @@ export default function Sidebar({
             title="Volver al Dashboard"
             onClick={() => {
               onNavigate("dashboard", true);
-              setOpen(false);
+              closeMenu();
             }}
           >
             {companies.find((c) => c.id === company) ? (
@@ -265,7 +262,7 @@ export default function Sidebar({
             aria-label={open ? "Cerrar menú" : "Abrir menú"}
             aria-expanded={open}
             aria-controls="ohana-navigation"
-            onClick={() => setOpen(!open)}
+            onClick={() => toggleMenu()}
           >
             <AppIcon name={open ? "navigation.close" : "navigation.menu"} />
           </button>
@@ -306,7 +303,7 @@ export default function Sidebar({
             {categories.map(({ id, label, icon, items }) => {
               const visible = items.filter(canShow);
               if (!visible.length) return null;
-              const isExpanded = expanded.has(id);
+              const isExpanded = expanded === id;
               const contentId = `ohana-nav-${id}`;
               return <div className="sidebar-category" key={id}>
                 <button
@@ -314,12 +311,7 @@ export default function Sidebar({
                   className={activeCategory === id && !isExpanded ? "sidebar-category-toggle selected" : "sidebar-category-toggle"}
                   aria-expanded={isExpanded}
                   aria-controls={contentId}
-                  onClick={() => setExpanded((previous) => {
-                    const next = new Set(previous);
-                    if (next.has(id)) next.delete(id);
-                    else next.add(id);
-                    return next;
-                  })}
+                  onClick={() => setExpanded(previous => previous === id ? undefined : id)}
                 >
                   <span aria-hidden="true"><NavIcon name={icon} /></span>
                   {label}

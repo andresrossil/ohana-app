@@ -203,6 +203,8 @@
 .shell .funds-report :is(h2, table, .table-mobile-sort) {
   text-transform: uppercase;
 }
+
+.shell .funds-balance-summary { width: min(100%, 42rem); }
 @media (min-width: 1000px) {
   .operations-dialog .purchase-receipt-line { grid-template-columns: minmax(0, 2fr) repeat(3, minmax(0, 1fr)); }
 }

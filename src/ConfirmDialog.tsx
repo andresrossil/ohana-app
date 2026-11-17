@@ -4,7 +4,7 @@ import "./confirm-dialog.css";
 type Options = {
   title?: string;
   confirmText?: string;
-  cancelText?: string;
+  cancelText?: string | null;
   iconKey?: string;
   danger?: boolean;
   busyCheck?: () => boolean;
@@ -76,9 +76,8 @@ export function ConfirmDialog({
   const blocked = busyCheck?.() || false;
   useEffect(() => {
     const previous = document.activeElement as HTMLElement | null;
-    ref.current
-      ?.querySelector<HTMLButtonElement>("[data-confirm-cancel]")
-      ?.focus();
+    (ref.current?.querySelector<HTMLButtonElement>("[data-confirm-cancel]") ??
+      ref.current?.querySelector<HTMLButtonElement>(".confirm-accept"))?.focus();
     const updated = () => refresh((n) => n + 1);
     window.addEventListener("ohana-operation-finished", updated);
     return () => {
@@ -137,7 +136,7 @@ export function ConfirmDialog({
             : message}
         </p>
         <div className="form-actions">
-          <AppButton
+          {cancelText && <AppButton
             type="button"
             className="confirm-cancel"
             iconKey="action.cancel"
@@ -145,7 +144,7 @@ export function ConfirmDialog({
             onClick={onCancel}
           >
             {cancelText}
-          </AppButton>
+          </AppButton>}
           <AppButton
             type="button"
             className="confirm-accept"

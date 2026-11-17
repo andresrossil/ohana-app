@@ -143,7 +143,7 @@ export default function Funds({ company }: { company: string }) {
           <AppButton className="secondary" disabled={busy} onClick={() => { setEntry(initialEntry()); setMode(""); }}>Cancelar</AppButton></div>
       </form>
     </section>}
-    {!showHistory && <section className="catalog funds-report">
+    {!showHistory && <section className="catalog funds-report funds-balance-summary">
       <div className="catalog-head"><h2>Resumen de fondos</h2></div>
       <ResponsiveTable className="fund-balance-table">
         <thead><tr><th>Fondo</th><th>Saldo</th></tr></thead>
