@@ -1004,6 +1004,7 @@ function App() {
               )}
               {section === "production" && (
                 <Production
+                  userId={session?.user.id}
                   key={company + section}
                   company={company}
                   onDirty={setSettingsDirty}
@@ -1017,7 +1018,7 @@ function App() {
                   currency={activeCompany?.currency}
                 />
               )}
-              {section === "order-preparation" && <OrderPreparation key={company} company={company} />}
+              {section === "order-preparation" && <OrderPreparation key={company} company={company} userId={session?.user.id} />}
               {(section === "customers" || section === "suppliers") && (
                 <BusinessPartners
                   key={company + section}

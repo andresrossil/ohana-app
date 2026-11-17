@@ -24,6 +24,7 @@ const ignoreDirty = () => {};
 export default function Production(props: {
   company: string;
   formulasOnly?: boolean;
+  userId?: string;
   manager?: boolean;
   onDirty?: (dirty: boolean) => void;
 }) {
@@ -33,6 +34,7 @@ export default function Production(props: {
     <ProductionBatches
       company={props.company}
       manager={props.manager}
+      userId={props.userId}
       onDirty={props.onDirty || ignoreDirty}
     />
   );
@@ -40,10 +42,12 @@ export default function Production(props: {
 function ProductionBatches({
   company,
   manager = false,
+  userId,
   onDirty,
 }: {
   company: string;
   manager?: boolean;
+  userId?: string;
   onDirty: (dirty: boolean) => void;
 }) {
   const [cancelId, setCancelId] = useState(""),
@@ -723,8 +727,7 @@ function ProductionBatches({
               )}
               {estimating && mode === "start" && !openingStock && (
                 <MaterialRequirements
-                  key={JSON.stringify([company, estimating.id, factor, draftUnits])}
-                  checklist
+                  checklistUser={userId}
                   company={company}
                   formula={estimating.id}
                   scale={factor}

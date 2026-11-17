@@ -31,3 +31,15 @@
 .shell .preparation-contact + .preparation-contact { margin-top: 6px; }
 .shell .preparation-order-controls > .preparation-contact { align-items: center; }
 .shell .preparation-items { margin: 0; padding-inline-start: 1.25rem; }
+
+.shell .preparation-worklist .preparation-items { padding-inline-start: 0; list-style: none; }
+.shell .preparation-worklist .preparation-check {
+  display: inline-flex;
+  align-items: center;
+  gap: .5rem;
+  min-height: 44px;
+  margin: 0;
+  max-width: 100%;
+}
+.shell .preparation-worklist .preparation-check input { flex: 0 0 auto; }
+.shell .preparation-worklist .preparation-check:has(input:checked) { color: #16803c; font-weight: 650; }

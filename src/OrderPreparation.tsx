@@ -1,3 +1,4 @@
+import { usePreparationChecklist } from "./preparation-checklist";
 import { useEffect, useState } from "react";
 import { AppButton } from "./AppIcon";
 import { salesTodayRange, salesWorklist } from "./commerce";
@@ -31,8 +32,10 @@ function customerContacts(orders: Row[]) {
   return [...contacts.entries()];
 }
 
-export default function OrderPreparation({ company }: { company: string }) {
+export default function OrderPreparation({ company, userId }: { company: string; userId?: string }) {
   const state = useOperation(company, "sales");
+  const { marks, mark } = usePreparationChecklist(JSON.stringify(["orders", userId, company]));
+  const lineKey = (order: Row, line: Row) => JSON.stringify([order.id, line.id, line.variant_id, Number(line.quantity)]);
   const [filters, setFilters] = useState(salesTodayRange);
   const [applied, setApplied] = useState(filters);
   const [orders, setOrders] = useState<Row[]>([]);
@@ -63,7 +66,7 @@ export default function OrderPreparation({ company }: { company: string }) {
     });
   }
 
-  const products = new Map<string, { product: string; size: string; quantity: number }>();
+  const products = new Map<string, { product: string; size: string; quantity: number; lines: string[] }>();
   const customers = new Map<string, { name: string; orders: Row[] }>();
   for (const order of orders) {
     const customer = customers.get(order.customer_id) ?? { name: order.customer_name, orders: [] as Row[] };
@@ -71,8 +74,9 @@ export default function OrderPreparation({ company }: { company: string }) {
     customers.set(order.customer_id, customer);
     if (!["invoiced", "preparing"].includes(order.stage)) continue;
     for (const line of order.lines as Row[]) {
-      const item = products.get(line.variant_id) ?? { ...preparationLine(line), quantity: 0 };
+      const item = products.get(line.variant_id) ?? { ...preparationLine(line), quantity: 0, lines: [] };
       item.quantity += Number(line.quantity);
+      item.lines.push(lineKey(order, line));
       products.set(line.variant_id, item);
     }
   }
@@ -117,10 +121,19 @@ export default function OrderPreparation({ company }: { company: string }) {
       {visibleCount === 0 ? <p className="empty" role="status">
         {state.busy ? "Consultando pedidos…" : view === "products" ? "No hay pedidos pendientes de preparar para esas fechas." : "No hay pedidos confirmados para esas fechas."}
       </p> : view === "products" ? <div className="table-wrap">
-        <ResponsiveTable>
-          <thead><tr><th>Producto</th><th>Variante</th><th>Unidades a reunir</th></tr></thead>
+        <ResponsiveTable showAllMobileFields>
+          <thead><tr><th>Producto</th><th>Variante</th><th>Unidades a reunir</th><th>Preparación</th></tr></thead>
           <tbody>{sortedProducts.map(([id, item]) => <tr key={id}>
             <td>{item.product}</td><td>{item.size}</td><td>{item.quantity}</td>
+            <td data-sort-value={item.lines.every((key) => marks.has(key)) ? 1 : 0}>
+              <label className="preparation-check">
+                <input type="checkbox" aria-label={"Reunido: " + item.product + " · " + item.size}
+                  checked={item.lines.every((key) => marks.has(key))}
+                  ref={(node) => { if (node) node.indeterminate = item.lines.some((key) => marks.has(key)) && !node.checked; }}
+                  onChange={(event) => mark(item.lines, event.target.checked)} />
+                {item.lines.every((key) => marks.has(key)) ? "Reunido" : "Marcar reunido"}
+              </label>
+            </td>
           </tr>)}</tbody>
         </ResponsiveTable>
       </div> : sortedCustomers.map(([id, customer]) => (
@@ -158,7 +171,14 @@ export default function OrderPreparation({ company }: { company: string }) {
                 <td><ul className="preparation-items">
                   {(order.lines as Row[]).map((line) => {
                     const item = preparationLine(line);
-                    return <li key={line.id}>{line.quantity} × {item.product} · {item.size}{line.is_gift ? " · Regalo" : ""}</li>;
+                    const key = lineKey(order, line);
+                    return <li key={line.id}>
+                      <label className="preparation-check">
+                        <input type="checkbox" checked={marks.has(key)}
+                          onChange={(event) => mark([key], event.target.checked)} />
+                        <span>{line.quantity} × {item.product} · {item.size}{line.is_gift ? " · Regalo" : ""}</span>
+                      </label>
+                    </li>;
                   })}
                 </ul></td>
                 <td>{fulfillmentLabels[order.stage]}</td>

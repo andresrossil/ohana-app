@@ -1,3 +1,4 @@
+import { usePreparationChecklist } from "./preparation-checklist";
 import { useEffect, useState } from "react";
 import { AppButton, AppIcon } from "./AppIcon";
 import { IconDetails } from "./PoolControls";
@@ -11,21 +12,22 @@ export default function MaterialRequirements({
   scale = 1,
   units = null,
   initialOpen = false,
-  checklist = false,
+  checklistUser,
 }: {
   company: string;
   formula?: string;
   scale?: number;
   units?: number | null;
   initialOpen?: boolean;
-  checklist?: boolean;
+  checklistUser?: string;
 }) {
   const [open, setOpen] = useState(initialOpen),
     [rows, setRows] = useState<Row[]>([]),
     [error, setError] = useState(""),
     [loading, setLoading] = useState(false),
-    [revision, setRevision] = useState(0),
-    [added, setAdded] = useState<Set<string>>(new Set());
+    [revision, setRevision] = useState(0);
+  const checklist = Boolean(checklistUser);
+  const { marks: added, mark, clear } = usePreparationChecklist(JSON.stringify(["production", checklistUser, company, formula, scale, units]));
   useEffect(() => {
     if (!open) return;
     let live = true;
@@ -82,6 +84,7 @@ export default function MaterialRequirements({
           >
             Actualizar requerimientos
           </AppButton>
+          {checklist && added.size > 0 && <AppButton type="button" className="secondary" onClick={clear}>Desmarcar materiales</AppButton>}
           {error && (
             <p className="error" role="alert">
               <AppIcon name="status.error" />
@@ -153,13 +156,7 @@ export default function MaterialRequirements({
                               aria-label={"Ya agregado: " + r.name}
                               onChange={(event) => {
                                 event.stopPropagation();
-                                const checked = event.target.checked;
-                                setAdded((current) => {
-                                  const next = new Set(current);
-                                  if (checked) next.add(r.material_id);
-                                  else next.delete(r.material_id);
-                                  return next;
-                                });
+                                mark([r.material_id], event.target.checked);
                               }} />
                             {added.has(r.material_id) ? "Agregado" : "Ya agregado"}
                           </label>
