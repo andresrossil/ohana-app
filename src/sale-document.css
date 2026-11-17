@@ -19,7 +19,7 @@ body { margin: 0; }
 .document-card h2 { font-size: 12pt; display: flex; align-items: center; gap: 8px; margin: 0 0 2mm; }
 .document-card p { margin: 0; line-height: 1.45; white-space: pre-line; }
 .document-card svg { width: 16px; height: 16px; vertical-align: text-bottom; color: #886951; }
-.document table { width: 100%; table-layout: fixed; border: 1px solid var(--line); border-spacing: 0; border-radius: 10px; color: #30231b; background: var(--paper); }
+.document table { font-size: 0.92em; width: 100%; table-layout: fixed; border: 1px solid var(--line); border-spacing: 0; border-radius: 10px; color: #30231b; background: var(--paper); }
 .document th, .document td { padding: 2.6mm 2mm; text-align: right; overflow-wrap: anywhere; vertical-align: top; }
 .document th { background: var(--sand); }
 .document th:first-child, .document td:first-child { width: 48%; text-align: left; }
