@@ -3,6 +3,7 @@ import { supabase } from "./client";
 import { money } from "./operations";
 import ResponsiveTable from "./ResponsiveTable";
 import { AppButton } from "./AppIcon";
+import { settlementNumber } from "./courier-account";
 import "./dashboard.css";
 
 type StockQuantity = number | string;
@@ -10,6 +11,8 @@ type AvailableProduct = { id: string; product: string; variant: string; availabl
 type ReorderMaterial = { id: string; sku: string | null; name: string; unit: string | null; minimum: StockQuantity; available: StockQuantity };
 type DashboardData = Record<string, unknown> & {
   available_products?: AvailableProduct[];
+  pending_settlements?: { id: string; number: number; date: string; courier: string; state: string; remaining: StockQuantity }[];
+  suggested_production?: { id: string; name: string; minimum: StockQuantity; available: StockQuantity; suggested: StockQuantity }[];
   reorder_materials?: ReorderMaterial[];
   price_list?: string | null;
   suppliers?: number;
@@ -26,6 +29,7 @@ export default function Dashboard({ company, currency, materials, products }: {
   const [data, setData] = useState<DashboardData>();
   const [failed, setFailed] = useState(false);
   const [stockExpanded, setStockExpanded] = useState(false);
+  const [settlementsExpanded, setSettlementsExpanded] = useState(false);
   useEffect(() => {
     let active = true;
     async function load() {
@@ -85,6 +89,37 @@ export default function Dashboard({ company, currency, materials, products }: {
         </div>
       </section>
     )}
+    {data?.pending_settlements && (
+      <section className="catalog dashboard-stock-list" aria-labelledby="dashboard-settlements-title">
+        <header className="dashboard-stock-heading">
+          <h2 id="dashboard-settlements-title">Liquidaciones pendientes ({data.pending_settlements.length})</h2>
+          <AppButton type="button" className="secondary"
+            iconKey={settlementsExpanded ? "action.collapse" : "action.expand"}
+            aria-expanded={settlementsExpanded} aria-controls="dashboard-settlements-content"
+            onClick={() => setSettlementsExpanded(value => !value)}>
+            {settlementsExpanded ? "Contraer" : "Expandir"}
+          </AppButton>
+        </header>
+        <div id="dashboard-settlements-content" hidden={!settlementsExpanded}>
+          {settlementsExpanded && (data.pending_settlements.length ? (
+            <div className="table-wrap"><ResponsiveTable showAllMobileFields>
+              <thead><tr><th>Liquidación</th><th>Fecha</th><th>Mensajería</th><th>Estado</th><th>Saldo pendiente</th></tr></thead>
+              <tbody>{data.pending_settlements.map(item => (
+                <tr key={item.id}>
+                  <td data-sort-value={item.number}>{settlementNumber(item.number)}</td>
+                  <td data-sort-value={item.date}>{item.date.split("-").reverse().join("/")}</td>
+                  <td>{item.courier}</td>
+                  <td>{item.state === "draft" ? "Borrador" : item.state === "partial" ? "Pago parcial" : "Pendiente"}</td>
+                  <td data-sort-value={item.remaining}>{money(Math.abs(Number(item.remaining)), currency)}
+                    <small>{Number(item.remaining) > 0 ? "Por recibir de mensajería" : Number(item.remaining) < 0 ? "Por pagar a mensajería" : "Sin saldo"}</small>
+                  </td>
+                </tr>
+              ))}</tbody>
+            </ResponsiveTable></div>
+          ) : <p className="empty">No hay liquidaciones pendientes.</p>)}
+        </div>
+      </section>
+    )}
     <div className="dashboard-grid" aria-busy={!data && !failed}>
       {materials != null && <section className="catalog dashboard-card">
         <h2>Materiales</h2><div>{metric("Materiales activos", number(materials))}
@@ -117,6 +152,22 @@ export default function Dashboard({ company, currency, materials, products }: {
           </div>
         </section>
       </>}
+      {data?.suggested_production && data.suggested_production.length > 0 && (
+        <section className="catalog dashboard-card dashboard-reorder">
+          <h2>Producción sugerida</h2>
+          <div className="table-wrap"><ResponsiveTable showAllMobileFields>
+            <thead><tr><th>Producto</th><th>Disponible total</th><th>Mínimo</th><th>Unidades sugeridas</th></tr></thead>
+            <tbody>{data.suggested_production.map(item => (
+              <tr key={item.id}>
+                <td>{item.name}</td>
+                <td data-sort-value={item.available}>{number(item.available)}</td>
+                <td data-sort-value={item.minimum}>{number(item.minimum)}</td>
+                <td data-sort-value={item.suggested}>{number(item.suggested)}</td>
+              </tr>
+            ))}</tbody>
+          </ResponsiveTable></div>
+        </section>
+      )}
       {data?.reorder != null && <section className="catalog dashboard-card dashboard-reorder">
         <h2>Reorden</h2>
         <div>{metric("Materiales con disponible menor al mínimo", number(data.reorder_materials?.length ?? data.reorder))}</div>

@@ -149,6 +149,7 @@ export default function ProductsCatalog({
         published: f.get("published") === "on",
         is_intermediate: f.get("is_intermediate") === "on",
         available_for_sale: f.get("available_for_sale") === "on",
+        minimum_stock: Number(f.get("minimum_stock") || 0),
         unit_id: f.get("unit_id") || null,
         active: f.get("active") !== "false",
         ...metadata,
@@ -371,6 +372,11 @@ export default function ProductsCatalog({
                   defaultChecked={edit?.published ?? false}
                 />{" "}
                 Publicar producto en tienda
+              </label>
+              <label>
+                Stock mínimo del producto
+                <input name="minimum_stock" type="number" min="0" step="any" required defaultValue={edit?.minimum_stock ?? 0} />
+                <small>Se compara con la suma disponible de sus variantes. Cero desactiva la sugerencia.</small>
               </label>
               <label className="check">
                 <input name="is_intermediate" type="checkbox" defaultChecked={edit?.is_intermediate ?? false} />
