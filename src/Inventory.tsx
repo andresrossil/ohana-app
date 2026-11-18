@@ -1,4 +1,5 @@
 import PurchaseReceiptEditor from "./PurchaseReceiptEditor";
+import PurchasePlanning from "./PurchasePlanning";
 import InventoryAdjustment from "./InventoryAdjustment";
 import { CuringProductionTable, curingCount, summarizeCuringProducts, useCuringProduction } from "./CuringProduction";
 import { useMaterialTypes, MaterialTypeLabel } from "./MaterialTypesContext";
@@ -27,6 +28,7 @@ export default function Inventory({
 }) {
   const types = useMaterialTypes();
   const [viewReceipt, setViewReceipt] = useState<Row | null>(null);
+  const [showPurchasePlan, setShowPurchasePlan] = useState(false);
   const [showCuring, setShowCuring] = useState(false);
   const [curingRevision, setCuringRevision] = useState(0);
   const curing = useCuringProduction(!purchases && productionRead ? company : null, curingRevision);
@@ -82,6 +84,10 @@ export default function Inventory({
           </p>
         </div>
         <div className="actions">
+          {purchases && <AppButton className="secondary" iconKey={showPurchasePlan ? "action.back" : "action.add"}
+            onClick={() => setShowPurchasePlan(value => !value)}>
+            {showPurchasePlan ? "Compras recibidas" : "Orden de compra"}
+          </AppButton>}
           {!purchases && (
             <AppButton className="secondary" iconKey="status.pending" onClick={() => setShowCuring(true)}>
               Productos en curación
@@ -199,7 +205,9 @@ export default function Inventory({
           </section>
         </div>
       )}
-      {purchases ? (
+      {purchases && showPurchasePlan ? (
+        <PurchasePlanning key={company} company={company} catalog={data} refresh={curingRevision} />
+      ) : purchases ? (
         <section className="catalog">
           <h2>Compras recibidas</h2>
           <div className="table-wrap">
