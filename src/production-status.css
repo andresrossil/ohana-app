@@ -1,0 +1,26 @@
+.shell .responsive-table > tbody > tr[data-production-status="finished"] {
+  --production-frame: var(--functional-success, #166534);
+}
+
+.shell .responsive-table > tbody > tr[data-production-status="cancelled"] {
+  --production-frame: var(--functional-danger, #b91c1c);
+}
+
+.shell .responsive-table > tbody > tr[data-production-status="curing"] {
+  --production-frame: #2563eb;
+}
+
+.shell .responsive-table > tbody > tr[data-production-status="in_progress"] {
+  --production-frame: #ca8a04;
+}
+
+.shell .responsive-table > tbody > tr[data-production-status] {
+  box-shadow: inset 0 0 0 2px var(--production-frame, transparent);
+}
+
+@media (max-width: 760px) {
+  .shell .responsive-table > tbody > tr[data-production-status] {
+    border-color: var(--production-frame, var(--admin-border));
+    box-shadow: inset 0 0 0 1px var(--production-frame, transparent);
+  }
+}
