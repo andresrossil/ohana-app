@@ -40,6 +40,7 @@ export default function OrderPreparation({ company, userId }: { company: string;
   const [applied, setApplied] = useState(filters);
   const [orders, setOrders] = useState<Row[]>([]);
   const [view, setView] = useState<"products" | "customers">("products");
+  const [pendingOnly, setPendingOnly] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
   const [finishing, setFinishing] = useState<string | null>(null);
 
@@ -68,11 +69,14 @@ export default function OrderPreparation({ company, userId }: { company: string;
 
   const products = new Map<string, { product: string; size: string; quantity: number; lines: string[] }>();
   const customers = new Map<string, { name: string; orders: Row[] }>();
-  for (const order of orders) {
+  const pendingOrders = orders.filter((order) => ["invoiced", "preparing"].includes(order.stage));
+  const showPendingOnly = view === "products" || pendingOnly;
+  const visibleOrders = showPendingOnly ? pendingOrders : orders;
+  for (const order of visibleOrders) {
     const customer = customers.get(order.customer_id) ?? { name: order.customer_name, orders: [] as Row[] };
     customer.orders.push(order);
     customers.set(order.customer_id, customer);
-    if (!["invoiced", "preparing"].includes(order.stage)) continue;
+    if (view !== "products") continue;
     for (const line of order.lines as Row[]) {
       const item = products.get(line.variant_id) ?? { ...preparationLine(line), quantity: 0, lines: [] };
       item.quantity += Number(line.quantity);
@@ -82,7 +86,7 @@ export default function OrderPreparation({ company, userId }: { company: string;
   }
   const sortedProducts = [...products].sort(([, a], [, b]) => names.compare(a.product, b.product) || names.compare(a.size, b.size));
   const sortedCustomers = [...customers].sort(([, a], [, b]) => names.compare(a.name, b.name));
-  const visibleCount = view === "products" ? orders.filter((order) => ["invoiced", "preparing"].includes(order.stage)).length : orders.length;
+  const visibleCount = visibleOrders.length;
 
   return <>
     <section className="intro">
@@ -116,10 +120,14 @@ export default function OrderPreparation({ company, userId }: { company: string;
           onClick={() => setView("products")}>Por producto y variante</AppButton>
         <AppButton className="secondary" iconKey="module.customers" aria-pressed={view === "customers"}
           onClick={() => setView("customers")}>Por cliente</AppButton>
+        {view === "customers" && <label className="preparation-check">
+          <input type="checkbox" checked={pendingOnly} onChange={(event) => setPendingOnly(event.target.checked)} />
+          Solo pendientes de preparar
+        </label>}
         <span>{visibleCount} {visibleCount === 1 ? "pedido" : "pedidos"}</span>
       </div>
       {visibleCount === 0 ? <p className="empty" role="status">
-        {state.busy ? "Consultando pedidos…" : view === "products" ? "No hay pedidos pendientes de preparar para esas fechas." : "No hay pedidos confirmados para esas fechas."}
+        {state.busy ? "Consultando pedidos…" : showPendingOnly ? "No hay pedidos pendientes de preparar para esas fechas." : "No hay pedidos confirmados para esas fechas."}
       </p> : view === "products" ? <div className="table-wrap">
         <ResponsiveTable showAllMobileFields>
           <thead><tr><th>Producto</th><th>Variante</th><th>Unidades a reunir</th><th>Preparación</th></tr></thead>
