@@ -727,7 +727,6 @@ function ProductionBatches({
               )}
               {estimating && mode === "start" && !openingStock && (
                 <MaterialRequirements
-                  checklistUser={userId}
                   company={company}
                   formula={estimating.id}
                   scale={factor}
@@ -942,6 +941,7 @@ function ProductionBatches({
       </section>
       {traceId && (
         <BatchTrace
+          userId={userId}
           company={company}
           id={traceId}
           formulas={formulas}

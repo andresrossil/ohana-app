@@ -1,4 +1,5 @@
 import { plannedLineQuantity, plannedProductionUnits, recipeLineKinds } from "./formula-model";
+import { usePreparationChecklist } from "./preparation-checklist";
 import { IconDetails } from "./PoolControls";
 import AdditionalCostsPanel from "./AdditionalCostsPanel";
 import CostSummary from "./CostSummary";
@@ -37,17 +38,21 @@ const num = (n: any) =>
     : new Intl.NumberFormat("es-GT", { maximumFractionDigits: 2 }).format(
         Number(n),
       );
-function DraftRecipe({ batch, formula }: { batch: Row; formula?: Row }) {
+function DraftRecipe({ batch, formula, company, userId }: {
+  batch: Row; formula?: Row; company: string; userId?: string;
+}) {
+  const checklist = usePreparationChecklist(JSON.stringify(["production-document", userId, company, batch.id]));
+  const preparing = batch.state === "in_progress" && Boolean(userId);
   if (!formula) return <p className="muted">No se encontró la versión de fórmula vinculada a este borrador.</p>;
   const scale = Number(batch.formula_scale ?? 1);
   const units = batch.planned_quantity ?? plannedProductionUnits(formula.estimated_units, scale);
   const materials = [
     ...(formula.ingredients ?? []).map((line: Row) => ({
-      ...line, key: line.material_id,
+      ...line, key: "material:" + (line.line_kind || "ingredient") + ":" + line.material_id,
       kind: recipeLineKinds[(line.line_kind || "ingredient") as keyof typeof recipeLineKinds],
     })),
     ...(formula.intermediates ?? []).map((line: Row) => ({
-      ...line, key: line.variant_id, kind: "Producto intermedio",
+      ...line, key: "intermediate:" + line.variant_id, kind: "Producto intermedio",
     })),
   ];
   return <>
@@ -63,15 +68,23 @@ function DraftRecipe({ batch, formula }: { batch: Row; formula?: Row }) {
     )}
     {materials.length ? (
       <div className="table-wrap">
-        <ResponsiveTable>
-          <thead><tr><th>Material / insumo</th><th>Cantidad prevista</th><th>Observaciones</th></tr></thead>
+        <ResponsiveTable showAllMobileFields>
+          <thead><tr><th>Material / insumo</th><th>Cantidad prevista</th><th>Observaciones</th>{preparing && <th>Preparación</th>}</tr></thead>
           <tbody>
             {materials.map((line) => {
               const quantity = plannedLineQuantity(line.quantity, line.quantity_basis, scale, units);
-              return <tr key={line.key}>
+              return <tr key={line.key} data-added={preparing && checklist.marks.has(line.key)}>
                 <td>{line.name}<small>{line.kind}</small></td>
                 <td data-sort-value={quantity ?? ""}>{quantity == null ? "—" : `${num(quantity)} ${line.unit || ""}`}</td>
                 <td style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{line.reference_notes || "—"}</td>
+                {preparing && <td data-sort-value={checklist.marks.has(line.key) ? 1 : 0}>
+                  <label className="material-added-check">
+                    <input type="checkbox" checked={checklist.marks.has(line.key)}
+                      aria-label={"Ya agregado: " + line.name}
+                      onChange={event => checklist.mark([line.key], event.target.checked)} />
+                    {checklist.marks.has(line.key) ? "Agregado" : "Ya agregado"}
+                  </label>
+                </td>}
               </tr>;
             })}
           </tbody>
@@ -87,12 +100,14 @@ export default function BatchTrace({
   onClose,
   showCosts = true,
   formulas,
+  userId,
 }: {
   company: string;
   id: string;
   onClose: () => void;
   showCosts?: boolean;
   formulas: Row[];
+  userId?: string;
 }) {
   const [data, setData] = useState<Row | null>(null),
     [error, setError] = useState("");
@@ -477,7 +492,7 @@ export default function BatchTrace({
                     </div>
                   </>
                 ) : (
-                  <DraftRecipe batch={data.batch} formula={formulas.find((formula) => formula.id === data.batch.formula_id)} />
+                  <DraftRecipe company={company} userId={userId} batch={data.batch} formula={formulas.find((formula) => formula.id === data.batch.formula_id)} />
                 )}
               </>
             )}
