@@ -5,6 +5,7 @@ import MaterialRequirements from "./MaterialRequirements";
 import { IconDetails } from "./PoolControls";
 import { plannedLineQuantity, recipeLineKinds } from "./formula-model";
 import ResponsiveTable from "./ResponsiveTable";
+import "./production-status.css";
 import { confirmAction } from "./ConfirmDialog";
 import { AppButton, AppIcon } from "./AppIcon";
 import Formulas from "./Formulas";
@@ -773,7 +774,7 @@ function ProductionBatches({
             </thead>
             <tbody>
               {batches.map((b) => (
-                <tr key={b.id}>
+                <tr key={b.id} data-production-status={b.finalized_at ? "finished" : b.state}>
                   <td>
                     {lotCode(b.batch_number)}
                     <small>{b.product_name}</small>
