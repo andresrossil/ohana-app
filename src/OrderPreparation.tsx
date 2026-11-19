@@ -1,7 +1,8 @@
 import { usePreparationChecklist } from "./preparation-checklist";
 import { useEffect, useState } from "react";
 import { AppButton } from "./AppIcon";
-import { salesTodayRange, salesWorklist } from "./commerce";
+import { sales, salesTodayRange, salesWorklist } from "./commerce";
+import { supabase } from "./client";
 import { keyedRequest, money, useOperation, type Row } from "./operations";
 import { confirmAction } from "./ConfirmDialog";
 import { deliveryZoneLabel } from "./delivery-address";
@@ -39,15 +40,51 @@ export default function OrderPreparation({ company, userId }: { company: string;
   const [filters, setFilters] = useState(salesTodayRange);
   const [applied, setApplied] = useState(filters);
   const [orders, setOrders] = useState<Row[]>([]);
+  const [listPrices, setListPrices] = useState(new Map<string, number>());
   const [view, setView] = useState<"products" | "customers">("products");
   const [pendingOnly, setPendingOnly] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
   const [finishing, setFinishing] = useState<string | null>(null);
 
   async function load(range = applied) {
-    const result = await salesWorklist(company, "preparation_list", range);
+    const result: Row[] = await salesWorklist(company, "preparation_list", range);
     setOrders(result);
     setApplied(range);
+    setListPrices(new Map());
+    const customerIds = [...new Set<string>(result.map((order) => order.customer_id).filter(Boolean))];
+    if (result.length === 0) return;
+
+    try {
+      const customerBatches = [];
+      for (let i = 0; i < customerIds.length; i += 100) {
+        customerBatches.push(supabase.from("business_partners").select("id,price_list_id")
+          .eq("company_id", company).eq("is_customer", true).in("id", customerIds.slice(i, i + 100)));
+      }
+      const [catalog, ...partners] = await Promise.all([sales(company), ...customerBatches]);
+      const listsByCustomer = new Map<string, string | null>();
+      for (const batch of partners) {
+        if (batch.error) throw batch.error;
+        for (const customer of batch.data) listsByCustomer.set(customer.id, customer.price_list_id);
+      }
+      const pricesByList = new Map<string, number>();
+      for (const entry of catalog.price_entries as Row[]) {
+        if (entry.price != null) {
+          pricesByList.set(JSON.stringify([entry.list_id, entry.variant_id, entry.currency]), Number(entry.price));
+        }
+      }
+      const prices = new Map<string, number>();
+      for (const order of result) {
+        if (order.customer_id && !listsByCustomer.has(order.customer_id)) continue;
+        const list = listsByCustomer.get(order.customer_id) ?? catalog.default_price_list;
+        for (const line of order.lines as Row[]) {
+          const price = pricesByList.get(JSON.stringify([list, line.variant_id, order.currency]));
+          if (price !== undefined) prices.set(lineKey(order, line), price);
+        }
+      }
+      setListPrices(prices);
+    } catch {
+      state.setError("No se pudieron consultar los precios de lista. Usa Actualizar para volver a intentarlo.");
+    }
   }
 
   useEffect(() => { void state.run(() => load(filters)); }, [company]);
@@ -157,43 +194,50 @@ export default function OrderPreparation({ company, userId }: { company: string;
                 </div>
               ))}
             </div>
-            <div className="preparation-order-controls">
-              {customer.orders.map((order) => (
-                <div className="preparation-contact" key={order.id}>
+          </header>
+          {customer.orders.map((order) => (
+            <section key={order.id} className="preparation-customer">
+              <header className="preparation-customer-header">
+                <div className="preparation-contact">
                   <strong>Pedido #{order.invoice_number || order.number} · {money(order.total, order.currency)}</strong>
+                  <span>{fulfillmentLabels[order.stage]}</span>
+                  <time dateTime={order.confirmed_at}>{confirmationDate.format(new Date(order.confirmed_at))}</time>
+                </div>
+                <div className="preparation-contact">
+                  <AppButton className="secondary" iconKey="action.expand" onClick={() => setSelected(order.id)}>Ver pedido</AppButton>
                   {state.canWrite && ["invoiced", "preparing", "finished"].includes(order.stage) &&
                     <AppButton iconKey="action.confirm" disabled={state.busy} onClick={() => advance(order)}>
                       {order.stage === "invoiced" ? "Iniciar preparación" : order.stage === "preparing" ? "Pedido terminado"
                         : order.delivery_kind === "courier" ? "Entregado a mensajería" : "Entregar al cliente"}
                     </AppButton>}
                 </div>
-              ))}
-            </div>
-          </header>
-          <div className="table-wrap">
-            <ResponsiveTable>
-              <thead><tr><th>Pedido</th><th>Confirmado</th><th>Productos y variantes</th><th>Estado</th><th>Acciones</th></tr></thead>
-              <tbody>{customer.orders.map((order) => <tr key={order.id}>
-                <td data-sort-value={order.invoice_number || order.number}>#{order.invoice_number || order.number}</td>
-                <td data-sort-value={order.confirmed_at}>{confirmationDate.format(new Date(order.confirmed_at))}</td>
-                <td><ul className="preparation-items">
-                  {(order.lines as Row[]).map((line) => {
+              </header>
+              <div className="table-wrap">
+                <ResponsiveTable showAllMobileFields aria-label={`Productos del pedido ${order.invoice_number || order.number}`}>
+                  <thead><tr><th>Producto y variante</th><th>Cantidad</th><th>Precio unitario de lista</th><th>Preparación</th></tr></thead>
+                  <tbody>{(order.lines as Row[]).map((line) => {
                     const item = preparationLine(line);
                     const key = lineKey(order, line);
-                    return <li key={line.id}>
-                      <label className="preparation-check">
-                        <input type="checkbox" checked={marks.has(key)}
-                          onChange={(event) => mark([key], event.target.checked)} />
-                        <span>{line.quantity} × {item.product} · {item.size}{line.is_gift ? " · Regalo" : ""}</span>
-                      </label>
-                    </li>;
-                  })}
-                </ul></td>
-                <td>{fulfillmentLabels[order.stage]}</td>
-                <td><AppButton className="secondary" iconKey="action.expand" onClick={() => setSelected(order.id)}>Ver pedido</AppButton></td>
-              </tr>)}</tbody>
-            </ResponsiveTable>
-          </div>
+                    const price = listPrices.get(key);
+                    const checked = marks.has(key);
+                    const description = [item.product, item.size].filter(Boolean).join(" · ");
+                    return <tr key={line.id}>
+                      <td>{description}{line.is_gift ? " · Regalo" : ""}</td>
+                      <td data-sort-value={line.quantity}>{line.quantity}</td>
+                      <td data-sort-value={price}>{price === undefined ? "—" : money(price, order.currency)}</td>
+                      <td data-sort-value={checked ? 1 : 0}>
+                        <label className="preparation-check">
+                          <input type="checkbox" aria-label={"Reunido: " + description}
+                            checked={checked} onChange={(event) => mark([key], event.target.checked)} />
+                          {checked ? "Reunido" : "Marcar reunido"}
+                        </label>
+                      </td>
+                    </tr>;
+                  })}</tbody>
+                </ResponsiveTable>
+              </div>
+            </section>
+          ))}
         </section>
       ))}
     </section>
