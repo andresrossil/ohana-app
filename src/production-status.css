@@ -12,10 +12,16 @@
 
 .shell .responsive-table > tbody > tr[data-production-status="in_progress"] {
   --production-frame: #ca8a04;
+  --production-status-text: #854d0e;
 }
 
 .shell .responsive-table > tbody > tr[data-production-status] {
   box-shadow: inset 0 0 0 2px var(--production-frame, transparent);
+}
+
+/* Estado is the second column in the production worklist. */
+.shell .responsive-table > tbody > tr[data-production-status] > td:nth-child(2) {
+  color: var(--production-status-text, var(--production-frame, inherit));
 }
 
 @media (max-width: 760px) {
