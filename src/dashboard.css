@@ -61,7 +61,15 @@
 }
 
 .dashboard-stock-list { margin-bottom: 1rem; }
-.dashboard-stock-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .5rem; padding: 1rem; }
+.dashboard-stock-heading {
+  height: auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: .5rem;
+  padding: 1rem;
+}
 .dashboard-stock-heading h2 { margin: 0; font-size: 1.15rem; }
 .dashboard-reorder { grid-column: span 6; }
 .dashboard-reorder > .table-wrap { display: block; margin-top: 1rem; }
