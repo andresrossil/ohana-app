@@ -103,6 +103,7 @@ export default function Formulas({
     [draft, setDraft] = useState<Row>(initial),
     [lines, setLines] = useState<RecipeLine[]>([blankLine()]),
     [query, setQuery] = useState(""),
+    [compactList, setCompactList] = useState(false),
     [productText, setProductText] = useState(""),
     [dirty, setDirty] = useState(false),
     [scale, setScale] = useState<number | string>(1),
@@ -975,7 +976,40 @@ export default function Formulas({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
+          <AppButton
+            type="button"
+            className="secondary"
+            onClick={() => setCompactList((active) => !active)}
+          >
+            {compactList ? "Vista detallada" : "Vista en lista"}
+          </AppButton>
         </div>
+        {compactList ? (
+          filtered.length > 0 && (
+            <div className="formula-table-scroll">
+              <ResponsiveTable className="formula-compact-list" showAllMobileFields>
+                <thead>
+                  <tr><th>Código</th><th>Fórmula / producto</th><th>Versión</th><th>Estado</th></tr>
+                </thead>
+                <tbody>
+                  {filtered.map((formula) => (
+                    <tr key={formula.id}>
+                      <td>{formula.code || "—"}</td>
+                      <td>
+                        <strong>{formula.name || formula.product_name}</strong>
+                        {formula.name && formula.product_name && formula.product_name !== formula.name && (
+                          <small>{formula.product_name}</small>
+                        )}
+                      </td>
+                      <td data-sort-value={formula.version}>v{formula.version}</td>
+                      <td>{labels[formula.state] || formula.state}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </ResponsiveTable>
+            </div>
+          )
+        ) : <>
         <div className="formula-table-scroll formula-gallery">
           <ResponsiveTable>
             <thead>
@@ -1187,6 +1221,7 @@ export default function Formulas({
           actuales y el precio de la lista base. Incluyen materiales, empaque,
           insumos y costos adicionales.
         </small>
+        </>}
         {!filtered.length && (
           <p className="empty">
             {state.busy
