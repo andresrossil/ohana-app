@@ -7,7 +7,16 @@ import { settlementNumber } from "./courier-account";
 import "./dashboard.css";
 
 type StockQuantity = number | string;
-type AvailableProduct = { id: string; product: string; variant: string; available: StockQuantity; general_price?: StockQuantity | null };
+type AvailableProduct = {
+  id: string;
+  product: string;
+  variant: string;
+  available: StockQuantity;
+  curing?: StockQuantity | null;
+  estimated?: StockQuantity;
+  unknown_lots?: number;
+  general_price?: StockQuantity | null;
+};
 type ReorderMaterial = { id: string; sku: string | null; name: string; unit: string | null; minimum: StockQuantity; available: StockQuantity };
 type DashboardData = Record<string, unknown> & {
   available_products?: AvailableProduct[];
@@ -62,7 +71,7 @@ export default function Dashboard({ company, currency, materials, products }: {
     {data?.available_products && (
       <section className="catalog dashboard-stock-list" aria-labelledby="dashboard-stock-title">
         <header className="dashboard-stock-heading">
-          <h2 id="dashboard-stock-title">Productos disponibles</h2>
+          <h2 id="dashboard-stock-title">Productos disponibles y en curación/secado</h2>
           <AppButton type="button" className="secondary"
             iconKey={stockExpanded ? "action.collapse" : "action.expand"}
             aria-expanded={stockExpanded} aria-controls="dashboard-stock-content"
@@ -74,18 +83,23 @@ export default function Dashboard({ company, currency, materials, products }: {
           {stockExpanded && (data.available_products.length ? (
             <div className="table-wrap">
               <ResponsiveTable showAllMobileFields>
-                <thead><tr><th>Producto</th><th>Variante</th><th>Disponible</th><th>Precio General</th></tr></thead>
+                <thead><tr><th>Producto</th><th>Variante</th><th>Disponible</th><th>En curación/secado</th><th>Precio General</th></tr></thead>
                 <tbody>{data.available_products.map(item => (
                   <tr key={item.id}>
                     <td>{item.product}</td>
                     <td>{item.variant || "—"}</td>
                     <td data-sort-value={item.available}><strong>{number(item.available)} ud</strong></td>
+                    <td data-sort-value={item.curing ?? ""}>
+                      {item.curing == null ? "—" : number(item.curing) + " ud"}
+                      {!!Number(item.estimated) && <small>{number(item.estimated)} estimadas</small>}
+                      {!!item.unknown_lots && <small>{item.unknown_lots === 1 ? "1 lote sin cantidad" : `${item.unknown_lots} lotes sin cantidad`}</small>}
+                    </td>
                     <td data-sort-value={item.general_price ?? ""}>{item.general_price == null ? "Sin precio" : money(item.general_price, currency)}</td>
                   </tr>
                 ))}</tbody>
               </ResponsiveTable>
             </div>
-          ) : <p className="empty">No hay productos con existencias disponibles.</p>)}
+          ) : <p className="empty">No hay productos disponibles ni en curación/secado.</p>)}
         </div>
       </section>
     )}
