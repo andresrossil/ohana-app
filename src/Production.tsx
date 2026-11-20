@@ -62,7 +62,7 @@ function ProductionBatches({
     }),
     [formulas, setFormulas] = useState<Row[]>([]),
     [batches, setBatches] = useState<Row[]>([]),
-    [mode, setMode] = useState<"start" | "finish" | "release" | "curing_edit" | null>(null),
+    [mode, setMode] = useState<"start" | "finish" | "curing_complete" | "curing_edit" | null>(null),
     [selected, setSelected] = useState<Row | null>(null),
     [date, setDate] = useState(today()),
     [openingStock, setOpeningStock] = useState(false),
@@ -76,6 +76,8 @@ function ProductionBatches({
     [targetUnits, setTargetUnits] = useState(""),
     [consumed, setConsumed] = useState<Record<string, string>>({}),
     [outputUnits, setOutputUnits] = useState<Record<string, string>>({});
+  const [yieldTiming, setYieldTiming] = useState("");
+  const [weightCounts, setWeightCounts] = useState<Record<string, number>>({});
   const [calendarDate, setCalendarDate] = useState(today);
   useEffect(() => {
     const timer = window.setInterval(() => setCalendarDate(today()), 60_000);
@@ -124,6 +126,24 @@ function ProductionBatches({
     (selected?.available_on_override
       ? selected.available_on > today()
       : formula?.requires_curing ?? selected?.requires_curing ?? true);
+  const sendingToCuring = mode === "finish" && requiresCuring;
+  const finishingCuring = mode === "curing_complete" || (mode === "finish" && !!selected?.opening_stock);
+  const assignedUnits = Object.values(outputUnits).reduce((sum, value) => sum + Number(value), 0)
+    + Object.values(weightCounts).reduce((sum, value) => sum + value, 0);
+
+  function openYield(batch: Row, nextMode: "finish" | "curing_complete") {
+    setSelected(batch);
+    setConsumed({});
+    setOutputUnits(Object.fromEntries(
+      (batch.preliminary_outputs ?? batch.outputs ?? []).map((output: Row) =>
+        [output.variant ?? output.variant_id, String(output.quantity)]),
+    ));
+    setWeightCounts({});
+    setYieldTiming("");
+    setDirty(false);
+    setMode(nextMode);
+  }
+
   const estimating = formulas.find(
     (f) => f.id === (mode === "start" ? draftFormula : selected?.formula_id),
   );
@@ -233,7 +253,7 @@ function ProductionBatches({
                 {
                   start: "Producción en preparación",
                   finish: "Confirmar producción",
-                  release: "Liberación manual",
+                  curing_complete: "Confirmar rendimiento final",
                   curing_edit: "Editar lote en curación",
                 }[mode]
               }
@@ -277,23 +297,23 @@ function ProductionBatches({
                     available_on_override: availableOverride,
                     quantity: draftUnits,
                   };
-                } else if (mode === "finish") {
-                  action = "batch_finish";
+                } else if (mode === "finish" || mode === "curing_complete") {
+                  action = mode === "curing_complete" ? "batch_curing_complete" : "batch_finish";
                   payload = {
                     batch: selected!.id,
-                    expected_revision: formula!.edit_revision,
+                    expected_revision: formula?.edit_revision,
                     scrap: Number(f.get("scrap") || 0),
-                    capture_mode: selected!.opening_stock ? "weights" : "variant_units",
-                    intermediates: (selected!.opening_stock ? [] : formula!.intermediates || []).map((r: Row) => ({
+                    capture_mode: selected!.opening_stock && mode === "finish" ? "weights" : "variant_units",
+                    intermediates: (finishingCuring ? [] : formula?.intermediates || []).map((r: Row) => ({
                       variant_id: r.variant_id,
                       quantity: f.get("consume_variant_" + r.variant_id),
                     })),
-                    consumptions: (selected!.opening_stock ? [] : formula!.ingredients).map((r: Row) => ({
+                    consumptions: (finishingCuring ? [] : formula?.ingredients || []).map((r: Row) => ({
                       material: r.material_id,
                       unit: r.unit_id,
                       quantity: f.get("consume_" + r.material_id),
                     })),
-                    outputs: catalog.variants
+                    outputs: sendingToCuring && yieldTiming !== "before" ? [] : catalog.variants
                       .filter(
                         (v: Row) =>
                           v.product_id === selected!.product_id &&
@@ -308,6 +328,24 @@ function ProductionBatches({
                           : { variant: v.id, quantity: f.get("output_" + v.id) };
                       }),
                   };
+                  if (sendingToCuring) {
+                    payload.yield_timing = yieldTiming;
+                    payload.preliminary_quantity = f.get("preliminary_quantity");
+                    if (payload.outputs.length && assignedUnits !== Number(payload.preliminary_quantity)) {
+                      state.setError("La suma por variante debe coincidir con las unidades contadas.");
+                      return;
+                    }
+                  }
+                  if (finishingCuring) {
+                    payload.final_quantity = assignedUnits;
+                    payload.reason = f.get("reason");
+                    payload.override = f.get("override") === "on";
+                    const assigned = payload.outputs.reduce((sum: number, output: Row) => sum + Number(output.quantity), 0);
+                    if (assigned !== assignedUnits || assigned < 1 || assigned > 10000) {
+                      state.setError("Registra entre 1 y 10,000 unidades en las variantes obtenidas.");
+                      return;
+                    }
+                  }
                   if (selected!.opening_stock && payload.outputs.some((output: Row) =>
                     output.unit_weights?.some((weight: number) => !Number.isFinite(weight) || weight <= 0 || Math.abs(weight * 10000 - Math.round(weight * 10000)) > 0.000001))) {
                     state.setError("Indica pesos positivos en gramos, con hasta cuatro decimales.");
@@ -324,13 +362,6 @@ function ProductionBatches({
                     previous_production_date: selected!.production_date,
                     previous_available_on: selected!.available_on,
                     previous_notes: selected!.notes,
-                  };
-                } else {
-                  action = "batch_release";
-                  payload = {
-                    batch: selected!.id,
-                    reason: f.get("reason"),
-                    override: f.get("override") === "on",
                   };
                 }
                 state.run(async () => {
@@ -543,9 +574,9 @@ function ProductionBatches({
                     />
                   </label>
                 </div>
-              ) : mode === "finish" ? (
+              ) : mode === "finish" || mode === "curing_complete" ? (
                 <>
-                  {!selected?.opening_stock && <><h3>Consumo real de materiales</h3>
+                  {mode === "finish" && !selected?.opening_stock && <><h3>Consumo real de materiales</h3>
                   <p>
                     Las cantidades sugeridas provienen de la fórmula y las
                     preparaciones a producir. Registra el total utilizado,
@@ -598,6 +629,33 @@ function ProductionBatches({
                         onChange={(event) => setConsumed((previous) => ({ ...previous, [r.variant_id]: event.target.value }))} />
                     </label>
                   ))}</>}
+                  {sendingToCuring ? (
+                    <fieldset className="settings-grid">
+                      <legend>¿Cuándo deseas registrar las unidades reales producidas?</legend>
+                      <label>
+                        Momento de registro
+                        <SearchSelect required value={yieldTiming} onChange={(e) => setYieldTiming(e.target.value)}>
+                          <option value="">Seleccionar</option>
+                          <option value="before">Antes del curado/secado</option>
+                          <option value="after">Después del curado/secado</option>
+                        </SearchSelect>
+                      </label>
+                      {yieldTiming && <label>
+                        {yieldTiming === "before" ? "Unidades contadas" : "Unidades estimadas (opcional)"}
+                        <input name="preliminary_quantity" type="number" required={yieldTiming === "before"}
+                          min="1" max="10000" step="1"
+                          defaultValue={yieldTiming === "after" ? selected?.planned_quantity ?? "" : ""}
+                          key={yieldTiming} />
+                      </label>}
+                    </fieldset>
+                  ) : null}
+                  {(!sendingToCuring || yieldTiming === "before") && <>
+                  {finishingCuring && <div className="settings-grid">
+                    <p role="status"><strong>Rendimiento final</strong> {assignedUnits} unidades</p>
+                    {(selected?.preliminary_quantity ?? selected?.planned_quantity) != null && <p>
+                      {selected?.yield_timing === "before" ? "Contadas al enviar" : "Unidades estimadas"} {selected?.preliminary_quantity ?? selected?.planned_quantity}
+                    </p>}
+                  </div>}
                   <h3>Variantes obtenidas</h3>
                   <div className="actions">
                     <AppButton
@@ -616,16 +674,16 @@ function ProductionBatches({
                     </AppButton>
                   </div>
                   <p>
-                    Indica las unidades buenas obtenidas de cada variante. Si
-                    falta alguna, agrégala en Productos y actualiza esta lista
-                    antes de confirmar.
+                    {sendingToCuring
+                      ? "Si ya conoces las variantes, captura todas las unidades por variante. Puedes dejar esta sección vacía y completarla al liberar el lote."
+                      : "Indica las unidades buenas obtenidas de cada variante. Si falta alguna, agrégala en Productos y actualiza esta lista antes de confirmar."}
                   </p>
                   <div className="table-wrap">
                     <ResponsiveTable>
                       <thead>
                         <tr>
                           <th>Variante</th>
-                          <th>{selected?.opening_stock ? "Pesos en gramos / unidades" : "Unidades obtenidas"}</th>
+                          <th>{selected?.opening_stock && mode === "finish" ? "Pesos en gramos / unidades" : "Unidades obtenidas"}</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -637,11 +695,15 @@ function ProductionBatches({
                             <tr key={v.id}>
                               <td>{variantLabel(v)}</td>
                               <td>
-                                {selected?.opening_stock && v.weight_min != null ? (
+                                {selected?.opening_stock && mode === "finish" && v.weight_min != null ? (
                                   <AutoTextarea
                                     aria-label={"Pesos en gramos de " + variantLabel(v)}
                                     name={"weights_" + v.id}
                                     placeholder="Un peso en gramos por unidad"
+                                    onChange={(event) => setWeightCounts((previous) => ({
+                                      ...previous,
+                                      [v.id]: event.target.value.trim().split(/\s+/).filter(Boolean).length,
+                                    }))}
                                   />
                                 ) : (
                                 <input
@@ -667,7 +729,8 @@ function ProductionBatches({
                       </tbody>
                     </ResponsiveTable>
                   </div>
-                  <div className="settings-grid">
+                  </>}
+                  {mode === "finish" && <div className="settings-grid">
                     <label>
                       Unidades dañadas (opcional)
                       <input
@@ -678,11 +741,20 @@ function ProductionBatches({
                         defaultValue="0"
                       />
                     </label>
-                  </div>
-                  <p>
-                    Solo las unidades buenas ingresan al inventario. Las
-                    unidades dañadas son informativas. {selected?.opening_stock ? "Este lote de saldo inicial no registra consumo de materias primas." : "Los materiales se descuentan según el consumo real registrado."}
-                  </p>
+                  </div>}
+                  {sendingToCuring && <p>Las unidades y sus variantes se registrarán en inventario al confirmar el rendimiento final.</p>}
+                  {selected?.opening_stock && <p>Este lote de saldo inicial conserva el pesaje por variante y el costo histórico disponible.</p>}
+                  {mode === "curing_complete" && <>
+                    <p>Fecha de disponibilidad: {selected?.available_on}.</p>
+                    <label>
+                      Nota de liberación
+                      <input name="reason" maxLength={500} required={selected!.available_on > today()}
+                        minLength={selected!.available_on > today() ? 5 : undefined} />
+                    </label>
+                    {selected!.available_on > today() && manager && <label>
+                      <input name="override" type="checkbox" required /> Autorizo la liberación anticipada.
+                    </label>}
+                  </>}
                 </>
               ) : mode === "curing_edit" ? (
                 <div className="settings-grid">
@@ -702,30 +774,7 @@ function ProductionBatches({
                     <AutoTextarea name="notes" maxLength={1000} defaultValue={selected!.notes ?? ""} />
                   </label>
                 </div>
-              ) : (
-                <>
-                  <p>
-                    Confirma que esta producción está listo para vender. Fecha
-                    estimada: {selected?.available_on}.
-                  </p>
-                  <label>
-                    Nota de liberación
-                    <input
-                      name="reason"
-                      maxLength={500}
-                      required
-                      minLength={5}
-                    />
-                  </label>
-                  {selected!.available_on > today() && manager && (
-                    <label>
-                      <input name="override" type="checkbox" required />{" "}
-                      Autorizo la liberación anticipada y he registrado el
-                      motivo
-                    </label>
-                  )}
-                </>
-              )}
+              ) : null}
               {estimating && mode === "start" && !openingStock && (
                 <MaterialRequirements
                   company={company}
@@ -737,11 +786,11 @@ function ProductionBatches({
               <div className="form-actions">
                 <AppButton disabled={state.busy}>
                   {mode === "finish"
-                    ? !requiresCuring
-                      ? "Confirmar producción y dejar disponible"
-                      : "Confirmar producción y enviar a curado"
-                    : mode === "release"
-                      ? "Liberar existencias"
+                    ? sendingToCuring ? "Enviar a curado/secado"
+                      : finishingCuring ? "Confirmar rendimiento y terminar"
+                      : "Confirmar producción y dejar disponible"
+                    : mode === "curing_complete"
+                      ? "Confirmar rendimiento y terminar"
                       : mode === "curing_edit"
                         ? "Guardar cambios"
                         : openingStock ? "Registrar lote en curación" : "Guardar borrador"}
@@ -806,7 +855,8 @@ function ProductionBatches({
                     }
                   </td>
                   <td>
-                    {b.actual_quantity ?? "—"} / {b.planned_quantity ?? "—"}
+                    {b.actual_quantity ?? (b.yield_timing ? "Pendiente" : "—")} / {b.planned_quantity ?? "—"}
+                    {b.preliminary_quantity != null && <small>{b.yield_timing === "after" ? "Estimadas al enviar" : "Contadas al enviar"}: {b.preliminary_quantity}</small>}
                     {b.opening_stock && <small>Saldo inicial{!b.confirmed ? " · Pesaje pendiente" : ""}</small>}
                     <small>Merma: {b.scrap_quantity}</small>
                   </td>
@@ -898,7 +948,7 @@ function ProductionBatches({
                         </AppButton>
                       </>
                     )}
-                    {b.outputs?.map((o: Row) => (
+                    {b.outputs?.filter((o: Row) => o.quantity > 0).map((o: Row) => (
                       <small key={o.id}>
                         {o.quantity} × {o.variant_name}
                       </small>
@@ -906,27 +956,17 @@ function ProductionBatches({
                     {state.canWrite && (b.state === "in_progress" || (b.opening_stock && b.state === "curing" && !b.confirmed)) && (
                       <AppButton
                         disabled={b.opening_stock && b.available_on > today()}
-                        onClick={() => {
-                          setSelected(b);
-                          setConsumed({});
-                          setOutputUnits({});
-                          setDirty(false);
-                          setMode("finish");
-                        }}
+                        onClick={() => openYield(b, "finish")}
                       >
-                        {b.opening_stock ? "Registrar pesos y variantes" : "Confirmar producción"}
+                        {b.opening_stock ? "Confirmar rendimiento final" : "Confirmar producción"}
                       </AppButton>
                     )}
                     {state.canWrite && b.state === "curing" && (!b.opening_stock || b.confirmed) && (
                       <AppButton
                         disabled={b.available_on > today() && !manager}
-                        onClick={() => {
-                          setSelected(b);
-                          setDirty(false);
-                          setMode("release");
-                        }}
+                        onClick={() => openYield(b, "curing_complete")}
                       >
-                        Liberar producción
+                        Confirmar rendimiento final
                       </AppButton>
                     )}
                   </td>
