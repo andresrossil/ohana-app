@@ -49,6 +49,7 @@ const number = (n: number | null) =>
   n == null
     ? "—"
     : new Intl.NumberFormat("es-GT", { maximumFractionDigits: 2 }).format(n);
+const ingredientQuantityFormat = new Intl.NumberFormat("es-GT", { maximumFractionDigits: 8 });
 const blankLine = (
   kind: RecipeLine["line_kind"] = "ingredient",
 ): RecipeLine => ({
@@ -103,7 +104,7 @@ export default function Formulas({
     [draft, setDraft] = useState<Row>(initial),
     [lines, setLines] = useState<RecipeLine[]>([blankLine()]),
     [query, setQuery] = useState(""),
-    [compactList, setCompactList] = useState(false),
+    [compactIngredients, setCompactIngredients] = useState(false),
     [productText, setProductText] = useState(""),
     [dirty, setDirty] = useState(false),
     [scale, setScale] = useState<number | string>(1),
@@ -206,6 +207,7 @@ export default function Formulas({
     if (!readOnly) changed();
   }
   function open(next: Mode, source?: Row) {
+    setCompactIngredients(false);
     const unit =
       catalog.units.find(
         (u: Row) =>
@@ -976,40 +978,7 @@ export default function Formulas({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
-          <AppButton
-            type="button"
-            className="secondary"
-            onClick={() => setCompactList((active) => !active)}
-          >
-            {compactList ? "Vista detallada" : "Vista en lista"}
-          </AppButton>
         </div>
-        {compactList ? (
-          filtered.length > 0 && (
-            <div className="formula-table-scroll">
-              <ResponsiveTable className="formula-compact-list" showAllMobileFields>
-                <thead>
-                  <tr><th>Código</th><th>Fórmula / producto</th><th>Versión</th><th>Estado</th></tr>
-                </thead>
-                <tbody>
-                  {filtered.map((formula) => (
-                    <tr key={formula.id}>
-                      <td>{formula.code || "—"}</td>
-                      <td>
-                        <strong>{formula.name || formula.product_name}</strong>
-                        {formula.name && formula.product_name && formula.product_name !== formula.name && (
-                          <small>{formula.product_name}</small>
-                        )}
-                      </td>
-                      <td data-sort-value={formula.version}>v{formula.version}</td>
-                      <td>{labels[formula.state] || formula.state}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </ResponsiveTable>
-            </div>
-          )
-        ) : <>
         <div className="formula-table-scroll formula-gallery">
           <ResponsiveTable>
             <thead>
@@ -1221,7 +1190,6 @@ export default function Formulas({
           actuales y el precio de la lista base. Incluyen materiales, empaque,
           insumos y costos adicionales.
         </small>
-        </>}
         {!filtered.length && (
           <p className="empty">
             {state.busy
@@ -1749,7 +1717,42 @@ export default function Formulas({
               )}
               <IconDetails className="formula-disclosure" open>
                 <summary>Materias primas</summary>
-                {rowsTable("ingredient")}
+                <div className="formula-ingredient-view">
+                  <AppButton type="button" className="secondary"
+                    onClick={() => setCompactIngredients((active) => !active)}>
+                    {compactIngredients ? "Vista detallada" : "Vista en lista"}
+                  </AppButton>
+                </div>
+                <div hidden={compactIngredients}>{rowsTable("ingredient")}</div>
+                {compactIngredients && (
+                  <section className="formula-ingredient-list" aria-label="Lista de ingredientes">
+                    <h3>{draft.name || "Materias primas"}</h3>
+                    <div className="formula-table-scroll">
+                      <ResponsiveTable className="formula-compact-list" showAllMobileFields>
+                        <thead>
+                          <tr><th>Ingrediente</th><th>Cantidad</th><th>Unidad</th></tr>
+                        </thead>
+                        <tbody>
+                          {lines.map((line, index) => {
+                            if (line.line_kind !== "ingredient") return null;
+                            const material = catalog.materials.find((item: Row) => item.id === line.material);
+                            if (!material && !line.material && !line.search) return null;
+                            const { plannedQuantity, unit } = math.rows[index];
+                            return (
+                              <tr key={line.key}>
+                                <td>{material?.name || line.search || "Material no disponible"}</td>
+                                <td data-sort-value={plannedQuantity ?? ""}>
+                                  {plannedQuantity == null ? "—" : ingredientQuantityFormat.format(plannedQuantity)}
+                                </td>
+                                <td>{unit?.symbol || "—"}</td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </ResponsiveTable>
+                    </div>
+                  </section>
+                )}
               </IconDetails>
               <IconDetails className="formula-disclosure" open={Boolean(draft.intermediates?.length)}>
                 <summary>Productos intermedios</summary>

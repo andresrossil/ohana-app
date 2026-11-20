@@ -372,31 +372,29 @@
 .shell .weight-paste-panel { display: grid; gap: 6px; padding: 12px; margin: 12px 0; border: 1px solid var(--admin-border); border-left: 4px solid var(--admin-primary); border-radius: 12px; background: var(--admin-secondary); }
 .shell .weight-paste-panel textarea { width: 100%; min-width: 0; box-sizing: border-box; background: var(--admin-surface); }
 
-.shell .formula-catalog .formula-compact-list :is(th, td) {
+.shell .formula-ingredient-list .formula-compact-list :is(th, td) {
   padding: 6px 12px;
   font-size: 13px;
 }
-.shell .formula-compact-list td small {
-  display: block;
-  font-size: 11px;
+.formula-ingredient-view {
+  display: flex;
+  justify-content: flex-end;
+  margin-block: 8px;
 }
 @media (max-width: 760px) {
-  .shell .formula-catalog .formula-compact-list > tbody {
+  .shell .formula-ingredient-list .formula-compact-list > tbody {
     gap: 0;
   }
-  .shell .formula-catalog .formula-compact-list > tbody > tr {
-    grid-template-columns: minmax(0, 0.85fr) minmax(0, 2fr) minmax(0, 0.55fr) minmax(0, 1fr);
+  .shell .formula-ingredient-list .formula-compact-list > tbody > tr {
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 0.65fr);
     gap: 6px;
     padding: 6px 8px;
     border: 0;
     border-bottom: 1px solid var(--admin-border);
     border-radius: 0;
   }
-  .shell .formula-catalog .formula-compact-list > tbody > tr > td {
+  .shell .formula-ingredient-list .formula-compact-list > tbody > tr > td {
     grid-column: auto;
     font-size: 12px;
-  }
-  .shell .formula-catalog .formula-compact-list .mobile-cell-label {
-    display: none;
   }
 }
