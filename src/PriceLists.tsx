@@ -14,6 +14,32 @@ import { pricesChanged, usePriceRefresh } from "./price-events";
 import VariantManager from "./VariantManager";
 import "./additional-costs.css";
 import { priceCost } from "./price-cost";
+const presentationUnits: Record<string, string> = {
+  mg: "mg", g: "g", gr: "g", grs: "g", gramo: "g", gramos: "g",
+  kg: "kg", kilo: "kg", kilos: "kg", lb: "lb", lbs: "lb", libra: "lb", libras: "lb",
+  oz: "oz", onza: "oz", onzas: "oz", "fl oz": "fl oz", "oz fl": "fl oz",
+  ml: "ml", mililitro: "ml", mililitros: "ml", l: "L", lt: "L", litro: "L", litros: "L",
+  ud: "ud", uds: "ud", u: "ud", unidad: "ud", unidades: "ud",
+  pieza: "ud", piezas: "ud", pza: "ud", pzas: "ud",
+};
+
+function presentationMeasure(variant: Row) {
+  const size = String(variant.name ?? "").trim().toLowerCase();
+  const match = size.match(/^(\d+(?:[.,]\d+)?)\s*([a-z]+(?:\s+[a-z]+)?)\.?$/);
+  if (match) {
+    const quantity = Number(match[1].replace(",", "."));
+    const label = match[2].replace(/\s+/g, " ");
+    const unit = Object.hasOwn(presentationUnits, label) ? presentationUnits[label] : null;
+    if (unit && Number.isFinite(quantity) && quantity > 0) return { quantity, unit, estimated: false };
+  }
+  const min = Number(variant.weight_min);
+  const max = Number(variant.weight_max);
+  if (min > 0 && max > min && Number.isFinite(max)) {
+    return { quantity: (min + max) / 2, unit: "g", estimated: true };
+  }
+  return { quantity: 1, unit: "ud", estimated: false };
+}
+
 export default function PriceLists({
   company,
   onDirty,
@@ -90,6 +116,11 @@ export default function PriceLists({
     onDirty(dirty);
     return () => onDirty(false);
   }, [dirty, onDirty]);
+  const unitPriceFormat = new Intl.NumberFormat("es-GT", {
+    style: "currency",
+    currency: data.currency,
+    maximumFractionDigits: 4,
+  });
   const list = data.lists.find((l: Row) => l.id === selected),
     base = data.lists.find((l: Row) => l.is_base);
   const allRows: Row[] = data.products
@@ -519,6 +550,7 @@ export default function PriceLists({
                   <th>
                     Precio {data.currency === "GTQ" ? "Q" : data.currency}
                   </th>
+                  <th>Precio por unidad de medida</th>
                   <th>Costo total estimado / unidad</th>
                   <th>
                     Diferencia aprox.<small>Precio − costo</small>
@@ -570,6 +602,9 @@ export default function PriceLists({
                     value && !value.delete && value.active
                       ? parseNumber(String(value.price))
                       : null;
+                  const measure = v ? presentationMeasure(v) : null;
+                  const rate = price != null && measure ? price / measure.quantity : null;
+                  const unitPrice = rate != null && Number.isFinite(rate) ? rate : null;
                   const margin =
                     estimate.cost != null && price != null
                       ? price - estimate.cost
@@ -614,6 +649,12 @@ export default function PriceLists({
                         ) : (
                           <span>Pendiente</span>
                         )}
+                      </td>
+                      <td className="price-estimate" data-sort-value={unitPrice ?? ""}>
+                        {unitPrice == null || !measure
+                          ? "Pendiente"
+                          : <>{unitPriceFormat.format(unitPrice)} / {measure.unit}
+                              {measure.estimated && <small>Según peso promedio del rango</small>}</>}
                       </td>
                       <td
                         className="price-estimate"
@@ -736,7 +777,7 @@ export default function PriceLists({
                 })}
                 {!rows.length && (
                   <tr>
-                    <td colSpan={8}>No hay productos para esta búsqueda.</td>
+                    <td colSpan={11}>No hay productos para esta búsqueda.</td>
                   </tr>
                 )}
               </tbody>
