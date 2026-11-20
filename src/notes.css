@@ -48,7 +48,14 @@
   gap: .7rem;
   padding: clamp(.85rem, 3vw, 2rem);
 }
-.shell .notes-page textarea { min-height: 45dvh; resize: vertical; }
+.shell .notes-page textarea {
+  box-sizing: border-box;
+  width: 100%;
+  height: clamp(14rem, 48dvh, 32rem);
+  padding: .75rem;
+  line-height: 1.5;
+  resize: vertical;
+}
 .shell .notes-page input { font-size: 1.25rem; font-weight: 700; }
 @media (max-width: 600px) {
   .notes-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
