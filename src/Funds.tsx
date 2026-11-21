@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { AppButton, AppIcon } from "./AppIcon";
+import { confirmAction } from "./ConfirmDialog";
 import { supabase as db } from "./client";
 import { salesWorklist } from "./commerce";
 import { operationFinished, operationStarted } from "./navigation-protection";
@@ -26,7 +27,7 @@ export default function Funds({ company }: { company: string }) {
   const [more, setMore] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [historyLoaded, setHistoryLoaded] = useState(false);
-  const [mode, setMode] = useState<"expense" | "transfer" | "">("");
+  const [mode, setMode] = useState<"expense" | "transfer" | "withdraw_all" | "">("");
   const [entry, setEntry] = useState(initialEntry);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -34,6 +35,14 @@ export default function Funds({ company }: { company: string }) {
   const [detail, setDetail] = useState<Row | null>(null);
   const origin = balances.find((fund) => fundId(fund) === entry.origin);
   const currencies = [...new Set(balances.map((fund) => fund.currency))];
+
+  const withdrawingAll = mode === "withdraw_all";
+  const withdrawable = balances.filter((fund) => Number(fund.balance) > 0);
+  const withdrawalTotals = currencies.map((currency) => ({
+    currency,
+    amount: withdrawable.filter((fund) => fund.currency === currency)
+      .reduce((sum, fund) => sum + Number(fund.balance), 0),
+  })).filter(({ amount }) => amount > 0);
 
   async function load(next = applied, nextPage = page, includeHistory = showHistory && historyLoaded) {
     let query = db.from("fund_movements").select("*").eq("company_id", company);
@@ -79,21 +88,39 @@ export default function Funds({ company }: { company: string }) {
 
   function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!origin) return;
+    if (withdrawingAll ? !withdrawable.length : !origin) return;
     const destination = balances.find((fund) => fundId(fund) === entry.destination);
-    if (mode === "transfer" && (!destination || destination.currency !== origin.currency)) return;
+    if (mode === "transfer" && (!destination || destination.currency !== origin?.currency)) return;
     void run(async () => {
+      if (withdrawingAll && !await confirmAction(
+        "Se registrará un gasto por el saldo completo de cada fondo con saldo positivo. Total: " +
+          withdrawalTotals.map(({ amount, currency }) => money(amount, currency)).join(" · "),
+        { title: "Confirmar retiro total", confirmText: "Registrar retiro total", danger: true },
+      )) return;
       operationStarted();
       let saved = false;
       try {
-        await keyedRequest(company, "record_fund_movement", {
-          ...entry, origin: origin.fund_key, currency: origin.currency,
-          destination: mode === "transfer" ? destination?.fund_key : "",
-        });
+        if (withdrawingAll) {
+          try {
+            await keyedRequest(company, "withdraw_all_funds", {
+              description: entry.description,
+              reference: entry.reference,
+              balances: Object.fromEntries(withdrawable.map((fund) => [fundId(fund), Number(fund.balance)])),
+            });
+          } catch (failure) {
+            await load().catch(() => {});
+            throw failure;
+          }
+        } else if (origin) {
+          await keyedRequest(company, "record_fund_movement", {
+            ...entry, origin: origin.fund_key, currency: origin.currency,
+            destination: mode === "transfer" ? destination?.fund_key : "",
+          });
+        }
         saved = true;
         setEntry(initialEntry());
         setMode("");
-        setNotice(mode === "transfer" ? "Transferencia registrada." : "Salida registrada.");
+        setNotice(withdrawingAll ? "Retiro total registrado como gasto." : mode === "transfer" ? "Transferencia registrada." : "Salida registrada.");
         await load();
       } finally {
         operationFinished(saved);
@@ -106,6 +133,8 @@ export default function Funds({ company }: { company: string }) {
       <h1><AppIcon name="module.funds" /> Fondos</h1>
       <div className="actions">
         <AppButton iconKey="action.add" disabled={busy || !balances.length || !!mode} onClick={() => setMode("expense")}>Registrar salida</AppButton>
+        <AppButton className="secondary" disabled={busy || !withdrawable.length || !!mode}
+          onClick={() => setMode("withdraw_all")}>Retirar todos los fondos</AppButton>
         <AppButton className="secondary" iconKey="control.sort" disabled={busy || !balances.some((a) => balances.some((b) => a !== b && a.currency === b.currency)) || !!mode} onClick={() => setMode("transfer")}>Transferir entre fondos</AppButton>
         <AppButton className="secondary" disabled={busy} onClick={() => run(() => load())}>Actualizar</AppButton>
         <AppButton className="secondary" iconKey={showHistory ? "action.back" : "action.history"}
@@ -120,9 +149,20 @@ export default function Funds({ company }: { company: string }) {
     {error && <p className="error" role="alert">{error}</p>}
     {notice && <p role="status">{notice}</p>}
     {mode && <section className="catalog">
-      <div className="catalog-head"><h2>{mode === "transfer" ? "Transferir entre fondos" : "Registrar salida"}</h2></div>
+      <div className="catalog-head"><h2>{withdrawingAll ? "Retirar todos los fondos" : mode === "transfer" ? "Transferir entre fondos" : "Registrar salida"}</h2></div>
+      {withdrawingAll && <>
+        <ResponsiveTable showAllMobileFields>
+          <thead><tr><th>Fondo</th><th>Monto a retirar</th></tr></thead>
+          <tbody>{withdrawable.map((fund) => <tr key={fundId(fund)}>
+            <td>{fund.fund_name}</td>
+            <td data-sort-value={fund.balance}>{money(fund.balance, fund.currency)} · {fund.currency}</td>
+          </tr>)}</tbody>
+        </ResponsiveTable>
+        <p><strong>Total a retirar</strong> {withdrawalTotals.map(({ amount, currency }) =>
+          money(amount, currency) + " " + currency).join(" · ") || "Sin saldos positivos"}</p>
+      </>}
       <form className="form-grid" onSubmit={save} aria-busy={busy}>
-        <label>{mode === "transfer" ? "Fondo de origen" : "Fondo"}
+        {!withdrawingAll && <><label>{mode === "transfer" ? "Fondo de origen" : "Fondo"}
           <select required value={entry.origin} onChange={(e) => setEntry({ ...entry, origin: e.target.value, destination: "" })}>
             <option value="">Seleccionar</option>
             {balances.map((fund) => <option key={fundId(fund)} value={fundId(fund)}>{fund.fund_name} · {fund.currency}</option>)}
@@ -136,10 +176,12 @@ export default function Funds({ company }: { company: string }) {
           </select>
         </label>}
         <label>Monto{origin ? " · " + origin.currency : ""}<input required type="number" inputMode="decimal" min="0.01" step="0.01" value={entry.amount} onChange={(e) => setEntry({ ...entry, amount: e.target.value })} /></label>
-        <label>Fecha<input required type="date" value={entry.date} onChange={(e) => setEntry({ ...entry, date: e.target.value })} /></label>
+        <label>Fecha<input required type="date" value={entry.date} onChange={(e) => setEntry({ ...entry, date: e.target.value })} /></label></>}
         <label>Concepto<input required maxLength={500} value={entry.description} onChange={(e) => setEntry({ ...entry, description: e.target.value })} /></label>
         <label>Referencia opcional<input maxLength={200} value={entry.reference} onChange={(e) => setEntry({ ...entry, reference: e.target.value })} /></label>
-        <div className="actions"><AppButton type="submit" disabled={busy}>Guardar</AppButton>
+        <div className="actions"><AppButton type="submit" disabled={busy || (withdrawingAll && !withdrawable.length)}>
+          {withdrawingAll ? "Registrar gasto total" : "Guardar"}
+        </AppButton>
           <AppButton className="secondary" disabled={busy} onClick={() => { setEntry(initialEntry()); setMode(""); }}>Cancelar</AppButton></div>
       </form>
     </section>}
