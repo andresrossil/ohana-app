@@ -551,11 +551,11 @@ export default function PriceLists({
                     Precio {data.currency === "GTQ" ? "Q" : data.currency}
                   </th>
                   <th>Costo total estimado / unidad</th>
+                  <th>
+                    Margen y diferencia aprox.<small>Precio − costo</small>
+                  </th>
                   <th>Costo estimado por UM</th>
                   <th>Precio de venta por UM</th>
-                  <th>
-                    Diferencia aprox.<small>Precio − costo</small>
-                  </th>
                   <th>Estado</th>
                   <th>Acciones</th>
                 </tr>
@@ -681,19 +681,8 @@ export default function PriceLists({
                         )}
                         <small>{estimate.reason || estimate.source}</small>
                       </td>
-                      <td className="price-estimate" data-sort-value={costPerMeasure ?? ""}>
-                        {costPerMeasure == null || !measure
-                          ? "Pendiente"
-                          : <>{unitPriceFormat.format(costPerMeasure)} / {measure.unit}
-                              {measure.estimated && <small>Según peso promedio del rango</small>}</>}
-                      </td>
-                      <td className="price-estimate" data-sort-value={unitPrice ?? ""}>
-                        {unitPrice == null || !measure
-                          ? "Pendiente"
-                          : <>{unitPriceFormat.format(unitPrice)} / {measure.unit}
-                              {measure.estimated && <small>Según peso promedio del rango</small>}</>}
-                      </td>
                       <td
+                        data-mobile-visible
                         data-sort-value={margin ?? ""}
                         className={
                           margin == null
@@ -727,6 +716,18 @@ export default function PriceLists({
                             </small>
                           </>
                         )}
+                      </td>
+                      <td className="price-estimate" data-sort-value={costPerMeasure ?? ""}>
+                        {costPerMeasure == null || !measure
+                          ? "Pendiente"
+                          : <>{unitPriceFormat.format(costPerMeasure)} / {measure.unit}
+                              {measure.estimated && <small>Según peso promedio del rango</small>}</>}
+                      </td>
+                      <td className="price-estimate" data-sort-value={unitPrice ?? ""}>
+                        {unitPrice == null || !measure
+                          ? "Pendiente"
+                          : <>{unitPriceFormat.format(unitPrice)} / {measure.unit}
+                              {measure.estimated && <small>Según peso promedio del rango</small>}</>}
                       </td>
                       <td>
                         {v ? (

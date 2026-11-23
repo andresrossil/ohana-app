@@ -21,6 +21,7 @@ type Element = ReactElement<{
   onChange?: unknown;
   type?: string;
   scope?: string;
+  "data-mobile-visible"?: boolean;
   "aria-sort"?: "none" | "ascending" | "descending" | "other";
 }>;
 function elements(children: ReactNode): Element[] {
@@ -347,7 +348,7 @@ export default forwardRef<
                       isOpen = expanded.has(key),
                       visible = cells.map(
                         (c, i) =>
-                          showAllMobileFields || primary.has(i) ||
+                          showAllMobileFields || c.props["data-mobile-visible"] || primary.has(i) ||
                           /acciones/i.test(headers[i] || "") ||
                           editable(c.props.children) ||
                           (c.props.colSpan || 1) > 1,
