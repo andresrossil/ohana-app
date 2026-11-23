@@ -178,6 +178,8 @@ test("mass and volume never receive combined percentages; missing prices stay un
     false,
     5,
   );
+  assert.deepEqual(r.errors, []);
+  assert.deepEqual(r.rows.map((row) => row.quantity), [10, 20]);
   assert.equal(r.compatible, false);
   assert.equal(r.rows[0].percentage, null);
   assert.equal(r.totalCost, null);

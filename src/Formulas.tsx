@@ -164,6 +164,9 @@ export default function Formulas({
       Number(draft.loss_percent),
       draft.estimated_units,
     );
+  const totalDimension = catalog.units.find((unit: Row) => unit.id === draft.total_unit)?.dimension;
+  const mixedPercentageUnits = draft.capture_mode === "percentage" && !!totalDimension &&
+    math.rows.some((row) => row.line_kind === "ingredient" && row.unit && row.unit.dimension !== totalDimension);
   const referenceVariant = centralVariant(
     catalog.presentations || [],
     draft.product,
@@ -451,6 +454,11 @@ export default function Formulas({
       state.setError(
         "Selecciona cada concepto de Otros gastos una sola vez e indica una cantidad válida.",
       );
+      return;
+    }
+    if (mixedPercentageUnits) {
+      switchCapture("quantity");
+      state.setNotice("Captura por cantidades activada. Revisa las cantidades de cada ingrediente antes de guardar.");
       return;
     }
     const formulaErrors = math.errors.filter((error) =>
@@ -1330,6 +1338,14 @@ export default function Formulas({
                     <option value="percentage">Por porcentajes</option>
                   </SearchSelect>
                 </label>
+                {!readOnly && mixedPercentageUnits && (
+                  <div>
+                    <p>Captura cada ingrediente en su propia unidad si tu fórmula usa gramos y mililitros.</p>
+                    <AppButton type="button" className="secondary" onClick={() => switchCapture("quantity")}>
+                      Capturar por cantidades
+                    </AppButton>
+                  </div>
+                )}
                 <label className="check">
                   <input
                     type="checkbox"
