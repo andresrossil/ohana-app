@@ -32,8 +32,9 @@ type DashboardData = Record<string, unknown> & {
   reorder?: number;
 };
 
-export default function Dashboard({ company, currency, materials, products }: {
+export default function Dashboard({ company, currency, materials, products, onOpenSettlement }: {
   company: string; currency: string; materials?: number; products?: number;
+  onOpenSettlement?: (id: string) => void;
 }) {
   const [data, setData] = useState<DashboardData>();
   const [failed, setFailed] = useState(false);
@@ -117,7 +118,7 @@ export default function Dashboard({ company, currency, materials, products }: {
         <div id="dashboard-settlements-content" hidden={!settlementsExpanded}>
           {settlementsExpanded && (data.pending_settlements.length ? (
             <div className="table-wrap"><ResponsiveTable showAllMobileFields>
-              <thead><tr><th>Liquidación</th><th>Fecha</th><th>Mensajería</th><th>Estado</th><th>Saldo pendiente</th></tr></thead>
+              <thead><tr><th>Liquidación</th><th>Fecha</th><th>Mensajería</th><th>Estado</th><th>Saldo pendiente</th>{onOpenSettlement && <th>Acciones</th>}</tr></thead>
               <tbody>{data.pending_settlements.map(item => (
                 <tr key={item.id}>
                   <td data-sort-value={item.number}>{settlementNumber(item.number)}</td>
@@ -127,6 +128,11 @@ export default function Dashboard({ company, currency, materials, products }: {
                   <td data-sort-value={item.remaining}>{money(Math.abs(Number(item.remaining)), currency)}
                     <small>{Number(item.remaining) > 0 ? "Por recibir de mensajería" : Number(item.remaining) < 0 ? "Por pagar a mensajería" : "Sin saldo"}</small>
                   </td>
+                  {onOpenSettlement && <td>
+                    <AppButton type="button" className="secondary"
+                      aria-label={`Abrir liquidación ${settlementNumber(item.number)}`}
+                      onClick={() => onOpenSettlement(item.id)}>Abrir liquidación</AppButton>
+                  </td>}
                 </tr>
               ))}</tbody>
             </ResponsiveTable></div>

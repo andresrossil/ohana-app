@@ -14,22 +14,34 @@ const states:Row={draft:"Borrador",pending:"Pendiente",partial:"Parcial",settled
 type Choice={selected:boolean;mark_collected:boolean;extra_cash:string};
 const emptyChoice=():Choice=>({selected:false,mark_collected:false,extra_cash:""});
 const blankExchange=()=>({actual_amount:"0",direction:"received",method:"cash",exchange_date:today(),exchange_notes:""});
-export default function CourierSettlements({company,onDirty}:{company:string;onDirty:(dirty:boolean)=>void}){
+export default function CourierSettlements({company,onDirty,initialId,onInitialOpen}:{company:string;onDirty:(dirty:boolean)=>void;initialId?:string;onInitialOpen?:()=>void}){
  const state=useOperation(company,"sales");
  const [history,setHistory]=useState<Row[]>([]),[couriers,setCouriers]=useState<Row[]>([]),[filters,setFilters]=useState({courier:"",state:"",from:"",to:""});
  const [document,setDocument]=useState<Row|null>(null),[items,setItems]=useState<Row[]>([]),[payments,setPayments]=useState<Row[]>([]),[paying,setPaying]=useState(false),[pending,setPending]=useState<Row[]>([]),[choices,setChoices]=useState<Record<string,Choice>>({});
  const [balance,setBalance]=useState(0),[dirty,setDirty]=useState(false),[exchangeDirty,setExchangeDirty]=useState(false),[exchange,setExchange]=useState(blankExchange);
  const [account,setAccount]=useState<Row|null>(null),[cancelling,setCancelling]=useState(false),[reason,setReason]=useState("");
  const load=async()=>{const [h,o]=await Promise.all([courierRead(company,"settlements",filters),courierRead(company,"options")]);setHistory(h);setCouriers(o.couriers);};
- useEffect(()=>{let live=true;void state.run(async()=>{const [h,o]=await Promise.all([courierRead(company,"settlements",filters),courierRead(company,"options")]);if(live){setHistory(h);setCouriers(o.couriers);}});return()=>{live=false;};},[company,filters]);
  useEffect(()=>{onDirty(dirty||exchangeDirty||cancelling);return()=>onDirty(false);},[dirty,exchangeDirty,cancelling,onDirty]);
  useEffect(()=>{let live=true;setPending([]);setBalance(0);if(!document?.courier_id)return;
   Promise.all([courierRead(company,"account",{courier:document.courier_id}),document.state==="draft"?courierRead(company,"pending",{courier:document.courier_id}):Promise.resolve([])])
    .then(([a,p])=>{if(live){setBalance(Number(a.balance));setPending(p);}}).catch(e=>{if(live)state.setError(e.message);});return()=>{live=false;};
  },[company,document?.courier_id,document?.id,document?.state,document?.revision]);
  const setDetail=(d:Row)=>{setDocument(d.document);setItems(d.items);setPayments(d.payments||[]);setBalance(Number(d.balance));const next:Record<string,Choice>={};for(const i of d.items){const previous=next[i.order_id]||emptyChoice();const extra=i.collection_pending||i.snapshot.recorded_receipt===false;next[i.order_id]={selected:true,mark_collected:previous.mark_collected||extra,extra_cash:String(Number(previous.extra_cash||0)+(extra?Number(i.amount):0))};}setChoices(next);setDirty(false);};
- const open=(id?:string)=>state.run(async()=>{setExchange(blankExchange());setExchangeDirty(false);setPaying(false);setCancelling(false);setReason("");if(id){const d=await courierRead(company,"settlement",{id});setDetail(d);if(d.document.state!=="draft")setExchange({actual_amount:String(d.document.actual_amount??0),direction:d.document.exchange_direction||"received",method:d.document.exchange_method||"cash",exchange_date:d.document.exchanged_on||d.document.settled_on,exchange_notes:d.document.exchange_notes||""});}
-  else{setDocument({courier_id:filters.courier,settled_on:today(),state:"draft",notes:""});setChoices({});setItems([]);setPayments([]);setDirty(false);}});
+ const openDocument=async(id?:string)=>{setExchange(blankExchange());setExchangeDirty(false);setPaying(false);setCancelling(false);setReason("");if(id){const d=await courierRead(company,"settlement",{id});setDetail(d);if(d.document.state!=="draft")setExchange({actual_amount:String(d.document.actual_amount??0),direction:d.document.exchange_direction||"received",method:d.document.exchange_method||"cash",exchange_date:d.document.exchanged_on||d.document.settled_on,exchange_notes:d.document.exchange_notes||""});}
+  else{setDocument({courier_id:filters.courier,settled_on:today(),state:"draft",notes:""});setChoices({});setItems([]);setPayments([]);setDirty(false);}};
+ const open=(id?:string)=>state.run(()=>openDocument(id));
+ useEffect(()=>{
+  let live=true;
+  void state.run(async()=>{
+   if(initialId){
+    onInitialOpen?.();
+    await openDocument(initialId);
+   }
+   const [h,o]=await Promise.all([courierRead(company,"settlements",filters),courierRead(company,"options")]);
+   if(live){setHistory(h);setCouriers(o.couriers);}
+  });
+  return()=>{live=false;};
+ },[company,filters]);
  const close=async()=>{if(state.busy)return;if((dirty||exchangeDirty||cancelling)&&!(await confirmAction("Hay cambios sin guardar. ¿Salir sin guardar?")))return;setDocument(null);setPaying(false);setDirty(false);setExchangeDirty(false);setCancelling(false);};
  useEffect(()=>{if(document?.state!=="draft")return;const transfers=new Set(pending.filter(p=>p.payment_method==="transfer").map(p=>p.order_id));if(items.some(i=>transfers.has(i.order_id)&&(i.payment_id||i.collection_pending)))setDirty(true);},[pending,items,document?.state]);
  const eligible=pending.filter(p=>!p.reserved_id||p.reserved_id===document?.id);

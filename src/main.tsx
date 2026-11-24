@@ -122,6 +122,7 @@ function App() {
   const [importOpen, setImportOpen] = useState(false),
     [importNotice, setImportNotice] = useState("");
   const [materialCosts, setMaterialCosts] = useState<Record<string, Row>>({});
+  const [dashboardSettlement, setDashboardSettlement] = useState<{ company: string; id: string } | null>(null);
   const [section, setSection] = useState<Section>("dashboard"),
     [configView, setConfigView] = useState("profile"),
     [expenseView, setExpenseView] = useState("overhead"),
@@ -906,6 +907,11 @@ function App() {
                     currency={activeCompany?.currency || "GTQ"}
                     materials={activeCompany?.catalog_read && !loading ? data.raw_materials.filter((m) => m.active).length : undefined}
                     products={activeCompany?.catalog_read && !loading ? data.products.filter((p) => p.active).length : undefined}
+                    onOpenSettlement={activeCompany?.manage || activeCompany?.sales_read ? async (id) => {
+                      if (!(await leaveSheet())) return;
+                      setDashboardSettlement({ company, id });
+                      setSection("settlements");
+                    } : undefined}
                   />
                 </section>
               )}
@@ -1026,7 +1032,9 @@ function App() {
                 />
               )}
               {section === "couriers" && <Couriers key={company} company={company} onDirty={setSettingsDirty} onSaved={load} canManage={activeCompany?.manage===true}/>}
-              {section === "settlements" && <CourierSettlements key={company} company={company} onDirty={setSettingsDirty}/>}
+              {section === "settlements" && <CourierSettlements key={company} company={company} onDirty={setSettingsDirty}
+                initialId={dashboardSettlement?.company === company ? dashboardSettlement.id : undefined}
+                onInitialOpen={() => setDashboardSettlement(null)}/>}
               {section === "reports" && (
                 <Reports key={company} company={company} currency={activeCompany?.currency} inventoryAllowed={activeCompany?.inventory_read === true} />
               )}
