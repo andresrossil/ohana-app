@@ -831,8 +831,12 @@ function ProductionBatches({
               </tr>
             </thead>
             <tbody>
-              {batches.map((b) => (
-                <tr key={b.id} data-production-status={b.finalized_at ? "finished" : b.state}>
+              {batches.map((b) => {
+                const status = b.finalized_at ? "finished"
+                  : b.state === "curing" && b.available_on && b.available_on <= calendarDate
+                    ? "ready_to_release"
+                    : b.state;
+                return <tr key={b.id} data-production-status={status}>
                   <td>
                     {lotCode(b.batch_number)}
                     <small>{b.product_name}</small>
@@ -846,7 +850,7 @@ function ProductionBatches({
                   <td>
                     <AppIcon
                       name={
-                        b.state === "released"
+                        status === "ready_to_release" || b.state === "released"
                           ? "status.success"
                           : b.state === "cancelled"
                             ? "status.archived"
@@ -854,13 +858,15 @@ function ProductionBatches({
                       }
                     />
                     {
-                      b.finalized_at ? "Terminado" : {
+                      {
+                        finished: "Terminado",
+                        ready_to_release: "Listo para Liberar",
                         draft: "Borrador",
                         in_progress: "En preparación",
                         curing: "En curación",
                         released: "Liberado",
                         cancelled: "Cancelado",
-                      }[b.state as string]
+                      }[status as string]
                     }
                   </td>
                   <td>
@@ -979,8 +985,8 @@ function ProductionBatches({
                       </AppButton>
                     )}
                   </td>
-                </tr>
-              ))}
+                </tr>;
+              })}
             </tbody>
           </ResponsiveTable>
 

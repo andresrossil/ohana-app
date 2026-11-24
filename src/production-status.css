@@ -10,6 +10,10 @@
   --production-frame: #2563eb;
 }
 
+.shell .responsive-table > tbody > tr[data-production-status="ready_to_release"] {
+  --production-frame: #795136;
+}
+
 .shell .responsive-table > tbody > tr[data-production-status="in_progress"] {
   --production-frame: #ca8a04;
   --production-status-text: #854d0e;
