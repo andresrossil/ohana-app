@@ -11,6 +11,7 @@ export default function CatalogFields({
   kind,
   item,
   origins,
+  compact = false,
   requestCodes = async (requests) => {
     const { data, error } = await db.rpc("suggest_catalog_skus", {
       p_company: company,
@@ -24,6 +25,7 @@ export default function CatalogFields({
   kind: "material" | "product";
   item?: CatalogRow | null;
   origins: CatalogRow[];
+  compact?: boolean;
   requestCodes?: (
     requests: { key: string; prefix: string }[],
   ) => Promise<{ key: string; sku: string }[]>;
@@ -84,14 +86,32 @@ export default function CatalogFields({
       active = false;
     };
   }, []);
+  const originField = (
+      <label>
+        Origen
+        <SearchSelect wrapSelection={compact} name="origin_id" defaultValue={item?.origin_id || ""}>
+          <option value="">Pendiente de definir</option>
+          {origins
+            .filter((o) => o.active || o.id === item?.origin_id)
+            .map((o) => (
+              <option key={o.id} value={o.id}>
+                {o.name}
+                {o.active ? "" : " (inactivo)"}
+              </option>
+            ))}
+        </SearchSelect>
+      </label>
+  );
   return (
-    <fieldset className="catalog-fields">
-      <legend>Identificación y organización</legend>
+    <fieldset className={compact ? "catalog-fields compact-form-grid" : "catalog-fields"}>
+      {!compact && <legend>Identificación y organización</legend>}
       {kind === "material" && (
         <label>
           Clasificación
           <SearchSelect
             name="classification"
+            data-validation-field={compact ? "classification" : undefined}
+            wrapSelection={compact}
             value={classification}
             onChange={(e) => {
               suggestionVersion.current++;
@@ -109,7 +129,8 @@ export default function CatalogFields({
           </SearchSelect>
         </label>
       )}
-      <label>
+      {compact && originField}
+      <label className={compact ? "form-wide" : undefined}>
         SKU (opcional)
         <div className="sku-field">
           <input
@@ -131,21 +152,8 @@ export default function CatalogFields({
           </AppButton>
         </div>
       </label>
-      <label>
-        Origen
-        <SearchSelect name="origin_id" defaultValue={item?.origin_id || ""}>
-          <option value="">Pendiente de definir</option>
-          {origins
-            .filter((o) => o.active || o.id === item?.origin_id)
-            .map((o) => (
-              <option key={o.id} value={o.id}>
-                {o.name}
-                {o.active ? "" : " (inactivo)"}
-              </option>
-            ))}
-        </SearchSelect>
-      </label>
-      <label>
+      {!compact && originField}
+      <label className={compact ? "form-wide" : undefined}>
         Código de barras (opcional)
         <input
           name="barcode"
@@ -160,7 +168,7 @@ export default function CatalogFields({
           }}
         />
       </label>
-      <label className="check-label">
+      <label className={compact ? "check-label form-wide" : "check-label"}>
         <input
           type="checkbox"
           checked={!custom}
@@ -173,12 +181,12 @@ export default function CatalogFields({
         Usar el SKU como código de barras
       </label>
       <input type="hidden" name="barcode_custom" value={String(custom)} />
-      <p className="muted">
+      <p className={compact ? "muted form-wide" : "muted"}>
         Puedes editar o dejar vacíos ambos códigos. Cambiar la clasificación
         conserva el SKU.
       </p>
       {error && (
-        <p className="error" role="alert">
+        <p className={compact ? "error form-wide" : "error"} role="alert">
           <AppIcon name="status.error" />
           {error}
         </p>

@@ -124,7 +124,7 @@
   margin: 0;
 }
 .shell .materials-filters .catalog-filters label { min-width: 0; }
-.shell .materials-filters .search-select-display {
+.shell :is(.materials-filters, .compact-form) .search-select-display {
   display: flex;
   align-items: center;
   min-height: 44px;
@@ -134,14 +134,14 @@
   overflow-wrap: anywhere;
   background: var(--admin-surface);
 }
-.shell .materials-filters .search-select[data-wrap-selection]:not(:focus-within) > input {
+.shell :is(.materials-filters, .compact-form) .search-select[data-wrap-selection]:not(:focus-within) > input {
   position: absolute;
   inset: 0;
   height: 100%;
   opacity: 0;
   cursor: text;
 }
-.shell .materials-filters .search-select:focus-within .search-select-display { display: none; }
+.shell :is(.materials-filters, .compact-form) .search-select:focus-within .search-select-display { display: none; }
 .shell .materials-clear-filters { min-height: 44px; padding: 5px 9px; font-size: 13px; }
 .materials-status-filter {
   display: flex;

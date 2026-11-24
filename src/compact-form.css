@@ -1,0 +1,135 @@
+.shell.chrome-shell .compact-form-overlay:not(.confirm-overlay) {
+  --compact-form-top: max(var(--chrome-height), var(--ohana-vtop, 0px));
+  top: var(--compact-form-top);
+  bottom: auto;
+  height: max(0px, calc(var(--ohana-vh, 100dvh) + var(--ohana-vtop, 0px) - var(--compact-form-top)));
+  padding-block: 6px max(6px, env(safe-area-inset-bottom));
+}
+.shell .overlay > .compact-form-dialog {
+  width: min(740px, 100%);
+  max-height: 100% !important;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-height: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--admin-border);
+  border-radius: 10px;
+}
+.shell .compact-form-header,
+.shell .compact-form-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--admin-surface);
+}
+.compact-form-header { justify-content: space-between; border-bottom: 1px solid var(--admin-border); }
+.shell .compact-form-header :is(h2, p) { margin: 0; }
+.shell .compact-form-header h2 { font-size: 21px; }
+.compact-form-header .eyebrow { display: flex; align-items: center; gap: 5px; }
+.shell .compact-form {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+.compact-form-body {
+  overflow: auto;
+  overscroll-behavior: contain;
+  min-height: 0;
+  padding: 10px 12px;
+  scroll-padding-block: 10px;
+}
+.compact-form-section + .compact-form-section { margin-top: 7px; }
+.compact-form-section {
+  border: 1px solid var(--admin-border);
+  border-radius: 8px;
+}
+.shell .compact-form-section > summary {
+  list-style: none;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 6px 9px;
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 650;
+  color: var(--admin-heading);
+}
+.compact-form-section > summary::-webkit-details-marker { display: none; }
+.compact-form-section[open] > summary { border-bottom: 1px solid var(--admin-border); }
+.compact-form-section[open] > summary .compact-form-chevron { transform: rotate(90deg); }
+.compact-form-section-content { padding: 10px; }
+.shell .compact-form .compact-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: 8px 10px;
+  min-width: 0;
+  margin: 0;
+}
+.shell .compact-form fieldset {
+  padding: 0;
+  border: 0;
+}
+.shell .compact-form label {
+  display: grid;
+  align-content: start;
+  gap: 4px;
+  margin: 0;
+  min-width: 0;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.shell .compact-form label.check-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.shell .compact-form :is(input:not([type="checkbox"]), textarea) {
+  min-width: 0;
+  width: 100%;
+  min-height: 42px;
+  padding: 6px 8px;
+  font-size: 14px;
+}
+.shell .compact-form textarea { resize: vertical; }
+.shell .compact-form button:not(.catalog-icon-button) {
+  min-height: 44px;
+  padding: 6px 10px;
+  font-size: 14px;
+  white-space: normal;
+}
+.shell .compact-form .sku-field { grid-template-columns: minmax(0, 1fr) auto; }
+.compact-form p { margin-block: 0; }
+.compact-form-body > p { margin-block: 0 8px; }
+.compact-form-body > p:last-of-type.sheet-warning { margin-block: 8px 0; }
+.compact-price-summary { padding: 8px; }
+.compact-price-summary small, .compact-photo-content small { display: block; }
+.shell .compact-form .material-create-vs { padding: 0; min-height: 0; border: 0; background: transparent; }
+.compact-form-actions { justify-content: flex-end; border-top: 1px solid var(--admin-border); }
+.compact-form-actions button[type="submit"] { min-width: min(55%, 180px); }
+.compact-photo { display: grid; grid-template-columns: 52px minmax(0, 1fr); gap: 8px; font-size: 13px; }
+.compact-photo-preview {
+  width: 52px;
+  height: 52px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--admin-border);
+  border-radius: 8px;
+  color: var(--admin-muted);
+  overflow: hidden;
+}
+.compact-photo-preview img { width: 100%; height: 100%; object-fit: cover; }
+.compact-photo-actions { display: flex; flex-wrap: wrap; gap: 4px; margin-block: 3px; }
+.shell .compact-field-error { color: var(--functional-error, var(--admin-text)); font-weight: 600; }
+@media (max-width: 760px) {
+  .shell .compact-form-overlay { padding-inline: max(5px, var(--ohana-safe-left)) max(5px, var(--ohana-safe-right)); }
+  .shell .compact-form :is(input:not([type="checkbox"]), textarea) { font-size: 16px; }
+  .compact-form-actions > button { flex: 1; }
+  .compact-form-actions > button[type="submit"] { flex: 1.4; }
+}

@@ -35,7 +35,7 @@ type Props = {
   editing: boolean;
   sheet: ReactNode;
   formatMoney: (amount: number, currency?: string) => string;
-  onCreate: () => void;
+  onCreate: () => Promise<boolean>;
   onImport: () => void;
   onToggleSheet: () => void;
   onGenerateSkus: () => void;
@@ -139,7 +139,10 @@ export default function MaterialsCatalog({
       <p>Conoce lo que compras. Cuida lo que creas.</p>
     </div>
     {canWrite && <div className="materials-entry">
-      <AppButton type="button" iconKey="action.add" disabled={loading} onClick={onCreate}>Nuevo material</AppButton>
+      <AppButton type="button" iconKey="action.add" disabled={loading} onClick={async (event) => {
+        const position = { scroll: window.scrollY, trigger: event.currentTarget };
+        if (await onCreate()) editPosition.current = position;
+      }}>Nuevo material</AppButton>
       <AppButton type="button" className="secondary" iconKey="action.duplicate" disabled={loading} onClick={onImport}>Copiar de tabla</AppButton>
     </div>}
     <section className="dashboard-surface materials-stats" aria-label="Indicadores de Materiales">

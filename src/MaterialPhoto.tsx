@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { AppButton, AppIcon } from "./AppIcon";
 import ProductImage from "./ProductImage";
 import { supabase as db } from "./client";
 
@@ -14,10 +15,55 @@ export async function uploadMaterialPhoto(file: File, company: string) {
   return path;
 }
 
-export default function MaterialPhoto({ path, name = "material" }: { path?: string | null; name?: string }) {
+export default function MaterialPhoto({ path, name = "material", compact, onChange }: {
+  path?: string | null;
+  name?: string;
+  compact?: boolean;
+  onChange?: () => void;
+}) {
   const [preview, setPreview] = useState("");
   const [removed, setRemoved] = useState(false);
   useEffect(() => () => { if (preview) URL.revokeObjectURL(preview); }, [preview]);
+  const picker = useRef<HTMLInputElement>(null);
+  const [error, setError] = useState("");
+  if (compact) return <div className="form-wide compact-photo">
+    <div className="compact-photo-preview" aria-hidden="true">
+      {preview ? <img src={preview} alt="" /> : <AppIcon name="module.products" />}
+    </div>
+    <div className="compact-photo-content">
+      <strong>Imagen del material</strong>
+      <input ref={picker} name="photo" type="file" accept="image/png,image/jpeg,image/webp" hidden
+        onChange={(event) => {
+          const file = event.currentTarget.files?.[0];
+          setError("");
+          event.currentTarget.setCustomValidity("");
+          if (file && (file.size > 3145728 || !["image/png", "image/jpeg", "image/webp"].includes(file.type))) {
+            setPreview("");
+            const message = "La imagen debe ser PNG, JPG o WebP de hasta 3 MB";
+            setError(message);
+            event.currentTarget.setCustomValidity(message);
+            return;
+          }
+          setPreview(file ? URL.createObjectURL(file) : "");
+        }} />
+      <div className="compact-photo-actions">
+        <AppButton type="button" className="secondary" iconKey="action.upload" onClick={() => picker.current?.click()}>
+          {preview ? "Reemplazar imagen" : "Cargar imagen"}
+        </AppButton>
+        {(preview || error) && <AppButton type="button" className="secondary" iconKey="action.cancel" onClick={() => {
+          if (picker.current) {
+            picker.current.value = "";
+            picker.current.setCustomValidity("");
+          }
+          setPreview("");
+          setError("");
+          onChange?.();
+        }}>Quitar</AppButton>}
+      </div>
+      <small>PNG, JPG o WebP · máximo 3 MB.</small>
+      {error && <small className="compact-field-error" role="alert">{error}</small>}
+    </div>
+  </div>;
   return <fieldset className="form-wide material-photo-field">
     <legend>Imagen del material</legend>
     <div className="material-photo-controls">

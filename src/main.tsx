@@ -1087,7 +1087,7 @@ function App() {
                   loading={loading}
                   busy={busy}
                   sheetView={sheetView}
-                  editing={Boolean(edit?.id)}
+                  editing={edit !== undefined}
                   sheet={sheetView && (
                     <MaterialSheet
                       currency={activeCompany?.currency}
@@ -1101,9 +1101,10 @@ function App() {
                   )}
                   formatMoney={money}
                   onCreate={async () => {
-                    if (!(await leaveSheet())) return;
+                    if (!(await leaveSheet())) return false;
                     setSheetView(false);
                     setEdit(null);
+                    return true;
                   }}
                   onImport={async () => {
                     if (!(await leaveSheet())) return;
@@ -1748,3 +1749,5 @@ import "./mobile.css";
 import "./layout-polish.css";
 import "./app-chrome.css";
 import "./materials-catalog.css";
+
+import "./compact-form.css";
