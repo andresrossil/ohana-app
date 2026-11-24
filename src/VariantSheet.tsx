@@ -22,6 +22,20 @@ const columns = [
   ["published", "Publicar en tienda"],
   ["allow_preorder", "Pedidos anticipados"],
 ] as const;
+function cell(r: Row, k: string) {
+    return ["aroma", "color", "tipo"].includes(k)
+      ? r.attributes?.[k] || ""
+      : r[k];
+  }
+export function copyVariantRows(rows: Row[]) {
+  return navigator.clipboard.writeText(formatTSV([
+    columns.map((column) => column[1]),
+    ...rows.map((row) => columns.map(([key]) => flags.has(key)
+      ? cell(row, key) ? "Sí" : "No"
+      : String(cell(row, key) ?? ""))),
+  ]));
+}
+
 const flags = new Set([
   "barcode_custom",
   "active",
@@ -102,11 +116,6 @@ export default function VariantSheet({
     window.addEventListener("beforeunload", protect);
     return () => window.removeEventListener("beforeunload", protect);
   }, [dirty, busy]);
-  function cell(r: Row, k: string) {
-    return ["aroma", "color", "tipo"].includes(k)
-      ? r.attributes[k] || ""
-      : r[k];
-  }
   function assign(r: Row, k: string, value: any): Row {
     if (["aroma", "color", "tipo"].includes(k))
       return { ...r, attributes: { ...r.attributes, [k]: value } };
@@ -326,20 +335,7 @@ export default function VariantSheet({
           disabled={busy}
           onClick={async () => {
             try {
-              await navigator.clipboard.writeText(
-                formatTSV([
-                  columns.map((c) => c[1]),
-                  ...rows.map((r) =>
-                    columns.map(([k]) =>
-                      flags.has(k)
-                        ? cell(r, k)
-                          ? "Sí"
-                          : "No"
-                        : String(cell(r, k) ?? ""),
-                    ),
-                  ),
-                ]),
-              );
+              await copyVariantRows(rows);
             } catch {
               setError(
                 "No se pudo copiar. Revisa el permiso del portapapeles.",

@@ -1,15 +1,21 @@
 import { priceCost } from "./price-cost";
-import ResponsiveTable from "./ResponsiveTable";
 import { confirmAction } from "./ConfirmDialog";
-import CatalogBadge from "./CatalogBadge";
-import { weightRangeError, weightRangeLabel } from "./variant-weights";
+import { weightRangeError } from "./variant-weights";
 import { AppButton, AppIcon } from "./AppIcon";
-import { useEffect, useState, Suspense } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, Suspense } from "react";
 import { lazyWithRecovery as lazy } from "./lazy-module";
 import { operation, mutate, useOperation, money, type Row } from "./operations";
 import { request } from "./commerce";
 import { usePriceRefresh, pricesChanged } from "./price-events";
-import VariantSheet from "./VariantSheet";
+import VariantSheet, { copyVariantRows } from "./VariantSheet";
+
+import VariantForm, { standardVariantAttributes } from "./VariantForm";
+import { SearchField } from "./PoolControls";
+import { variantMatches } from "./variant-catalog-search";
+import ResponsiveTable from "./ResponsiveTable";
+import CatalogBadge from "./CatalogBadge";
+import { weightRangeLabel } from "./variant-weights";
+import "./variant-manager.css";
 import { variantLabel } from "./variant-label";
 const BarcodeDialog = lazy(() => import("./BarcodeDialog"));
 export default function VariantManager({
@@ -34,6 +40,32 @@ export default function VariantManager({
   const [sheet, setSheet] = useState<"edit" | "import" | null>(null);
   const [sheetDirty, setSheetDirty] = useState(false);
   const state = useOperation(company, "catalog");
+  const [query, setQuery] = useState("");
+  const catalogDialog = useRef<HTMLElement>(null);
+  const savedPosition = useRef<{ top: number; trigger: HTMLElement | null } | null>(null);
+  const attributeKeys = useMemo(() => [...new Set([
+    ...standardVariantAttributes,
+    ...rows.flatMap(row => Object.keys(row.attributes || {})),
+  ])], [rows]);
+  const visibleRows = rows.filter(row => variantMatches(query, row));
+  useLayoutEffect(() => {
+    if (edit !== undefined || state.busy || !savedPosition.current || !catalogDialog.current) return;
+    const position = savedPosition.current;
+    savedPosition.current = null;
+    if (position.trigger?.isConnected) position.trigger.focus({ preventScroll: true });
+    catalogDialog.current.scrollTop = position.top;
+  }, [edit, state.busy]);
+
+  function openEditor(row: Row | null) {
+    const focus = document.activeElement;
+    savedPosition.current = { top: catalogDialog.current?.scrollTop ?? 0, trigger: focus instanceof HTMLElement ? focus : null };
+    state.setError("");
+    setEdit(row);
+  }
+  function closeEditor() {
+    state.setError("");
+    setEdit(undefined);
+  }
   async function load() {
     const [variants, base, catalog, formulas] = await Promise.all([
       operation(company, "variants", { product: product.id }),
@@ -67,261 +99,88 @@ export default function VariantManager({
       await onChanged?.();
     });
   }
-  return (
-    <div className="overlay">
-      <section
-        className="modal operations-dialog"
-        role="dialog"
-        aria-modal="true"
-        aria-label="Variantes del producto"
-      >
-        <header>
-          <div>
-            <p className="eyebrow">VARIANTES</p>
-            <h2>{product.name}</h2>
-          </div>
-          <AppButton
-            disabled={state.busy}
-            className="secondary"
-            onClick={async () => {
-              if (document.querySelector('.variant-sheet[aria-busy="true"]'))
-                return;
-              if (
-                (edit !== undefined || sheetDirty) &&
-                !(await confirmAction(
-                  "¿Descartar los cambios de esta variante?",
-                ))
-              )
-                return;
-              onClose();
-            }}
-          >
-            Cerrar
-          </AppButton>
-        </header>
-        <p>
-          El peso mínimo está incluido y el máximo no. Ejemplo: 80–90 g
-          corresponde a pesos desde 80 g hasta menos de 90 g.
-        </p>
-        {state.error && (
-          <p className="error" role="alert">
-            <AppIcon name="status.error" />
-            {state.error}
-          </p>
-        )}
-        {state.notice && <p role="status">{state.notice}</p>}
-        {state.canWrite && edit === undefined && (
-          <div className="form-actions">
-            {!sheet && (
-              <>
-                <AppButton onClick={() => setEdit(null)}>
-                  Agregar variante individual
-                </AppButton>
-                <AppButton
-                  className="secondary"
-                  onClick={() => setSheet("edit")}
-                >
-                  Editar catálogo en tabla
-                </AppButton>
-                <AppButton
-                  className="secondary"
-                  onClick={() => setSheet("import")}
-                >
-                  Copiar de Tabla
-                </AppButton>
-              </>
-            )}
-          </div>
-        )}
-        {sheet && (
-          <VariantSheet
-            key={company + product.id + sheet}
-            company={company}
-            product={product}
-            existing={rows}
-            importing={sheet === "import"}
-            onDirty={setSheetDirty}
-            onClose={() => {
-              setSheet(null);
-              setSheetDirty(false);
-            }}
-            onSaved={async () => {
-              await load();
-              await onChanged?.();
-              pricesChanged(company);
-              state.setNotice("Variantes guardadas");
-            }}
-          />
-        )}
-        {edit !== undefined && (
-          <form
-            key={edit?.id || "new"}
-            className="settings-grid"
-            onSubmit={(e) => {
-              e.preventDefault();
-              const data = Object.fromEntries(new FormData(e.currentTarget));
-              let attributes: Row = { ...edit?.attributes };
-              for (const key of ["aroma", "color", "tipo"])
-                if (String(data[key] || "").trim())
-                  attributes[key] = String(data[key]).trim().toLowerCase();
-                else delete attributes[key];
-              const payload = {
-                ...data,
-                attributes,
-                product: product.id,
-                id: edit?.id || "",
-                barcode_custom: data.custom === "on",
-                published: data.published === "on",
-                active: data.active === "on",
-                allow_preorder: data.allow_preorder === "on",
-              };
-              if (
-                !String(data.name || "").trim() &&
-                !String(data.commercial_code || "").trim()
-              ) {
-                state.setError(
-                  "Indica un código comercial o un tamaño comercial.",
-                );
-                return;
-              }
-              const rangeError = weightRangeError(
-                rows.map((r) => ({ ...r, id: r.id })),
-                {
-                  ...payload,
-                  id: edit?.id || "",
-                  weight_min: String(data.weight_min || ""),
-                  weight_max: String(data.weight_max || ""),
-                },
-              );
-              if (rangeError) {
-                state.setError(rangeError);
-                return;
-              }
-              state.run(async () => {
-                await mutate(company, "variant_save", payload);
-                setEdit(undefined);
+  function saveVariant(data: Row, attributes: Row) {
+    const payload = {
+      ...data,
+      attributes,
+      product: product.id,
+      id: edit?.id || "",
+      barcode_custom: data.custom === "on",
+      published: data.published === "on",
+      active: data.active === "on",
+      allow_preorder: data.allow_preorder === "on",
+    };
+    if (!String(data.name || "").trim() && !String(data.commercial_code || "").trim()) {
+      state.setError("Indica un código comercial o un tamaño comercial.");
+      return;
+    }
+    const rangeError = weightRangeError(rows.map(row => ({ ...row, id: row.id })), {
+      ...payload,
+      weight_min: String(data.weight_min || ""),
+      weight_max: String(data.weight_max || ""),
+    });
+    if (rangeError) {
+      state.setError(rangeError);
+      return;
+    }
+    void state.run(async () => {
+      await mutate(company, "variant_save", payload);
+      setEdit(undefined);
+      await load();
+      await onChanged?.();
+      pricesChanged(company);
+      state.setNotice("Variante guardada");
+    });
+  }
+  async function closeCatalog() {
+    if (state.busy || catalogDialog.current?.querySelector('.variant-sheet[aria-busy="true"]')) return;
+    if (sheetDirty && !(await confirmAction("¿Descartar los cambios de esta variante?"))) return;
+    onClose();
+  }
+
+  return <>
+    <div className="overlay compact-form-overlay variant-manager-overlay" hidden={edit !== undefined}>
+      <section ref={catalogDialog} className="modal compact-form-dialog variant-catalog-dialog"
+        role="dialog" aria-modal="true" aria-labelledby="variant-catalog-title">
+        <div className="compact-form-header">
+          <div><h2 id="variant-catalog-title">Variantes y existencias</h2><p>{product.name}</p></div>
+          <AppButton type="button" className="secondary catalog-icon-button" iconKey="action.cancel"
+            aria-label="Cerrar variantes y existencias" disabled={state.busy} onClick={() => void closeCatalog()} />
+        </div>
+        <div className="variant-catalog-body">
+          {edit === undefined && state.error && <p className="error" role="alert"><AppIcon name="status.error" /> {state.error}</p>}
+          {state.notice && <p role="status">{state.notice}</p>}
+          {sheet ? (
+            <VariantSheet key={company + product.id + sheet} company={company} product={product} existing={rows}
+              importing={sheet === "import"} onDirty={setSheetDirty}
+              onClose={() => { setSheet(null); setSheetDirty(false); }}
+              onSaved={async () => {
                 await load();
                 await onChanged?.();
                 pricesChanged(company);
-                state.setNotice("Variante guardada");
-              });
-            }}
-          >
-            <label>
-              Código comercial
-              <input
-                name="commercial_code"
-                maxLength={80}
-                placeholder="JT-1, JT-2…"
-                defaultValue={edit?.commercial_code}
-              />
-            </label>
-            <label>
-              Tamaño comercial
-              <input
-                name="name"
-                maxLength={120}
-                placeholder="PEQUEÑO, MEDIANO… Puede repetirse."
-                defaultValue={edit?.name}
-              />
-            </label>
-            <label>
-              SKU
-              <input
-                name="sku"
-                readOnly
-                maxLength={80}
-                required={!!edit}
-                placeholder="Se genera al guardar, por ejemplo P0001-01"
-                defaultValue={edit?.sku}
-              />
-            </label>
-            <label>
-              Código de barras personalizado
-              <input
-                name="barcode"
-                maxLength={80}
-                defaultValue={edit?.barcode}
-              />
-              <span>
-                <input
-                  type="checkbox"
-                  name="custom"
-                  defaultChecked={edit?.barcode_custom}
-                />{" "}
-                Conservar este código, incluso vacío
-              </span>
-              <small>Sin personalizar, se utiliza el SKU.</small>
-            </label>
-            {["aroma", "color", "tipo"].map((k) => (
-              <label key={k}>
-                {k}
-                <input
-                  name={k}
-                  maxLength={120}
-                  defaultValue={edit?.attributes?.[k]}
-                />
-              </label>
-            ))}
-            <label>
-              Peso mínimo (g)
-              <input
-                name="weight_min"
-                type="number"
-                min="0.0001"
-                step="0.0001"
-                defaultValue={edit?.weight_min}
-              />
-            </label>
-            <label>
-              Peso máximo (g)
-              <input
-                name="weight_max"
-                type="number"
-                min="0.0001"
-                step="0.0001"
-                defaultValue={edit?.weight_max}
-              />
-            </label>
-            <p className="form-wide muted">
-              Los precios de venta se administran en el menú Listas de precios.
-            </p>
-            <label>
-              <input
-                name="active"
-                type="checkbox"
-                defaultChecked={edit?.active ?? true}
-              />{" "}
-              Activa
-            </label>
-            <label>
-              <input
-                name="published"
-                type="checkbox"
-                defaultChecked={edit?.published ?? false}
-              />{" "}
-              Publicar en tienda
-            </label>
-            <label>
-              <input
-                name="allow_preorder"
-                type="checkbox"
-                defaultChecked={edit?.allow_preorder ?? false}
-              />{" "}
-              Permitir pedidos anticipados
-            </label>
-            <div className="form-actions">
-              <AppButton disabled={state.busy}>Guardar variante</AppButton>
-              <AppButton
-                type="button"
-                className="secondary"
-                onClick={() => setEdit(undefined)}
-              >
-                Cancelar
-              </AppButton>
+                state.setNotice("Variantes guardadas");
+              }} />
+          ) : <>
+            <div className="variant-catalog-actions">
+              {state.canWrite && <>
+                <AppButton type="button" iconKey="action.add" disabled={state.busy} onClick={() => openEditor(null)}>Nueva variante</AppButton>
+                <AppButton type="button" className="secondary" iconKey="action.edit" disabled={state.busy} onClick={() => setSheet("edit")}>Editar catálogo en tabla</AppButton>
+              </>}
+              {state.canWrite && <AppButton type="button" className="secondary" iconKey="action.duplicate" disabled={state.busy} onClick={async () => {
+                try {
+                  await copyVariantRows(rows);
+                  state.setError("");
+                  state.setNotice("Tabla copiada.");
+                } catch {
+                  state.setError("No se pudo copiar. Revisa el permiso del portapapeles.");
+                }
+              }}>Copiar tabla</AppButton>}
+              {state.canWrite && <AppButton type="button" className="secondary" iconKey="action.upload" disabled={state.busy}
+                onClick={() => setSheet("import")}>Pegar desde Excel</AppButton>}
             </div>
-          </form>
-        )}
+            <div className="variant-search-tools">
+              <SearchField aria-label="Buscar variantes" placeholder="Buscar por nombre, SKU o características…" value={query} onChange={event => setQuery(event.target.value)} />
+            </div>
         {!sheet && (
           <div className="table-wrap">
             <ResponsiveTable>
@@ -339,7 +198,7 @@ export default function VariantManager({
                 </tr>
               </thead>
               <tbody>
-                {rows.map((r) => (
+                {visibleRows.map((r) => (
                   <tr key={r.id}>
                     <td>
                       <span className="admin-name">{variantLabel(r)}</span>
@@ -384,24 +243,23 @@ export default function VariantManager({
                 ))}
               </tbody>
             </ResponsiveTable>
-            {!rows.length && (
-              <p className="empty">
-                Agrega la primera variante para producir o vender este producto.
-              </p>
-            )}
+            {!visibleRows.length && <p className="empty" role="status">{state.busy ? "Consultando variantes…" : rows.length
+              ? "No hay variantes que coincidan con la búsqueda."
+              : "Agrega la primera variante para producir o vender este producto."}</p>}
           </div>
         )}
-        {barcode && (
-          <Suspense fallback={<p>Preparando código…</p>}>
-            <BarcodeDialog
-              item={barcode as any}
-              onClose={() => setBarcode(null)}
-            />
-          </Suspense>
-        )}
+          </>}
+        </div>
       </section>
     </div>
-  );
+    {edit !== undefined && <VariantForm key={edit?.id || "new"} productName={product.name} variant={edit}
+      attributeKeys={attributeKeys} busy={state.busy} error={state.error} onClose={closeEditor} onSave={saveVariant} />}
+    {barcode && (
+      <Suspense fallback={<p>Preparando código…</p>}>
+        <BarcodeDialog item={barcode as any} onClose={() => setBarcode(null)} />
+      </Suspense>
+    )}
+  </>;
 }
 
 function VariantEstimate({ variant, data }: { variant: Row; data: Row }) {
