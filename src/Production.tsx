@@ -128,6 +128,9 @@ function ProductionBatches({
       : formula?.requires_curing ?? selected?.requires_curing ?? true);
   const sendingToCuring = mode === "finish" && requiresCuring;
   const finishingCuring = mode === "curing_complete" || (mode === "finish" && !!selected?.opening_stock);
+  const curingDaysLeft = finishingCuring && selected?.available_on
+    ? Math.max(0, (Date.parse(selected.available_on) - Date.parse(calendarDate)) / 86_400_000)
+    : 0;
   const assignedUnits = Object.values(outputUnits).reduce((sum, value) => sum + Number(value), 0)
     + Object.values(weightCounts).reduce((sum, value) => sum + value, 0);
 
@@ -339,7 +342,7 @@ function ProductionBatches({
                   if (finishingCuring) {
                     payload.final_quantity = assignedUnits;
                     payload.reason = f.get("reason");
-                    payload.override = f.get("override") === "on";
+                    payload.override = curingDaysLeft > 0 && manager;
                     const assigned = payload.outputs.reduce((sum: number, output: Row) => sum + Number(output.quantity), 0);
                     if (assigned !== assignedUnits || assigned < 1 || assigned > 10000) {
                       state.setError("Registra entre 1 y 10,000 unidades en las variantes obtenidas.");
@@ -365,6 +368,12 @@ function ProductionBatches({
                   };
                 }
                 state.run(async () => {
+                  if (curingDaysLeft > 0 && !await confirmAction(
+                    curingDaysLeft === 1
+                      ? "Aún falta 1 día de curación/secado. ¿Estás seguro de liberar el lote?"
+                      : `Aún faltan ${curingDaysLeft} días de curación/secado. ¿Estás seguro de liberar el lote?`,
+                    { title: "Liberación anticipada", confirmText: "Liberar lote", cancelText: "Volver" },
+                  )) return;
                   if ((mode === "start" && !openingStock) || (mode === "finish" && !selected?.opening_stock)) {
                     const stock = await request("production_command", {
                       p_company: company,
@@ -744,16 +753,16 @@ function ProductionBatches({
                   </div>}
                   {sendingToCuring && <p>Las unidades y sus variantes se registrarán en inventario al confirmar el rendimiento final.</p>}
                   {selected?.opening_stock && <p>Este lote de saldo inicial conserva el pesaje por variante y el costo histórico disponible.</p>}
-                  {mode === "curing_complete" && <>
+                  {finishingCuring && <>
                     <p>Fecha de disponibilidad: {selected?.available_on}.</p>
                     <label>
                       Nota de liberación
-                      <input name="reason" maxLength={500} required={selected!.available_on > today()}
-                        minLength={selected!.available_on > today() ? 5 : undefined} />
+                      <input name="reason" maxLength={500} required={curingDaysLeft > 0}
+                        minLength={curingDaysLeft > 0 ? 5 : undefined} />
                     </label>
-                    {selected!.available_on > today() && manager && <label>
-                      <input name="override" type="checkbox" required /> Autorizo la liberación anticipada.
-                    </label>}
+                    {curingDaysLeft > 0 && <p role="status">
+                      {curingDaysLeft === 1 ? "Aún falta 1 día de curación/secado." : `Aún faltan ${curingDaysLeft} días de curación/secado.`}
+                    </p>}
                   </>}
                 </>
               ) : mode === "curing_edit" ? (
@@ -955,7 +964,7 @@ function ProductionBatches({
                     ))}
                     {state.canWrite && (b.state === "in_progress" || (b.opening_stock && b.state === "curing" && !b.confirmed)) && (
                       <AppButton
-                        disabled={b.opening_stock && b.available_on > today()}
+                        disabled={b.opening_stock && b.available_on > calendarDate && !manager}
                         onClick={() => openYield(b, "finish")}
                       >
                         {b.opening_stock ? "Confirmar rendimiento final" : "Confirmar producción"}
@@ -963,7 +972,7 @@ function ProductionBatches({
                     )}
                     {state.canWrite && b.state === "curing" && (!b.opening_stock || b.confirmed) && (
                       <AppButton
-                        disabled={b.available_on > today() && !manager}
+                        disabled={b.available_on > calendarDate && !manager}
                         onClick={() => openYield(b, "curing_complete")}
                       >
                         Confirmar rendimiento final
