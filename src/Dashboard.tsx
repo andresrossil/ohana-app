@@ -1,3 +1,4 @@
+import { SearchField } from "./PoolControls";
 import { useEffect, useState } from "react";
 import { supabase } from "./client";
 import { money } from "./operations";
@@ -38,6 +39,13 @@ export default function Dashboard({ company, currency, materials, products, onOp
 }) {
   const [data, setData] = useState<DashboardData>();
   const [failed, setFailed] = useState(false);
+  const [stockQuery, setStockQuery] = useState("");
+  const normalizeStock = (value: string) => value.normalize("NFD").replace(/\p{M}/gu, "").toLocaleLowerCase("es");
+  const stockTerms = normalizeStock(stockQuery.trim()).split(/\s+/);
+  const filteredStock = (data?.available_products ?? []).filter(({ product, variant }) =>
+    stockTerms.every((term) => normalizeStock(product + " " + (variant || "")).includes(term)),
+  ).sort((a, b) => a.product.localeCompare(b.product, "es", { sensitivity: "base", numeric: true }) ||
+    (a.variant || "").localeCompare(b.variant || "", "es", { sensitivity: "base", numeric: true }));
   const [stockExpanded, setStockExpanded] = useState(false);
   const [settlementsExpanded, setSettlementsExpanded] = useState(false);
   useEffect(() => {
@@ -81,11 +89,17 @@ export default function Dashboard({ company, currency, materials, products, onOp
           </AppButton>
         </header>
         <div id="dashboard-stock-content" hidden={!stockExpanded}>
-          {stockExpanded && (data.available_products.length ? (
+          {stockExpanded && data.available_products.length > 0 && (
+            <div className="dashboard-stock-search">
+              <SearchField aria-label="Filtrar productos" placeholder="Buscar producto o variante…"
+                value={stockQuery} onChange={(event) => setStockQuery(event.target.value)} />
+            </div>
+          )}
+          {stockExpanded && (filteredStock.length ? (
             <div className="table-wrap">
-              <ResponsiveTable showAllMobileFields>
+              <ResponsiveTable showAllMobileFields sortable={false}>
                 <thead><tr><th>Producto</th><th>Variante</th><th>Disponible</th><th>En curación/secado</th><th>Precio General</th></tr></thead>
-                <tbody>{data.available_products.map(item => (
+                <tbody>{filteredStock.map(item => (
                   <tr key={item.id}>
                     <td>{item.product}</td>
                     <td>{item.variant || "—"}</td>
@@ -100,7 +114,9 @@ export default function Dashboard({ company, currency, materials, products, onOp
                 ))}</tbody>
               </ResponsiveTable>
             </div>
-          ) : <p className="empty">No hay productos disponibles ni en curación/secado.</p>)}
+          ) : <p className="empty">{data.available_products.length
+            ? "No hay productos que coincidan con la búsqueda."
+            : "No hay productos disponibles ni en curación/secado."}</p>)}
         </div>
       </section>
     )}

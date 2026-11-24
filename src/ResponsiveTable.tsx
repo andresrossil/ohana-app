@@ -1,5 +1,4 @@
 import TableActions from "./TableActions";
-import SearchSelect from "./SearchSelect";
 import {
   Children,
   Fragment,
@@ -9,6 +8,7 @@ import {
   useState,
   useRef,
   useLayoutEffect,
+  useEffect,
 } from "react";
 import type { ReactElement, ReactNode, TableHTMLAttributes } from "react";
 import { AppButton, AppIcon } from "./AppIcon";
@@ -62,10 +62,11 @@ export default forwardRef<
   HTMLTableElement,
   TableHTMLAttributes<HTMLTableElement> & {
     showAllMobileFields?: boolean;
+    sortable?: boolean;
     onSortRows?: (indexes: number[]) => void;
   }
 >(function ResponsiveTable(
-  { children, className, onInvalidCapture, onSortRows, showAllMobileFields, ...props },
+  { children, className, onInvalidCapture, onSortRows, showAllMobileFields, sortable = true, ...props },
   ref,
 ) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set()),
@@ -76,7 +77,15 @@ export default forwardRef<
     direction: "asc" | "desc";
     values: Record<string, string>;
   } | null>(null);
-  const [mobileColumn, setMobileColumn] = useState("");
+  const [mobile, setMobile] = useState(() => window.matchMedia("(max-width: 760px)").matches);
+  const [descriptionSort, setDescriptionSort] = useState<typeof sort>(null);
+  useEffect(() => {
+    const viewport = window.matchMedia("(max-width: 760px)");
+    const update = () => setMobile(viewport.matches);
+    viewport.addEventListener("change", update);
+    update();
+    return () => viewport.removeEventListener("change", update);
+  }, []);
   const head = parts.find((n) => n.type === "thead"),
     headerRows = head ? elements(head.props.children) : [],
     headers = headerRows.length
@@ -87,9 +96,11 @@ export default forwardRef<
             .trim(),
         )
       : [];
-  const activeHeader = headerRows.at(-1);
-  const mobileDirection = mobileColumn === "" ? undefined :
-    elements(activeHeader?.props.children)[Number(mobileColumn)]?.props["aria-sort"];
+  const descriptionColumn = headers.findIndex((heading) => /^descripci[oó]n\b/i.test(heading));
+  const mobileColumn = descriptionColumn >= 0 ? descriptionColumn : headers.findIndex((heading) =>
+    /^(nombre|producto|materia prima|material|ingrediente|art[ií]culo|cliente|proveedor|concepto|fondo|variante)\b/i.test(heading),
+  );
+  const selection = mobile && sortable && mobileColumn >= 0 ? descriptionSort : sort;
   function capture(column: number) {
     const values: Record<string, string> = {};
     for (const body of Array.from(table.current?.tBodies || []))
@@ -101,13 +112,13 @@ export default forwardRef<
       }
     return values;
   }
-  function orderedRows(part: Element, partIndex: number, selection = sort) {
+  function orderedRows(part: Element, partIndex: number, orderBy = selection) {
     const rows = elements(part.props.children).map((row, index) => ({
       row,
       index,
       key: partIndex + "-" + String(row.key ?? index),
     }));
-    if (!selection) return rows;
+    if (!orderBy) return rows;
     // Rows with spanning section/summary cells retain their own positions.
     const normal = rows.filter(
       ({ row }) =>
@@ -119,9 +130,9 @@ export default forwardRef<
     normal.sort(
       (a, b) =>
         compareCells(
-          selection.values[a.key],
-          selection.values[b.key],
-          selection.direction,
+          orderBy.values[a.key],
+          orderBy.values[b.key],
+          orderBy.direction,
         ) || a.index - b.index,
     );
     let next = 0;
@@ -144,7 +155,6 @@ export default forwardRef<
       values: capture(column),
     };
     setSort(selection);
-    setMobileColumn(String(column));
     if (onSortRows) {
       const index = parts.findIndex((p) => p.type === "tbody");
       if (index >= 0)
@@ -154,8 +164,25 @@ export default forwardRef<
     }
   }
   useLayoutEffect(() => {
+    if (!mobile || !sortable || mobileColumn < 0 ||
+      (table.current?.contains(document.activeElement) &&
+        /^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement?.tagName || ""))) return;
+    const values = capture(mobileColumn);
+    const next = { column: mobileColumn, direction: "asc" as const, values };
+    if (descriptionSort?.column !== mobileColumn ||
+      Object.keys(values).length !== Object.keys(descriptionSort.values).length ||
+      Object.entries(values).some(([key, value]) => descriptionSort.values[key] !== value)) {
+      setDescriptionSort(next);
+    }
+    const body = parts.findIndex((part) => part.type === "tbody");
+    if (onSortRows && body >= 0) {
+      const indexes = orderedRows(parts[body], body, next).map((row) => row.index);
+      if (indexes.some((value, index) => value !== index)) onSortRows(indexes);
+    }
+  });
+  useLayoutEffect(() => {
     if (
-      !sort ||
+      mobile || !sort ||
       (table.current?.contains(document.activeElement) &&
         /^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement?.tagName || ""))
     )
@@ -197,50 +224,6 @@ export default forwardRef<
   );
   return (
     <>
-      {headers.length > 0 && (
-        <div className="table-mobile-sort">
-          <label>
-            Ordenar por
-            <SearchSelect
-              aria-label="Columna para ordenar"
-              value={mobileColumn}
-              onChange={(e) => {
-                setMobileColumn(e.target.value);
-                const button =
-                  table.current?.tHead?.rows[headerRows.length - 1]?.cells[
-                    Number(e.target.value)
-                  ]?.querySelector<HTMLButtonElement>("button");
-                button?.click();
-              }}
-            >
-              <option value="" disabled>
-                Selecciona una columna
-              </option>
-              {headers.map((label, i) => (
-                <option key={i} value={i}>
-                  {label || "Columna " + (i + 1)}
-                </option>
-              ))}
-            </SearchSelect>
-          </label>
-          <AppButton
-            type="button"
-            iconKey="control.sort"
-            className="secondary mobile-sort-direction"
-            aria-label="Cambiar sentido del orden"
-            disabled={mobileColumn === ""}
-            onClick={() =>
-              table.current?.tHead?.rows[headerRows.length - 1]?.cells[
-                Number(mobileColumn)
-              ]
-                ?.querySelector<HTMLButtonElement>("button")
-                ?.click()
-            }
-          >
-            {mobileColumn === "" ? "Sentido" : sort?.direction === "desc" || mobileDirection === "descending" ? "Desc." : "Asc."}
-          </AppButton>
-        </div>
-      )}
       <table
         {...props}
         ref={(node) => {
@@ -267,7 +250,7 @@ export default forwardRef<
       >
         {parts.map((part, partIndex) =>
           part.type === "thead"
-            ? cloneElement(
+            ? !sortable ? part : cloneElement(
                 part,
                 {},
                 elements(part.props.children).map((row, index) =>
@@ -292,7 +275,6 @@ export default forwardRef<
                               onClickCapture: own
                                 ? () => {
                                     setSort(null);
-                                    setMobileColumn(String(column));
                                   }
                                 : undefined,
                             } as {},

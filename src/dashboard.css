@@ -73,3 +73,5 @@
 .dashboard-stock-heading h2 { margin: 0; font-size: 1.15rem; }
 .dashboard-reorder { grid-column: span 6; }
 .dashboard-reorder > .table-wrap { display: block; margin-top: 1rem; }
+
+.dashboard-stock-search { padding: 12px 16px; max-width: 480px; }
