@@ -133,11 +133,11 @@ export default function MaterialsCatalog({
   }
 
   return <div className="materials-home">
-    <header className="dashboard-welcome materials-welcome">
+    <div className="dashboard-welcome materials-welcome">
       <span>La base de cada creación</span>
       <h1 className="module-title"><AppIcon name="module.materials" /> Materiales</h1>
       <p>Conoce lo que compras. Cuida lo que creas.</p>
-    </header>
+    </div>
     {canWrite && <div className="materials-entry">
       <AppButton type="button" iconKey="action.add" disabled={loading} onClick={onCreate}>Nuevo material</AppButton>
       <AppButton type="button" className="secondary" iconKey="action.duplicate" disabled={loading} onClick={onImport}>Copiar de tabla</AppButton>
