@@ -12,7 +12,10 @@
   flex-direction: column;
   min-height: 0;
   padding: 0;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  scroll-padding-block: 64px 76px;
   border: 1px solid var(--admin-border);
   border-radius: 10px;
 }
@@ -24,28 +27,21 @@
   padding: 8px 12px;
   background: var(--admin-surface);
 }
-.compact-form-header { flex: 0 0 auto; justify-content: space-between; border-bottom: 1px solid var(--admin-border); }
+.compact-form-header { position: sticky; top: 0; z-index: 2; flex: 0 0 auto; justify-content: space-between; border-bottom: 1px solid var(--admin-border); }
 .shell .compact-form-header :is(h2, p) { margin: 0; }
 .shell .compact-form-header h2 { font-size: 21px; }
 .compact-form-header .eyebrow { display: flex; align-items: center; gap: 5px; }
 .shell .compact-form {
   display: flex;
-  flex: 1 1 auto;
+  flex: 1 0 auto;
   flex-direction: column;
-  min-height: 0;
   min-width: 0;
-  overflow: hidden;
 }
 .compact-form-body {
   position: relative;
-  flex: 1 1 auto;
-  overflow-x: hidden;
-  overflow-y: auto;
-  touch-action: pan-y;
-  overscroll-behavior: contain;
-  min-height: 0;
+  flex: 1 0 auto;
+  min-width: 0;
   padding: 10px 12px;
-  scroll-padding-block: 10px;
 }
 .compact-form-section + .compact-form-section { margin-top: 7px; }
 .compact-form-section {
@@ -116,7 +112,7 @@
 .compact-price-summary { padding: 8px; }
 .compact-price-summary small, .compact-photo-content small { display: block; }
 .shell .compact-form .material-create-vs { padding: 0; min-height: 0; border: 0; background: transparent; }
-.compact-form-actions { flex: 0 0 auto; z-index: 1; justify-content: flex-end; border-top: 1px solid var(--admin-border); }
+.compact-form-actions { position: sticky; bottom: 0; flex: 0 0 auto; z-index: 1; justify-content: flex-end; border-top: 1px solid var(--admin-border); }
 .compact-form-actions button[type="submit"] { min-width: min(55%, 180px); }
 .compact-photo { display: grid; grid-template-columns: 52px minmax(0, 1fr); gap: 8px; font-size: 13px; }
 .compact-photo-preview {

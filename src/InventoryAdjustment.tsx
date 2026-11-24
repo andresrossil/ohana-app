@@ -10,7 +10,7 @@ import { parseTSV, formatTSV, parseNumber } from "./sheet-model";
 import { priceCost } from "./price-cost";
 import FormSection from "./FormSection";
 import { IconDetails } from "./PoolControls";
-import { useCompactFormViewport } from "./compact-form-viewport";
+import { scrollCompactFormToStart, useCompactFormViewport } from "./compact-form-viewport";
 import { inventoryCountPreview } from "./inventory-count-preview";
 import "./inventory-documents.css";
 import "./inventory-count.css";
@@ -104,7 +104,7 @@ export default function InventoryAdjustment({
     [dirty, setDirty] = useState(false);
   useEffect(() => {
     if (!countMode) return;
-    if (state.error) body.current?.scrollTo({ top: 0 });
+    if (state.error) scrollCompactFormToStart(body.current);
     else if (review) {
       reviewSection.current?.focus({ preventScroll: true });
       reviewSection.current?.scrollIntoView({ block: "start", inline: "nearest" });

@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState } from "react";
 import type { ComponentProps, FormEvent } from "react";
-import { useCompactFormViewport } from "./compact-form-viewport";
+import { scrollCompactFormToStart, useCompactFormViewport } from "./compact-form-viewport";
 import { AppButton, AppIcon } from "./AppIcon";
 import CatalogFields from "./CatalogFields";
 import { confirmAction } from "./ConfirmDialog";
@@ -52,7 +52,7 @@ export default function ProductCreateForm({ company, origins, units, requestCode
     if (!error) return;
     const field = serverField ? form.current?.querySelector<HTMLElement>(`[name="${serverField}"]`) : null;
     if (field) focusIssue(field);
-    else body.current?.scrollTo({ top: 0 });
+    else scrollCompactFormToStart(body.current);
   }, [error, serverField]);
 
   async function close() {

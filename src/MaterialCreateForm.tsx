@@ -1,4 +1,4 @@
-import { useCompactFormViewport } from "./compact-form-viewport";
+import { scrollCompactFormToStart, useCompactFormViewport } from "./compact-form-viewport";
 import { pricesChanged } from "./price-events";
 import MoneyInput from "./MoneyInput";
 import MaterialPhoto, { uploadMaterialPhoto } from "./MaterialPhoto";
@@ -73,7 +73,7 @@ export default function MaterialCreateForm({
   const submitting = useRef(false);
   const body = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    if (state.error || state.notice) body.current?.scrollTo({ top: 0 });
+    if (state.error || state.notice) scrollCompactFormToStart(body.current);
   }, [state.error, state.notice]);
   useCompactFormViewport(body);
   const batch = useRef<{ payload: string; id: string } | null>(null);
@@ -223,7 +223,7 @@ export default function MaterialCreateForm({
         const target = first?.hidden ? first.parentElement?.querySelector("button") : first;
         target?.focus({ preventScroll: true });
         target?.scrollIntoView({ block: "nearest", inline: "nearest" });
-        if (!target) body.current?.scrollTo({ top: 0 });
+        if (!target) scrollCompactFormToStart(body.current);
       });
       return;
     }
