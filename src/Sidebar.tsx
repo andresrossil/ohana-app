@@ -67,6 +67,7 @@ export default function Sidebar({
     [profile, setProfile] = useState({ name: "", photo: "" });
   const activeCategory = categories.find(({ items }) => items.includes(section))?.id;
   const [expanded, setExpanded] = useState<string | undefined>();
+  const profileMenu = useRef<HTMLDetailsElement>(null);
   const drawer = useRef<HTMLElement>(null),
     toggle = useRef<HTMLButtonElement>(null);
   const closeMenu = () => { setOpen(false); setExpanded(undefined); };
@@ -130,6 +131,13 @@ export default function Sidebar({
       document.removeEventListener("keydown", escape);
     };
   }, [open]);
+  useEffect(() => {
+    const closeOutside = (event: PointerEvent) => {
+      if (!profileMenu.current?.contains(event.target as Node)) profileMenu.current?.removeAttribute("open");
+    };
+    document.addEventListener("pointerdown", closeOutside);
+    return () => document.removeEventListener("pointerdown", closeOutside);
+  }, []);
   const activeCompany = companies.find((c) => c.id === company);
   const canShow = (key: Section) => !allowedSections || allowedSections.includes(key);
   const navigationButton = (key: Section) => (
@@ -191,31 +199,25 @@ export default function Sidebar({
         >
           <AppIcon name="action.collapse" />
         </button>
-        <div className="chrome-user">
-          <span title={email}>{profile.name || "Usuario"}</span>
-          {profile.photo ? (
-            <img
-              className="chrome-avatar"
-              src={profile.photo}
-              alt={profile.name}
-              onError={() => setProfile((p) => ({ ...p, photo: "" }))}
-            />
-          ) : (
-            <span
-              className="chrome-avatar chrome-avatar-empty"
-              aria-hidden="true"
-            >
-              {(profile.name || "U").slice(0, 1)}
-            </span>
-          )}
-          <AppButton
-            className="secondary"
-            iconKey="action.back"
-            onClick={onLogout}
-          >
-            Cerrar sesión
-          </AppButton>
-        </div>
+        <details className="chrome-profile" ref={profileMenu} onKeyDown={event => {
+          if (event.key === "Escape") {
+            profileMenu.current?.removeAttribute("open");
+            profileMenu.current?.querySelector("summary")?.focus();
+          }
+        }}>
+          <summary aria-label="Perfil de usuario">
+            {profile.photo ? <img className="chrome-avatar" src={profile.photo} alt=""
+              onError={() => setProfile(value => ({ ...value, photo: "" }))} />
+              : <span className="chrome-avatar chrome-avatar-empty" aria-hidden="true">{(profile.name || "U").slice(0, 1)}</span>}
+          </summary>
+          <div className="chrome-profile-panel">
+            <strong>{profile.name || email || "Usuario"}</strong>
+            <AppButton className="secondary" iconKey="action.back" onClick={() => {
+              profileMenu.current?.removeAttribute("open");
+              onLogout();
+            }}>Cerrar sesión</AppButton>
+          </div>
+        </details>
       </header>
       {open && (
         <button

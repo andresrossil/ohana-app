@@ -21,9 +21,9 @@ const orderDate = new Intl.DateTimeFormat("es-GT", {
   timeZone: "America/Guatemala", dateStyle: "short", timeStyle: "short",
 });
 
-export default function Sales({ company, currency = "GTQ" }: { company: string; currency?: string }) {
+export default function Sales({ company, currency = "GTQ", initialDrafts = false }: { company: string; currency?: string; initialDrafts?: boolean }) {
   const state = useOperation(company, "sales");
-  const [filters, setFilters] = useState(() => ({ ...salesTodayRange(), customer: "", status: "" }));
+  const [filters, setFilters] = useState(() => ({ ...(initialDrafts ? { ...salesTodayRange(), from: "0001-01-01" } : salesTodayRange()), customer: "", status: initialDrafts ? "draft" : "" }));
   const [applied, setApplied] = useState(filters);
   const [customers, setCustomers] = useState<Row[]>([]);
   const [orders, setOrders] = useState<Row[]>([]);

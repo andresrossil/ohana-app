@@ -25,6 +25,7 @@ const ignoreDirty = () => {};
 export default function Production(props: {
   company: string;
   formulasOnly?: boolean;
+  initialTraceId?: string;
   userId?: string;
   manager?: boolean;
   onDirty?: (dirty: boolean) => void;
@@ -34,6 +35,7 @@ export default function Production(props: {
   ) : (
     <ProductionBatches
       company={props.company}
+      initialTraceId={props.initialTraceId}
       manager={props.manager}
       userId={props.userId}
       onDirty={props.onDirty || ignoreDirty}
@@ -42,11 +44,13 @@ export default function Production(props: {
 }
 function ProductionBatches({
   company,
+  initialTraceId,
   manager = false,
   userId,
   onDirty,
 }: {
   company: string;
+  initialTraceId?: string;
   manager?: boolean;
   userId?: string;
   onDirty: (dirty: boolean) => void;
@@ -69,7 +73,7 @@ function ProductionBatches({
     [availableOverride, setAvailableOverride] = useState(""),
     [draftProduct, setDraftProduct] = useState(""),
     [draftFormula, setDraftFormula] = useState(""),
-    [traceId, setTraceId] = useState<string | null>(null),
+    [traceId, setTraceId] = useState<string | null>(initialTraceId ?? null),
     [dirty, setDirty] = useState(false),
     [draftScale, setDraftScale] = useState("1"),
     [quantityMode, setQuantityMode] = useState("preparations"),

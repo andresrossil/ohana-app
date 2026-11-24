@@ -1,7 +1,6 @@
-import { Bell } from "lucide-react";
 import remainingCuringDaysCell from "./RemainingCuringDays";
 import { useEffect, useState } from "react";
-import { AppButton, AppIcon } from "./AppIcon";
+import { AppIcon } from "./AppIcon";
 import { lotCode } from "./BatchTrace";
 import { request } from "./commerce";
 import { today } from "./operations";
@@ -102,61 +101,6 @@ export function useCuringProduction(company: string | null, revision = 0) {
     };
   }, [company, revision]);
   return { batches, error, date };
-}
-
-export default function CuringProduction({
-  company,
-  onProduction,
-}: {
-  company: string;
-  onProduction: () => void;
-}) {
-  const { batches, error, date } = useCuringProduction(company);
-  const products = summarizeCuringProducts(error ? [] : batches ?? [], true).sort(([, a], [, b]) =>
-    (a.availableOn ?? "9999").localeCompare(b.availableOn ?? "9999") || a.name.localeCompare(b.name, "es-GT"),
-  );
-  const due = products.reduce((count, [, product]) =>
-    product.availableOn && product.availableOn <= date ? count + product.lots : count, 0);
-  return (
-    <section className={`catalog admin-dashboard${due ? " curing-ready" : ""}`} aria-labelledby="dashboard-curing">
-      <h2 id="dashboard-curing">Lotes en curación</h2>
-      {due > 0 && (
-        <div className="toolbar curing-ready-notice">
-          <p role="status">
-            <Bell size={20} aria-hidden="true" /> {due === 1
-              ? "1 lote listo para confirmar o liberar"
-              : `${due} lotes listos para confirmar o liberar`}
-          </p>
-          <AppButton className="secondary" onClick={onProduction}>Ir a Producción</AppButton>
-        </div>
-      )}
-      {error ? <p className="error" role="alert">No se pudo consultar la producción en curación.</p>
-        : batches === null ? <p className="empty" role="status">Consultando lotes en curación…</p>
-        : !products.length ? <p className="empty">No hay lotes en curación.</p> :
-        <div className="table-wrap">
-          <ResponsiveTable>
-            <thead>
-              <tr><th>Producto</th><th>Lotes</th><th>Unidades teóricas</th><th>Fecha disponible</th><th>Días restantes</th></tr>
-            </thead>
-            <tbody>
-              {products.map(([id, product]) => (
-                <tr key={id} className={product.availableOn && product.availableOn <= date ? "curing-ready-row" : undefined}>
-                  <td>{product.name}</td>
-                  <td>{product.lots}</td>
-                  <td data-sort-value={product.known ? product.total : undefined}>
-                    {product.known ? curingCount.format(product.total) : "Sin estimación"}
-                    {product.known > 0 && product.missing > 0 && <small>Total parcial</small>}
-                  </td>
-                  <td data-sort-value={product.availableOn ?? ""}>{product.availableOn?.split("-").reverse().join("/") || "—"}</td>
-                  {remainingCuringDaysCell(product.availableOn, date)}
-                </tr>
-              ))}
-            </tbody>
-          </ResponsiveTable>
-        </div>
-      }
-    </section>
-  );
 }
 
 export function CuringProductionTable({

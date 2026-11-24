@@ -50,7 +50,6 @@ type Row = { id: string; [key: string]: any };
 const Reports = lazy(() => import("./Reports"));
 const Inventory = lazy(() => import("./Inventory"));
 const Notes = lazy(() => import("./Notes"));
-const CuringProduction = lazy(() => import("./CuringProduction"));
 const Formulas = lazy(() => import("./Formulas"));
 const Production = lazy(() => import("./Production"));
 const BusinessPartners = lazy(() => import("./BusinessPartners"));
@@ -122,6 +121,8 @@ function App() {
   const [importOpen, setImportOpen] = useState(false),
     [importNotice, setImportNotice] = useState("");
   const [materialCosts, setMaterialCosts] = useState<Record<string, Row>>({});
+  const [dashboardLot, setDashboardLot] = useState<{ company: string; id: string } | null>(null);
+  const [dashboardDraftsCompany, setDashboardDraftsCompany] = useState("");
   const [dashboardSettlement, setDashboardSettlement] = useState<{ company: string; id: string } | null>(null);
   const [section, setSection] = useState<Section>("dashboard"),
     [configView, setConfigView] = useState("profile"),
@@ -133,6 +134,11 @@ function App() {
     [canCreate, setCanCreate] = useState(false),
     [pickerCorp, setPickerCorp] = useState(""),
     [settingsDirty, setSettingsDirty] = useState(false);
+  useEffect(() => {
+    if (section !== "production") setDashboardLot(null);
+    if (section !== "sales") setDashboardDraftsCompany("");
+  }, [section, company]);
+
   useEffect(() => {
     protection.clear();
     setPendingNavigation(null);
@@ -719,7 +725,7 @@ function App() {
             });
           }}
         />
-        <main>
+        <main className={section === "dashboard" ? "dashboard-main" : undefined}>
           <header>
             <span>OHANA / {sectionTitle.toUpperCase()}</span>
             <span className="badge">
@@ -888,22 +894,22 @@ function App() {
                 </>
               )}
               {section === "dashboard" && (
-                <section
-                  className="admin-dashboard"
-                  aria-label="Resumen de empresa"
-                >
-                  <section className="intro">
-                    <div>
-                      <p className="eyebrow">
-                        {activeCompany?.corporation_name}
-                      </p>
-                      <h1>{activeCompany?.name}</h1>
-                      <p>Tu negocio, en armonía.</p>
-                    </div>
-                  </section>
                   <Dashboard
                     key={company}
                     company={company}
+                    companyName={activeCompany?.name}
+                    corporationName={activeCompany?.corporation_name}
+                    catalogRead={activeCompany?.catalog_read}
+                    onDrafts={activeCompany?.sales_read ? async () => {
+                      if (!(await leaveSheet())) return;
+                      setDashboardDraftsCompany(company);
+                      setSection("sales");
+                    } : undefined}
+                    onProduction={activeCompany?.production_read ? async (id) => {
+                      if (!(await leaveSheet())) return;
+                      setDashboardLot(id ? { company, id } : null);
+                      setSection("production");
+                    } : undefined}
                     currency={activeCompany?.currency || "GTQ"}
                     materials={activeCompany?.catalog_read && !loading ? data.raw_materials.filter((m) => m.active).length : undefined}
                     products={activeCompany?.catalog_read && !loading ? data.products.filter((p) => p.active).length : undefined}
@@ -913,16 +919,6 @@ function App() {
                       setSection("settlements");
                     } : undefined}
                   />
-                </section>
-              )}
-              {section === "dashboard" && activeCompany?.production_read && (
-                <CuringProduction
-                  key={company}
-                  company={company}
-                  onProduction={async () => {
-                    if (await leaveSheet()) setSection("production");
-                  }}
-                />
               )}
               {section === "prices" && activeCompany?.manage && (
                 <PriceLists
@@ -1011,6 +1007,7 @@ function App() {
                   key={company + section}
                   company={company}
                   onDirty={setSettingsDirty}
+                  initialTraceId={dashboardLot?.company === company ? dashboardLot.id : undefined}
                   manager={activeCompany?.manage}
                 />
               )}
@@ -1018,6 +1015,7 @@ function App() {
                 <Sales
                   key={company + section}
                   company={company}
+                  initialDrafts={dashboardDraftsCompany === company}
                   currency={activeCompany?.currency}
                 />
               )}

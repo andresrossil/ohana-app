@@ -30,18 +30,11 @@
   border-bottom: 1px solid var(--admin-border);
   box-shadow: 0 2px 10px #0000000a;
 }
-.shell .chrome-left,
-.shell .chrome-user {
+.shell .chrome-left {
   display: flex;
   align-items: center;
   gap: 10px;
   min-width: 0;
-  max-width: calc(50% - 24px);
-}
-.shell .chrome-user > span:first-child {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 .shell .app-topbar button {
   margin: 0;
@@ -91,7 +84,6 @@
 .shell .chrome-collapse.is-collapsed .app-icon {
   transform: none;
 }
-.shell .app-topbar.is-collapsed .chrome-user,
 .shell .app-topbar.is-collapsed .chrome-brand {
   display: none;
 }
@@ -196,22 +188,13 @@
     width: clamp(46px, 16vw, 72px);
     height: 36px;
   }
-  .shell .chrome-left,
-  .shell .chrome-user {
-    gap: 4px;
-    max-width: none;
-  }
-  .shell .chrome-user { justify-content: end; }
-  .shell .chrome-user > span:first-child {
-    min-width: 0;
-    font-size: 12px;
-  }
+  .shell .chrome-left { gap: 4px; }
   .shell .chrome-avatar {
     width: 26px;
     height: 26px;
     flex-basis: 26px;
   }
-  .shell .app-topbar :is(.chrome-menu-toggle, .chrome-collapse, .chrome-user button) {
+  .shell .app-topbar :is(.chrome-menu-toggle, .chrome-collapse) {
     min-height: 44px;
     padding: 6px;
     font-size: 12px;
@@ -246,3 +229,34 @@
 .material-photo-controls > label { flex: 1 1 220px; min-width: 0; }
 .material-photo-field input[type="file"] { width: 100%; max-width: 100%; min-width: 0; }
 .material-photo-controls .product-photo { width: 88px; height: 88px; object-fit: contain; flex: 0 0 auto; }
+
+.shell .app-topbar { grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); }
+.shell .chrome-profile { justify-self: end; margin-inline-start: auto; }
+.shell .chrome-profile > summary {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  cursor: pointer;
+  list-style: none;
+}
+.shell .chrome-profile > summary::-webkit-details-marker { display: none; }
+.shell .chrome-profile-panel {
+  position: absolute;
+  inset: 100% max(8px, env(safe-area-inset-right, 0px)) auto auto;
+  display: grid;
+  gap: 8px;
+  width: min(240px, calc(100vw - 16px));
+  padding: 12px;
+  background: var(--admin-surface);
+  border: 1px solid var(--admin-border);
+  border-radius: 10px;
+  overflow-wrap: anywhere;
+}
+.shell .chrome-profile-panel button { justify-self: start; }
+.shell .app-topbar.is-collapsed .chrome-profile > summary { height: 30px; }
+.shell .app-topbar.is-collapsed .chrome-avatar { width: 26px; height: 26px; }
+@media (max-width: 600px) {
+  .shell .app-topbar { grid-template-columns: minmax(0, 1fr) 44px minmax(0, 1fr); }
+}
