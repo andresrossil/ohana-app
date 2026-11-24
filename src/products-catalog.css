@@ -69,13 +69,12 @@
   .shell .products-catalog { padding: 8px; }
   .products-toolbar { grid-template-columns: minmax(0, 1fr); }
   .products-toolbar h2 { grid-column: auto; }
-  .shell .products-table > tbody > tr { padding: 7px; gap: 5px 8px; }
-  .shell .products-table > tbody > tr > .product-identity { grid-area: 1 / 1 / 2 / -1; padding-inline-end: 52px !important; }
+  .shell .products-table > tbody > tr { position: relative; padding: 7px; gap: 5px 8px; }
+  .shell .products-table > tbody > tr > .product-identity { grid-column: 1 / -1; width: 100% !important; box-sizing: border-box; padding-inline-end: 52px !important; }
   .shell .products-table > tbody > tr:has(button[popovertarget]) > .product-identity { padding-inline-end: 96px !important; }
   .shell .products-table > tbody > tr > .product-row-actions {
-    grid-area: 1 / 2 / 2 / 3;
-    justify-self: end;
-    align-self: start;
+    position: absolute;
+    inset: 7px 7px auto auto;
     width: max-content !important;
     display: flex;
     gap: 2px;
