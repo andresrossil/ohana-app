@@ -66,12 +66,14 @@ export default function SearchSelect(
   props: React.SelectHTMLAttributes<HTMLSelectElement> & {
     hideGroupLabels?: boolean;
     wrapSelection?: boolean;
+    resolveText?: (text: string) => string | undefined;
   },
 ) {
   const {
     children,
     hideGroupLabels = false,
     wrapSelection = false,
+    resolveText,
     value,
     defaultValue,
     onChange,
@@ -128,6 +130,16 @@ export default function SearchSelect(
       } as React.ChangeEvent<HTMLSelectElement>);
     }
   }
+  function resolveAlias(input: HTMLInputElement) {
+    if (!resolveText || !editing || editing.value !== selected) return false;
+    const key = resolveText(input.value);
+    if (!key || !entries.some(entry => entry.value === key && !entry.disabled)) return false;
+    input.setCustomValidity("");
+    choose(key);
+    setEditing(null);
+    return true;
+  }
+
   return (
     <span className="search-select" style={style} data-wrap-selection={wrapSelection || undefined}>
       {wrapSelection && <span className="search-select-display" aria-hidden="true">
@@ -173,7 +185,12 @@ export default function SearchSelect(
             );
           }
         }}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" && resolveAlias(event.currentTarget)) event.preventDefault();
+          props.onKeyDown?.(event as unknown as React.KeyboardEvent<HTMLSelectElement>);
+        }}
         onBlur={(event) => {
+          resolveAlias(event.currentTarget);
           props.onBlur?.(
             event as unknown as React.FocusEvent<HTMLSelectElement>,
           );

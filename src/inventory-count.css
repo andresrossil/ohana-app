@@ -1,0 +1,114 @@
+.shell .overlay > .inventory-count-dialog {
+  width: min(1480px, 100%);
+  max-width: 100%;
+  padding: 0;
+  margin: 0;
+}
+.shell .inventory-count-dialog .inventory-document-value {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.inventory-document-value span { color: var(--admin-muted); }
+.shell .inventory-count-import,
+.shell .inventory-count-import textarea { width: 100%; min-width: 0; }
+.shell .inventory-count-help { margin-top: 6px; }
+.shell .inventory-count-help summary { font-size: 13px; min-height: 40px; }
+.shell .inventory-count-help p { margin: 4px 0 0; font-size: 13px; color: var(--admin-muted); }
+.inventory-count-tools { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.inventory-count-dialog .compact-form-section-content > .table-wrap { margin: 0; }
+.shell .inventory-count-table { width: 100%; }
+.shell .inventory-count-table :is(th, td) {
+  padding: 5px;
+  min-width: 0;
+  font-size: 13px;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+.shell .inventory-count-table thead button { font-size: inherit; text-align: start; white-space: normal; }
+.shell .inventory-count-table .count-article { min-width: 190px; }
+.shell .inventory-count-table .count-quantity { min-width: 85px; }
+.shell .inventory-count-table .count-unit { min-width: 105px; }
+.shell .inventory-count-table .count-action { min-width: 135px; }
+.shell .inventory-count-table .count-notes { min-width: 105px; }
+.shell .inventory-count-table small { display: block; }
+.shell .inventory-count-dialog .search-select-display {
+  display: flex;
+  align-items: center;
+  padding: 5px 8px;
+  min-height: 42px;
+  border: 1px solid var(--admin-border);
+  border-radius: 8px;
+  background: var(--admin-surface);
+  overflow-wrap: anywhere;
+}
+.shell .inventory-count-dialog .search-select[data-wrap-selection]:not(:focus-within) > input {
+  position: absolute;
+  inset: 0;
+  height: 100%;
+  opacity: 0;
+  cursor: text;
+}
+.shell .inventory-count-dialog .search-select:focus-within .search-select-display { display: none; }
+.shell .inventory-count-table .count-row-summary { display: none; }
+.shell .inventory-count-table [data-direction="Entrada"] { color: var(--functional-success, var(--admin-primary)); }
+.shell .inventory-count-table [data-direction="Salida"] { color: var(--functional-error, var(--admin-heading)); }
+.shell .inventory-count-table .count-indicator { font-weight: 650; }
+.shell .inventory-count-footer > button:last-child { flex: 0 1 180px; }
+.shell .inventory-count-dialog .inventory-review { margin: 8px 0 0; padding: 10px; scroll-margin-block: 8px; }
+.shell .inventory-count-dialog .inventory-review h3 { margin: 0 0 6px; }
+@media (max-width: 760px) {
+  .shell .inventory-count-table > tbody > tr {
+    position: relative;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 6px;
+    padding: 8px;
+  }
+  .shell .inventory-count-table > tbody > tr > .count-article { order: -1; }
+  .shell .inventory-count-table > tbody > tr > :is(.count-article, .count-action, .count-notes) {
+    grid-column: 1 / -1;
+    min-width: 0;
+  }
+  .shell .inventory-count-table > tbody > tr > :is(.count-quantity, .count-unit) {
+    grid-column: span 3;
+    min-width: 0;
+  }
+  .shell .inventory-count-table > tbody > tr > .count-indicator {
+    grid-column: span 2;
+    background: var(--admin-secondary);
+    border-radius: 6px;
+    padding: 5px !important;
+  }
+  .shell .inventory-count-table > tbody > tr > :is(.count-index, .count-type, .mobile-row-toggle),
+  .shell .inventory-count-table .count-article > .mobile-cell-label,
+  .shell .inventory-count-table .count-remove > .mobile-cell-label {
+    display: none !important;
+  }
+  .shell .inventory-count-table > tbody > tr > .count-remove {
+    position: absolute;
+    inset: 8px 8px auto auto;
+    width: 44px !important;
+  }
+  .shell .inventory-count-table button.count-row-summary {
+    width: calc(100% - 50px);
+    display: flex;
+    justify-content: space-between;
+    align-items: start;
+    text-align: start;
+    gap: 6px;
+    margin: 0 0 4px;
+    padding: 4px !important;
+    color: var(--admin-heading);
+    background: var(--admin-surface);
+    border: 1px solid var(--admin-border);
+    border-radius: 8px;
+  }
+  .count-row-summary > span { min-width: 0; overflow-wrap: anywhere; }
+  .shell .inventory-count-table tr[data-count-collapsed="true"] > :not(.count-article, .count-remove),
+  .shell .inventory-count-table tr[data-count-collapsed="true"] .count-article-control {
+    display: none !important;
+  }
+  .shell .inventory-count-footer > button:last-child { flex: 1.4; }
+}

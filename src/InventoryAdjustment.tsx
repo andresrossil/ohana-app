@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { request } from "./commerce";
 import { keyedRequest, today, useOperation, type Row } from "./operations";
 import SearchSelect from "./SearchSelect";
@@ -8,7 +8,12 @@ import { AppButton, AppIcon } from "./AppIcon";
 import { confirmAction } from "./ConfirmDialog";
 import { parseTSV, formatTSV, parseNumber } from "./sheet-model";
 import { priceCost } from "./price-cost";
+import FormSection from "./FormSection";
+import { IconDetails } from "./PoolControls";
+import { useCompactFormViewport } from "./compact-form-viewport";
+import { inventoryCountPreview } from "./inventory-count-preview";
 import "./inventory-documents.css";
+import "./inventory-count.css";
 
 export const inventoryRequest = (
   company: string,
@@ -77,6 +82,10 @@ export default function InventoryAdjustment({
   countMode?: boolean;
 }) {
   const state = useOperation(company, "inventory");
+  const body = useRef<HTMLDivElement>(null);
+  const reviewSection = useRef<HTMLElement>(null);
+  const [collapsedRows, setCollapsedRows] = useState<Set<string>>(new Set());
+  useCompactFormViewport(body);
   const [cat, setCat] = useState<Row>({
       materials: [],
       variants: [],
@@ -94,6 +103,14 @@ export default function InventoryAdjustment({
     [review, setReview] = useState<Row | null>(null),
     [dirty, setDirty] = useState(false);
   useEffect(() => {
+    if (!countMode) return;
+    if (state.error) body.current?.scrollTo({ top: 0 });
+    else if (review) {
+      reviewSection.current?.focus({ preventScroll: true });
+      reviewSection.current?.scrollIntoView({ block: "start", inline: "nearest" });
+    }
+  }, [countMode, review, state.error]);
+  useEffect(() => {
     state.run(async () => {
       const c = await inventoryRequest(company, "catalog");
       setCat(c);
@@ -104,12 +121,14 @@ export default function InventoryAdjustment({
       ...m,
       key: "m:" + m.id,
       item_kind: "material",
+      displayName: m.name,
       label: [m.sku, m.name].filter(Boolean).join(" · "),
     })),
     ...cat.variants.map((v: Row) => ({
       ...v,
       key: "v:" + v.id,
       item_kind: "variant",
+      displayName: [v.product_name, v.label].filter(Boolean).join(" · "),
       label: [v.sku, v.product_name, v.label].filter(Boolean).join(" · "),
     })),
   ];
@@ -118,12 +137,18 @@ export default function InventoryAdjustment({
   const countActions:Record<string,string>={count:"Conteo real",adjust_in:"Entrada por ajuste",adjust_out:"Salida por ajuste"};
   const displayColumns=columns;
   const exportColumns:readonly (readonly [string,string])[]=countMode?[...columns,["count_action","Acción"]]:columns;
-  function countValues(r:Row){
-    const a=articles.find(x=>x.key===r.article),unit=cat.units.find((u:Row)=>u.id===r.unit_id),base=cat.units.find((u:Row)=>u.id===a?.unit_id);
-    const factor=a?.item_kind==="variant"?1:unit&&base?Number(unit.base_factor)/Number(base.base_factor):null;
-    const balance=cat.balances?.find((b:Row)=>b.item_kind===r.item_kind&&b.item_id===r.item_id);
-    const theoretical=a&&factor?Number(balance?.on_hand||0)/factor:null;
-    return {theoretical,difference:theoretical!=null&&r.quantity!==""?(r.count_action==="adjust_in"?Number(r.quantity):r.count_action==="adjust_out"?-Number(r.quantity):Number(r.quantity)-theoretical):null};
+  function countValues(r: Row) {
+    const article = articles.find(candidate => candidate.key === r.article);
+    const base = cat.units.find((unit: Row) => unit.id === article?.unit_id);
+    const unit = cat.units.find((candidate: Row) => candidate.id === r.unit_id) || base;
+    const factor = article?.item_kind === "variant" ? 1 : unit && base ? Number(unit.base_factor) / Number(base.base_factor) : null;
+    const balance = cat.balances?.find((candidate: Row) => candidate.item_kind === r.item_kind && candidate.item_id === r.item_id);
+    const theoretical = article && factor ? Number(balance?.on_hand || 0) / factor : null;
+    return inventoryCountPreview(theoretical, r.quantity, r.count_action || "count");
+  }
+  const countNumber = new Intl.NumberFormat("es-GT", { maximumFractionDigits: 8 });
+  function countText(value: number | null, unit?: string, signed = false) {
+    return value == null ? "—" : [signed && value > 0 ? "+" + countNumber.format(value) : countNumber.format(value), unit].filter(Boolean).join(" ");
   }
   function changed() {
     setDirty(true);
@@ -227,6 +252,10 @@ export default function InventoryAdjustment({
           if (a) r = selectArticle(r, a.key);
           else {
             r.article = "";
+            if (countMode) {
+              delete r.item_id;
+              delete r.item_kind;
+            }
             r.unresolved = value;
             errors.push(`Fila ${idx + 1}: artículo no identificado: ${value}`);
           }
@@ -323,429 +352,516 @@ export default function InventoryAdjustment({
     )
       onClose();
   }
+  function validateCountChoices() {
+    if (countMode && body.current?.querySelector("input[data-search-select]:invalid")) {
+      throw Error("Selecciona una opción válida en los campos de artículo, acción y unidad.");
+    }
+  }
   async function preview() {
     await state.run(async () => {
+      validateCountChoices();
       if (rows.some((r) => !r.item_id) && !reversal)
         throw Error("Selecciona un artículo válido en todas las filas.");
+      if (countMode) {
+        const missing = rows.findIndex(row => String(row.quantity ?? "").trim() === "");
+        if (missing !== -1) throw Error(`Fila ${missing + 1}: captura una cantidad. Escribe 0 si el conteo real es cero.`);
+      }
       setReview(
         await inventoryRequest(company, "review", await currentPayload()),
       );
     });
   }
+  const confirmButton = review && (
+    <AppButton
+      disabled={state.busy}
+      onClick={() =>
+        state.run(async () => {
+          validateCountChoices();
+          await keyedRequest(
+            company,
+            "inventory_command",
+            {
+              ...(await currentPayload()),
+              proof: review.proof,
+              acknowledged: true,
+            },
+            "confirm",
+          );
+          setDirty(false);
+          setReview(null);
+          try {
+            await onSaved();
+          } finally {
+            onClose();
+          }
+        })
+      }
+    >
+      Confirmar documento
+    </AppButton>
+  );
+  const reviewButton = (
+    <AppButton type="button" iconKey="action.confirm"
+      disabled={
+        state.busy || !reason.trim() || (!reversal && !rows.length)
+      }
+      onClick={preview}
+    >
+      Revisar documento
+    </AppButton>
+  );
+  const cancel = <AppButton type="button" className="secondary" disabled={state.busy} onClick={close}>Cancelar</AppButton>;
+  const documentFields = (
+    <div className={countMode ? "compact-form-grid" : "settings-grid"}>
+      {countMode?<div className="inventory-document-value"><strong>Tipo de movimiento</strong><span>Conteo físico · entrada o salida automática</span></div>:<label>
+        Tipo de movimiento
+        <SearchSelect
+          value={kind}
+          disabled={!!reversal || state.busy}
+          onChange={(e) => {
+            changed();
+            setKind(e.target.value);
+            setRows(
+              rows.map((r) => ({
+                ...r,
+                unit_cost: "",
+                lot_id: "",
+                individual_unit_id: "",
+              })),
+            );
+          }}
+        >
+          {[
+            ...(correction ? [] : ["opening"]),
+            "adjust_in",
+            "adjust_out",
+            ...(reversal ? ["reversal"] : []),
+          ].map((k) => (
+            <option key={k} value={k}>
+              {inventoryKinds[k]}
+            </option>
+          ))}
+        </SearchSelect>
+      </label>}
+      <label>
+        Fecha efectiva
+        <input
+          type="date"
+          max={today()}
+          value={date}
+          onChange={(e) => {
+            changed();
+            setDate(e.target.value);
+          }}
+        />
+      </label>
+      {countMode ? <div className="inventory-document-value"><strong>Número de documento</strong><span>Automático al confirmar · INV-000001…</span></div> : <label>
+        Número de documento
+        <input readOnly value="Automático al confirmar · INV-000001…" />
+      </label>}
+      <label>
+        Motivo obligatorio
+        <AutoTextarea
+          maxLength={500}
+          value={reason}
+          onChange={(e) => {
+            changed();
+            setReason(e.target.value);
+          }}
+        />
+      </label>
+      <label className={countMode ? "form-wide" : undefined}>
+        {countMode ? "Observaciones generales" : "Observaciones"}
+        {countMode ? <textarea rows={2} maxLength={2000} value={notes} onChange={(e) => {
+          changed();
+          setNotes(e.target.value);
+        }} /> : <AutoTextarea maxLength={2000} value={notes} onChange={(e) => {
+          changed();
+          setNotes(e.target.value);
+        }} />}
+      </label>
+    </div>
+  );
+  const pasteFields = (
+    <>
+      <div className={countMode ? "inventory-count-import" : "inventory-paste"}>
+        <label>
+          {countMode ? "Pega las filas aquí" : "Pegar filas desde Excel"}
+          <textarea
+            rows={2}
+            placeholder={columns.map((c) => c[1]).join(" | ")}
+            value=""
+            onChange={() => {}}
+            onPaste={(e) => {
+              e.preventDefault();
+              paste(e.clipboardData.getData("text"));
+            }}
+          />
+        </label>
+        {countMode?<IconDetails open={false} className="inventory-count-help">
+          <summary><AppIcon name="status.info" /> Ayuda para pegar filas</summary>
+          <p>Usa el nombre exacto, SKU o código de barras. Puedes incluir encabezados de artículo, cantidad, unidad, observaciones y acción.</p>
+          <p>Conteo real reemplaza el total físico y admite cero. Entrada por ajuste suma la cantidad y Salida por ajuste la resta. El sistema vuelve a validar las existencias al confirmar.</p>
+        </IconDetails>:<small>
+          Pega aquí sin crear filas. Usa SKU, nombre exacto o código de
+          barras existente. Ingresa únicamente cantidades. El costo
+          vigente se asigna automáticamente al confirmar. Las cantidades
+          siempre son positivas; el tipo determina entrada o salida.
+        </small>}
+      </div>
+      <div className={countMode ? "inventory-count-tools" : "actions"}>
+        <AppButton
+          className="secondary"
+          disabled={state.busy}
+          onClick={() => {
+            changed();
+            setRows([...rows, empty()]);
+          }}
+        >
+          Agregar fila
+        </AppButton>
+        <AppButton
+          className="secondary"
+          onClick={() =>
+            state.run(async () => {
+              await navigator.clipboard.writeText(
+                formatTSV([
+                  exportColumns.map((c) => c[1]),
+                  ...rows.map((r) =>
+                    exportColumns.map(([key]) =>
+                      key === "count_action"?countActions[r.count_action||"count"]:key === "article"
+                        ? articles.find((a) => a.key === r.article)
+                            ?.sku ||
+                          (countMode ? articles.find((a) => a.key === r.article)?.label : "") ||
+                          r.unresolved ||
+                          ""
+                        : key === "unit"
+                          ? cat.units.find(
+                              (u: Row) => u.id === r.unit_id,
+                            )?.symbol || ""
+                          : key === "lot"
+                            ? outgoing
+                              ? r.lot_id
+                              : r.lot_label
+                            : String(r[key] ?? ""),
+                    ),
+                  ),
+                ]),
+              );
+            })
+          }
+        >
+          Copiar tabla
+        </AppButton>
+      </div>
+
+    </>
+  );
+  const itemTable = (
+    <div className="table-wrap">
+      <ResponsiveTable
+        className={countMode ? "inventory-count-table" : "inventory-edit-table"}
+        onSortRows={(indexes) => {
+          setReview(null);
+          setRows(indexes.map((i) => rows[i]));
+        }}
+      >
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Tipo de artículo</th>
+            {countMode&&<th>Acción</th>}
+            {displayColumns.map((c) => (
+              <th key={c[0]}>{c[1]}</th>
+            ))}
+            {countMode&&<><th>Existencia teórica</th><th>Existencia resultante</th><th>Diferencia</th></>}
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r, i) => {
+            const a = articles.find((a) => a.key === r.article),
+              bu = cat.units.find((u: Row) => u.id === a?.unit_id);
+            const values = countMode ? countValues(r) : null;
+            const unit = countMode ? cat.units.find((u: Row) => u.id === (r.unit_id || a?.unit_id))?.symbol : undefined;
+            const rowOpen = !collapsedRows.has(r.line_key);
+            const direction = values?.difference == null ? "Pendiente"
+              : values.difference > 0 ? "Entrada" : values.difference < 0 ? "Salida" : "Sin diferencia";
+            const action = countActions[r.count_action || "count"];
+            return (
+              <tr key={r.line_key} data-count-collapsed={countMode && !rowOpen ? "true" : undefined}>
+                <td className={countMode ? "count-index" : undefined}>{i + 1}</td>
+                <td className={countMode ? "count-type" : undefined}>
+                  {r.item_kind === "material"
+                    ? "Material"
+                    : r.item_kind === "variant"
+                      ? "Producto terminado"
+                      : "—"}
+                </td>
+                {countMode&&<td className="count-action"><SearchSelect wrapSelection aria-label="Acción de inventario" value={r.count_action||"count"} onChange={e=>update(i,{count_action:e.target.value})}>{Object.entries(countActions).map(([key,label])=><option key={key} value={key}>{label}</option>)}</SearchSelect><small>{r.count_action==="adjust_in"?"Suma la cantidad encontrada":r.count_action==="adjust_out"?"Resta la cantidad indicada":"Captura el total físico real"}</small></td>}
+                {columns.map(([key], ci) => (
+                  <td
+                    key={key}
+                    className={countMode ? "count-field count-" + key : undefined}
+                    onPaste={(e) => {
+                      if (
+                        e.clipboardData
+                          .getData("text")
+                          .includes("\t") ||
+                        e.clipboardData.getData("text").includes("\n")
+                      ) {
+                        e.preventDefault();
+                        paste(e.clipboardData.getData("text"), i, ci);
+                      }
+                    }}
+                  >
+                    {key === "article" ? (
+                      <>
+                        {countMode && <button type="button" className="count-row-summary" aria-expanded={rowOpen}
+                          onClick={() => setCollapsedRows(old => {
+                            const next = new Set(old);
+                            if (next.has(r.line_key)) next.delete(r.line_key);
+                            else next.add(r.line_key);
+                            return next;
+                          })}>
+                          <span><strong>{a?.displayName || r.unresolved || `Artículo ${i + 1}`}</strong>
+                            {a?.sku && <small>SKU {a.sku}</small>}
+                            {!rowOpen && <small>{action} · {r.quantity === "" ? "Sin cantidad" : [r.quantity, unit].filter(Boolean).join(" ")} · Diferencia {countText(values?.difference ?? null, unit, true)}</small>}
+                          </span>
+                          <AppIcon name={rowOpen ? "action.collapse" : "action.expand"} />
+                        </button>}
+                        <div className={countMode ? "count-article-control" : undefined}>
+                        <SearchSelect
+                          aria-label={countMode ? "Buscar artículo por nombre, SKU o código de barras" : undefined}
+                          resolveText={countMode ? value => findArticle(value)?.key : undefined}
+                          wrapSelection={countMode}
+                          value={r.article}
+                          onChange={(e) =>
+                            update(
+                              i,
+                              selectArticle(r, e.target.value),
+                            )
+                          }
+                        >
+                          <option value="">
+                            {countMode ? "Nombre, SKU o código de barras" : "Seleccionar artículo"}
+                          </option>
+                          {articles.map((a) => (
+                            <option key={a.key} value={a.key}>
+                              {countMode && a.barcode && a.barcode !== a.sku ? `${a.label} · ${a.barcode}` : a.label}
+                            </option>
+                          ))}
+                        </SearchSelect>
+                        {r.unresolved && (
+                          <small className="error">
+                            {r.unresolved}
+                          </small>
+                        )}
+                        </div>
+                      </>
+                    ) : key === "unit" ? (
+                      <SearchSelect
+                        aria-label={countMode ? "Unidad de medida" : undefined}
+                        wrapSelection={countMode}
+                        value={r.unit_id}
+                        onChange={(e) => {
+                          update(i, {
+                            unit_id: e.target.value,
+                          });
+                        }}
+                      >
+                        <option value="">Seleccionar</option>
+                        {cat.units
+                          .filter((x: Row) =>
+                            a?.item_kind === "variant"
+                              ? x.dimension === "count" &&
+                                Number(x.base_factor) === 1
+                              : !bu || x.dimension === bu.dimension,
+                          )
+                          .map((u: Row) => (
+                            <option key={u.id} value={u.id}>
+                              {u.name} ({u.symbol})
+                            </option>
+                          ))}
+                      </SearchSelect>
+                    ) : key === "notes" && countMode ? (
+                      <textarea aria-label="Observaciones de la línea" rows={2} value={r.notes} maxLength={1000}
+                        onChange={e => update(i, { notes: e.target.value })} />
+                    ) : key === "notes" ? (
+                      <AutoTextarea
+                        value={r.notes}
+                        maxLength={1000}
+                        onChange={(e) =>
+                          update(i, { notes: e.target.value })
+                        }
+                      />
+                    ) : (
+                      <input
+                        type={
+                          ["weight", "quantity"].includes(key)
+                            ? "number"
+                            : "text"
+                        }
+                        step="any"
+                        min="0"
+                        aria-label={countMode ? "Cantidad" : undefined}
+                        inputMode={countMode ? "decimal" : undefined}
+                        readOnly={outgoing && key === "weight"}
+                        value={r[key] ?? ""}
+                        onChange={(e) =>
+                          update(i, { [key]: e.target.value })
+                        }
+                      />
+                    )}
+                  </td>
+                ))}
+
+                {values && <>
+                  <td className="count-indicator count-theory" data-sort-value={values.theoretical ?? ""}>{countText(values.theoretical, unit)}</td>
+                  <td className="count-indicator count-result" data-sort-value={values.resulting ?? ""}>{countText(values.resulting, unit)}</td>
+                  <td className="count-indicator count-difference" data-sort-value={values.difference ?? ""} data-direction={direction}>
+                    {countText(values.difference, unit, true)}
+                    <small>{direction}</small>
+                  </td>
+                </>}
+                <td className={countMode ? "count-remove" : undefined}>
+                  <AppButton
+                    type="button"
+                    className={countMode ? "secondary catalog-icon-button" : "danger"}
+                    iconKey={countMode ? "action.cancel" : undefined}
+                    aria-label={countMode ? `Quitar línea ${i + 1}` : undefined}
+                    title={countMode ? "Quitar línea" : undefined}
+                    disabled={state.busy}
+                    onClick={() => {
+                      changed();
+                      setRows(rows.filter((_, j) => j !== i));
+                    }}
+                  >
+                    {countMode ? null : "Quitar"}
+                  </AppButton>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </ResponsiveTable>
+    </div>
+  );
+  const reviewContent = (
+    <>
+      {review && (
+        <section className="inventory-review" ref={countMode ? reviewSection : undefined} tabIndex={countMode ? -1 : undefined}>
+          <h3>Revisar documento · {review.line_count} líneas</h3>
+          {countMode&&<p>{review.changed_count} artículos con diferencia · {review.unchanged_count} sin movimiento. Las filas sin diferencia se conservarán en la captura histórica y no generarán entradas ni salidas.</p>}
+          <p>
+            {inventoryKinds[review.kind]} · {review.date} · {review.reason}
+          </p>
+          <p>
+            {review.quantity_totals
+              ?.map((x: Row) => `${num(x.quantity)} ${x.unit}`)
+              .join(" · ")}{" "}
+          </p>
+          <div className="table-wrap">
+            <ResponsiveTable>
+              <thead>
+                <tr>
+                  {(countMode?["Artículo","Acción","Cantidad capturada","Teórico","Existencia resultante","Diferencia","Movimiento","Unidad"]:["Artículo", "Cantidad", "Unidad"]).map((h) => (
+                    <th key={h}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {(countMode?review.counts:review.lines).map((r: Row) => (
+                  <tr key={r.line_key}>
+                    <td>
+                      {(r.snapshot||r).sku} · {(r.snapshot||r).name}
+                      <small>{(r.snapshot||r).variant}</small>
+                    </td>
+                    {countMode?<><td>{countActions[r.action||"count"]}</td><td data-sort-value={r.captured_quantity??r.actual}>{countText(r.captured_quantity??r.actual)}</td><td data-sort-value={r.theoretical}>{countText(r.theoretical)}</td><td data-sort-value={r.actual}>{countText(r.actual)}</td><td data-sort-value={r.difference}>{countText(r.difference, undefined, true)}</td><td>{Number(r.difference)>0?"Entrada":Number(r.difference)<0?"Salida":"Sin movimiento"}</td><td>{r.unit}</td></>:<><td data-sort-value={r.quantity}>{num(r.quantity)}</td><td>{r.snapshot.input_unit}</td></>}
+                  </tr>
+                ))}
+              </tbody>
+            </ResponsiveTable>
+          </div>
+          {review.warnings.length > 0 && (
+              <ul>
+                {review.warnings.map((s: string, i: number) => (
+                  <li key={i}>{s}</li>
+                ))}
+              </ul>
+          )}
+          {countMode && confirmButton}
+        </section>
+      )}
+
+    </>
+  );
+  const alerts = (
+    <>
+      {reversal && (
+        <p className="inventory-hint">
+          La reversión utiliza las líneas y costos históricos del documento
+          original. Solo puede confirmarse si las existencias y unidades
+          correspondientes están disponibles.
+        </p>
+      )}
+      {correction && (
+        <p className="inventory-hint">
+          Corrección vinculada al documento {correction}. Registra
+          únicamente la diferencia de entrada o salida; el original se
+          conserva.
+        </p>
+      )}
+      {state.error && (
+        <p className="error" role="alert">
+          <AppIcon name="status.error" />
+          {state.error}
+        </p>
+      )}
+
+    </>
+  );
   return (
-    <div className="overlay">
+    <div className={countMode ? "overlay compact-form-overlay" : "overlay"}>
       <section
-        className="modal inventory-adjustment"
+        className={countMode ? "modal inventory-adjustment compact-form-dialog inventory-count-dialog" : "modal inventory-adjustment"}
         role="dialog"
         aria-modal="true"
-        aria-label={countMode?"Conteo de inventario":"Ajuste de existencias"}
+        aria-label={countMode ? "Conteo de inventario" : "Ajuste de existencias"}
         data-navigation-dirty={dirty}
         aria-busy={state.busy}
       >
-        <header className="catalog-head">
-          <h2>{countMode?"Conteo de inventario":"Ajuste de existencias"}</h2>
-          <AppButton
-            className="secondary"
-            disabled={state.busy}
-            onClick={close}
-          >
-            Cerrar
-          </AppButton>
-        </header>
-        <fieldset disabled={state.busy}>
-          <div className="settings-grid">
-            {countMode?<label>Tipo de registro<input readOnly value="Conteo físico · entrada o salida automática"/></label>:<label>
-              Tipo de movimiento
-              <SearchSelect
-                value={kind}
-                disabled={!!reversal || state.busy}
-                onChange={(e) => {
-                  changed();
-                  setKind(e.target.value);
-                  setRows(
-                    rows.map((r) => ({
-                      ...r,
-                      unit_cost: "",
-                      lot_id: "",
-                      individual_unit_id: "",
-                    })),
-                  );
-                }}
-              >
-                {[
-                  ...(correction ? [] : ["opening"]),
-                  "adjust_in",
-                  "adjust_out",
-                  ...(reversal ? ["reversal"] : []),
-                ].map((k) => (
-                  <option key={k} value={k}>
-                    {inventoryKinds[k]}
-                  </option>
-                ))}
-              </SearchSelect>
-            </label>}
-            <label>
-              Fecha efectiva
-              <input
-                type="date"
-                max={today()}
-                value={date}
-                onChange={(e) => {
-                  changed();
-                  setDate(e.target.value);
-                }}
-              />
-            </label>
-            <label>
-              Número de documento
-              <input readOnly value="Automático al confirmar · INV-000001…" />
-            </label>
-            <label>
-              Motivo obligatorio
-              <AutoTextarea
-                maxLength={500}
-                value={reason}
-                onChange={(e) => {
-                  changed();
-                  setReason(e.target.value);
-                }}
-              />
-            </label>
-            <label>
-              Observaciones
-              <AutoTextarea
-                maxLength={2000}
-                value={notes}
-                onChange={(e) => {
-                  changed();
-                  setNotes(e.target.value);
-                }}
-              />
-            </label>
+        {countMode ? <>
+          <div className="compact-form-header">
+            <h2>Conteo de inventario</h2>
+            <AppButton type="button" className="secondary catalog-icon-button" iconKey="action.cancel"
+              aria-label="Cerrar conteo de inventario" title="Cerrar" disabled={state.busy} onClick={close} />
           </div>
-          {reversal && (
-            <p className="inventory-hint">
-              La reversión utiliza las líneas y costos históricos del documento
-              original. Solo puede confirmarse si las existencias y unidades
-              correspondientes están disponibles.
-            </p>
-          )}
-          {correction && (
-            <p className="inventory-hint">
-              Corrección vinculada al documento {correction}. Registra
-              únicamente la diferencia de entrada o salida; el original se
-              conserva.
-            </p>
-          )}
-          {state.error && (
-            <p className="error" role="alert">
-              <AppIcon name="status.error" />
-              {state.error}
-            </p>
-          )}
-          {!reversal && (
-            <>
-              <section className="inventory-paste">
-                <label>
-                  Pegar filas desde Excel
-                  <textarea
-                    rows={2}
-                    placeholder={columns.map((c) => c[1]).join(" | ")}
-                    value=""
-                    onChange={() => {}}
-                    onPaste={(e) => {
-                      e.preventDefault();
-                      paste(e.clipboardData.getData("text"));
-                    }}
-                  />
-                </label>
-                {countMode?<small>Elige la acción por línea. Conteo real reemplaza el total físico (cero es válido). Entrada por ajuste suma solo la cantidad adicional encontrada; Salida por ajuste resta la cantidad indicada. El teórico se valida nuevamente antes de confirmar.</small>:<small>
-                  Pega aquí sin crear filas. Usa SKU, nombre exacto o código de
-                  barras existente. Ingresa únicamente cantidades. El costo
-                  vigente se asigna automáticamente al confirmar. Las cantidades
-                  siempre son positivas; el tipo determina entrada o salida.
-                </small>}
-              </section>
-              <div className="actions">
-                <AppButton
-                  className="secondary"
-                  disabled={state.busy}
-                  onClick={() => {
-                    changed();
-                    setRows([...rows, empty()]);
-                  }}
-                >
-                  Agregar fila
-                </AppButton>
-                <AppButton
-                  className="secondary"
-                  onClick={() =>
-                    state.run(async () => {
-                      await navigator.clipboard.writeText(
-                        formatTSV([
-                          exportColumns.map((c) => c[1]),
-                          ...rows.map((r) =>
-                            exportColumns.map(([key]) =>
-                              key === "count_action"?countActions[r.count_action||"count"]:key === "article"
-                                ? articles.find((a) => a.key === r.article)
-                                    ?.sku ||
-                                  r.unresolved ||
-                                  ""
-                                : key === "unit"
-                                  ? cat.units.find(
-                                      (u: Row) => u.id === r.unit_id,
-                                    )?.symbol || ""
-                                  : key === "lot"
-                                    ? outgoing
-                                      ? r.lot_id
-                                      : r.lot_label
-                                    : String(r[key] ?? ""),
-                            ),
-                          ),
-                        ]),
-                      );
-                    })
-                  }
-                >
-                  Copiar tabla
-                </AppButton>
-              </div>
-              <div className="table-wrap">
-                <ResponsiveTable
-                  className="inventory-edit-table"
-                  onSortRows={(indexes) => {
-                    setReview(null);
-                    setRows(indexes.map((i) => rows[i]));
-                  }}
-                >
-                  <thead>
-                    <tr>
-                      <th>#</th>
-                      <th>Tipo de artículo</th>
-                      {countMode&&<th>Acción</th>}
-                      {displayColumns.map((c) => (
-                        <th key={c[0]}>{c[1]}</th>
-                      ))}
-                      {countMode&&<><th>Teórico</th><th>Diferencia</th></>}
-                      <th>Acciones</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {rows.map((r, i) => {
-                      const a = articles.find((a) => a.key === r.article),
-                        bu = cat.units.find((u: Row) => u.id === a?.unit_id);
-                      return (
-                        <tr key={r.line_key}>
-                          <td>{i + 1}</td>
-                          <td>
-                            {r.item_kind === "material"
-                              ? "Material"
-                              : r.item_kind === "variant"
-                                ? "Producto terminado"
-                                : "—"}
-                          </td>
-                          {countMode&&<td><SearchSelect aria-label="Acción de inventario" value={r.count_action||"count"} onChange={e=>update(i,{count_action:e.target.value})}>{Object.entries(countActions).map(([key,label])=><option key={key} value={key}>{label}</option>)}</SearchSelect><small>{r.count_action==="adjust_in"?"Suma la cantidad encontrada":r.count_action==="adjust_out"?"Resta la cantidad indicada":"Captura el total físico real"}</small></td>}
-                          {columns.map(([key], ci) => (
-                            <td
-                              key={key}
-                              onPaste={(e) => {
-                                if (
-                                  e.clipboardData
-                                    .getData("text")
-                                    .includes("\t") ||
-                                  e.clipboardData.getData("text").includes("\n")
-                                ) {
-                                  e.preventDefault();
-                                  paste(e.clipboardData.getData("text"), i, ci);
-                                }
-                              }}
-                            >
-                              {key === "article" ? (
-                                <>
-                                  <SearchSelect
-                                    value={r.article}
-                                    onChange={(e) =>
-                                      update(
-                                        i,
-                                        selectArticle(r, e.target.value),
-                                      )
-                                    }
-                                  >
-                                    <option value="">
-                                      Seleccionar artículo
-                                    </option>
-                                    {articles.map((a) => (
-                                      <option key={a.key} value={a.key}>
-                                        {a.label}
-                                      </option>
-                                    ))}
-                                  </SearchSelect>
-                                  {r.unresolved && (
-                                    <small className="error">
-                                      {r.unresolved}
-                                    </small>
-                                  )}
-                                </>
-                              ) : key === "unit" ? (
-                                <SearchSelect
-                                  value={r.unit_id}
-                                  onChange={(e) => {
-                                    update(i, {
-                                      unit_id: e.target.value,
-                                    });
-                                  }}
-                                >
-                                  <option value="">Seleccionar</option>
-                                  {cat.units
-                                    .filter((x: Row) =>
-                                      a?.item_kind === "variant"
-                                        ? x.dimension === "count" &&
-                                          Number(x.base_factor) === 1
-                                        : !bu || x.dimension === bu.dimension,
-                                    )
-                                    .map((u: Row) => (
-                                      <option key={u.id} value={u.id}>
-                                        {u.name} ({u.symbol})
-                                      </option>
-                                    ))}
-                                </SearchSelect>
-                              ) : key === "notes" ? (
-                                <AutoTextarea
-                                  value={r.notes}
-                                  maxLength={1000}
-                                  onChange={(e) =>
-                                    update(i, { notes: e.target.value })
-                                  }
-                                />
-                              ) : (
-                                <input
-                                  type={
-                                    ["weight", "quantity"].includes(key)
-                                      ? "number"
-                                      : "text"
-                                  }
-                                  step="any"
-                                  min="0"
-                                  readOnly={outgoing && key === "weight"}
-                                  value={r[key] ?? ""}
-                                  onChange={(e) =>
-                                    update(i, { [key]: e.target.value })
-                                  }
-                                />
-                              )}
-                            </td>
-                          ))}
-
-                          {countMode&&<><td data-sort-value={countValues(r).theoretical}>{num(countValues(r).theoretical)}</td><td data-sort-value={countValues(r).difference} className={Number(countValues(r).difference)<0?"balance-debt":"balance-credit"}>{num(countValues(r).difference)}</td></>}
-                          <td>
-                            <AppButton
-                              className="danger"
-                              disabled={state.busy}
-                              onClick={() => {
-                                changed();
-                                setRows(rows.filter((_, j) => j !== i));
-                              }}
-                            >
-                              Quitar
-                            </AppButton>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </ResponsiveTable>
-              </div>
-            </>
-          )}
-          {review && (
-            <section className="inventory-review">
-              <h3>Revisar documento · {review.line_count} líneas</h3>
-              {countMode&&<p>{review.changed_count} artículos con diferencia · {review.unchanged_count} sin movimiento. Las filas sin diferencia se conservarán en la captura histórica y no generarán entradas ni salidas.</p>}
-              <p>
-                {inventoryKinds[review.kind]} · {review.date} · {review.reason}
-              </p>
-              <p>
-                {review.quantity_totals
-                  ?.map((x: Row) => `${num(x.quantity)} ${x.unit}`)
-                  .join(" · ")}{" "}
-              </p>
-              <div className="table-wrap">
-                <ResponsiveTable>
-                  <thead>
-                    <tr>
-                      {(countMode?["Artículo","Acción","Cantidad capturada","Teórico","Existencia resultante","Diferencia","Movimiento","Unidad"]:["Artículo", "Cantidad", "Unidad"]).map((h) => (
-                        <th key={h}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(countMode?review.counts:review.lines).map((r: Row) => (
-                      <tr key={r.line_key}>
-                        <td>
-                          {(r.snapshot||r).sku} · {(r.snapshot||r).name}
-                          <small>{(r.snapshot||r).variant}</small>
-                        </td>
-                        {countMode?<><td>{countActions[r.action||"count"]}</td><td data-sort-value={r.captured_quantity??r.actual}>{num(r.captured_quantity??r.actual)}</td><td data-sort-value={r.theoretical}>{num(r.theoretical)}</td><td data-sort-value={r.actual}>{num(r.actual)}</td><td data-sort-value={r.difference}>{num(r.difference)}</td><td>{Number(r.difference)>0?"Entrada":Number(r.difference)<0?"Salida":"Sin movimiento"}</td><td>{r.unit}</td></>:<><td data-sort-value={r.quantity}>{num(r.quantity)}</td><td>{r.snapshot.input_unit}</td></>}
-                      </tr>
-                    ))}
-                  </tbody>
-                </ResponsiveTable>
-              </div>
-              {review.warnings.length > 0 && (
-                  <ul>
-                    {review.warnings.map((s: string, i: number) => (
-                      <li key={i}>{s}</li>
-                    ))}
-                  </ul>
-              )}
-            </section>
-          )}
-          <div className="actions">
-            <AppButton
-              disabled={
-                state.busy || !reason.trim() || (!reversal && !rows.length)
-              }
-              onClick={preview}
-            >
-              Revisar documento
-            </AppButton>
-            {review && (
-              <AppButton
-                disabled={state.busy}
-                onClick={() =>
-                  state.run(async () => {
-                    await keyedRequest(
-                      company,
-                      "inventory_command",
-                      {
-                        ...(await currentPayload()),
-                        proof: review.proof,
-                        acknowledged: true,
-                      },
-                      "confirm",
-                    );
-                    setDirty(false);
-                    setReview(null);
-                    try {
-                      await onSaved();
-                    } finally {
-                      onClose();
-                    }
-                  })
-                }
-              >
-                Confirmar documento
-              </AppButton>
-            )}
-            <AppButton
-              className="secondary"
-              disabled={state.busy}
-              onClick={close}
-            >
-              Cancelar
-            </AppButton>
-          </div>
-        </fieldset>
+          <fieldset className="compact-form" disabled={state.busy}>
+            <div ref={body} className="compact-form-body">
+              {alerts}
+              <FormSection title="Datos del documento" icon="status.info">{documentFields}</FormSection>
+              <FormSection title="Pegar filas desde Excel" icon="action.upload">{pasteFields}</FormSection>
+              <FormSection title="Detalle de artículos" icon="module.inventory">
+                {rows.length ? itemTable : <p className="muted">Agrega una fila o pega artículos desde Excel.</p>}
+              </FormSection>
+              {reviewContent}
+            </div>
+            <div className="compact-form-actions inventory-count-footer">{cancel}{reviewButton}</div>
+          </fieldset>
+        </> : <>
+          <header className="catalog-head">
+            <h2>Ajuste de existencias</h2>
+            <AppButton className="secondary" disabled={state.busy} onClick={close}>Cerrar</AppButton>
+          </header>
+          <fieldset disabled={state.busy}>
+            {documentFields}
+            {alerts}
+            {!reversal && <>{pasteFields}{itemTable}</>}
+            {reviewContent}
+            <div className="actions">{reviewButton}{confirmButton}{cancel}</div>
+          </fieldset>
+        </>}
       </section>
     </div>
   );
