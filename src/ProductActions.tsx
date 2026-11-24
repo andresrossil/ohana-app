@@ -2,10 +2,11 @@ import { useId, useRef } from "react";
 import { EllipsisVertical } from "lucide-react";
 import { AppButton } from "./AppIcon";
 
-export default function ProductActions({ name, onEdit, onBarcode }: {
+export default function ProductActions({ name, onEdit, onBarcode, onDelete }: {
   name: string;
   onEdit?: () => void;
   onBarcode?: () => void;
+  onDelete?: () => void;
 }) {
   const id = useId();
   const menu = useRef<HTMLDivElement>(null);
@@ -23,7 +24,7 @@ export default function ProductActions({ name, onEdit, onBarcode }: {
         if (!panel) return;
         const anchor = event.currentTarget.getBoundingClientRect();
         const below = anchor.bottom + 5;
-        const needed = 18 + 48 * (Number(Boolean(onEdit)) + Number(Boolean(onBarcode)));
+        const needed = 18 + 48 * (Number(Boolean(onEdit)) + Number(Boolean(onBarcode)) + Number(Boolean(onDelete)));
         panel.style.top = `${below + needed <= window.innerHeight ? below : Math.max(0, anchor.top - needed)}px`;
         panel.style.right = `${Math.max(8, window.innerWidth - anchor.right)}px`;
       }}>
@@ -33,6 +34,7 @@ export default function ProductActions({ name, onEdit, onBarcode }: {
       {onEdit && <AppButton type="button" className="secondary" iconKey="action.edit" onClick={() => choose(onEdit)}>Editar</AppButton>}
       {onBarcode && <AppButton type="button" className="secondary" iconKey="action.barcode"
         onClick={() => choose(onBarcode)}>Código de barras</AppButton>}
+      {onDelete && <AppButton type="button" className="danger" iconKey="action.delete" onClick={() => choose(onDelete)}>Eliminar variante</AppButton>}
     </div>
   </>;
 }

@@ -4,17 +4,16 @@ import { weightRangeError } from "./variant-weights";
 import { AppButton, AppIcon } from "./AppIcon";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, Suspense } from "react";
 import { lazyWithRecovery as lazy } from "./lazy-module";
-import { operation, mutate, useOperation, money, type Row } from "./operations";
+import { operation, mutate, useOperation, type Row } from "./operations";
 import { request } from "./commerce";
 import { usePriceRefresh, pricesChanged } from "./price-events";
 import VariantSheet, { copyVariantRows } from "./VariantSheet";
-
+import VariantCard, { variantEstimatedCost } from "./VariantCard";
 import VariantForm, { standardVariantAttributes } from "./VariantForm";
 import { SearchField } from "./PoolControls";
+import SearchSelect from "./SearchSelect";
 import { variantMatches } from "./variant-catalog-search";
-import ResponsiveTable from "./ResponsiveTable";
-import CatalogBadge from "./CatalogBadge";
-import { weightRangeLabel } from "./variant-weights";
+import { compareCells } from "./table-sort";
 import "./variant-manager.css";
 import { variantLabel } from "./variant-label";
 const BarcodeDialog = lazy(() => import("./BarcodeDialog"));
@@ -41,13 +40,30 @@ export default function VariantManager({
   const [sheetDirty, setSheetDirty] = useState(false);
   const state = useOperation(company, "catalog");
   const [query, setQuery] = useState("");
+  const [order, setOrder] = useState("");
   const catalogDialog = useRef<HTMLElement>(null);
   const savedPosition = useRef<{ top: number; trigger: HTMLElement | null } | null>(null);
   const attributeKeys = useMemo(() => [...new Set([
     ...standardVariantAttributes,
     ...rows.flatMap(row => Object.keys(row.attributes || {})),
   ])], [rows]);
+  const estimates = useMemo(() => new Map(rows.map(row => [
+    row.id, costData.catalog ? priceCost(row, costData.formulas, costData.catalog, row) : null,
+  ])), [rows, costData]);
+  const sortFields = [
+    ["name", "Variante"], ["sku", "SKU"], ["barcode", "Código de barras"], ["weight_min", "Peso mínimo"],
+    ["price", "Precio"], ["cost", "Costo estimado"], ["available", "Disponible"], ["blocked", "En curación"],
+  ];
   const visibleRows = rows.filter(row => variantMatches(query, row));
+  if (order) {
+    const [field, direction] = order.split(":");
+    function fieldValue(row: Row) {
+      if (field === "name") return variantLabel(row);
+      if (field === "cost") return variantEstimatedCost(estimates.get(row.id) ?? null);
+      return row[field];
+    }
+    visibleRows.sort((a, b) => compareCells(fieldValue(a), fieldValue(b), direction === "desc" ? "desc" : "asc"));
+  }
   useLayoutEffect(() => {
     if (edit !== undefined || state.busy || !savedPosition.current || !catalogDialog.current) return;
     const position = savedPosition.current;
@@ -180,74 +196,23 @@ export default function VariantManager({
             </div>
             <div className="variant-search-tools">
               <SearchField aria-label="Buscar variantes" placeholder="Buscar por nombre, SKU o características…" value={query} onChange={event => setQuery(event.target.value)} />
+              <SearchSelect aria-label="Ordenar variantes" value={order} onChange={event => setOrder(event.target.value)}>
+                <option value="">Orden del catálogo</option>
+                {sortFields.flatMap(([field, label]) => [
+                  <option key={field + ":asc"} value={field + ":asc"}>{label} · ascendente</option>,
+                  <option key={field + ":desc"} value={field + ":desc"}>{label} · descendente</option>,
+                ])}
+              </SearchSelect>
             </div>
-        {!sheet && (
-          <div className="table-wrap">
-            <ResponsiveTable>
-              <thead>
-                <tr>
-                  <th>Variante</th>
-                  <th>SKU / barras</th>
-                  <th>Peso</th>
-                  <th className="base-price-heading">
-                    {baseName ? "PRECIO · " + baseName : "PRECIO DE LISTA BASE"}
-                  </th>
-                  <th>Costo estimado por variante</th>
-                  <th>Disponible / curación</th>
-                  <th>Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {visibleRows.map((r) => (
-                  <tr key={r.id}>
-                    <td>
-                      <span className="admin-name">{variantLabel(r)}</span>
-                      <small>
-                        <CatalogBadge
-                          active={r.active}
-                          label={r.active ? "Activa" : "Archivada"}
-                        />
-                      </small>
-                    </td>
-                    <td>
-                      {r.sku}
-                      <small>{r.barcode || "Sin código de barras"}</small>
-                    </td>
-                    <td>{weightRangeLabel({ ...r, id: r.id })}</td>
-                    <td>
-                      {r.price == null
-                        ? "Pendiente de precio"
-                        : money(r.price, r.currency)}
-                    </td>
-                    <td>
-                      <VariantEstimate variant={r} data={costData} />
-                    </td>
-                    <td>
-                      {r.available} / {r.blocked}
-                    </td>
-                    <td className="actions">
-                      {state.canWrite && (
-                        <AppButton onClick={() => setEdit(r)}>Editar</AppButton>
-                      )}
-                      {r.barcode && (
-                        <AppButton onClick={() => setBarcode(r)}>
-                          Barras
-                        </AppButton>
-                      )}
-                      {state.canWrite && edit === undefined && (
-                        <AppButton className="danger" iconKey="action.delete" disabled={state.busy}
-                          onClick={() => void removeVariant(r)}>Eliminar</AppButton>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </ResponsiveTable>
+            <div className="variant-cards">
+              {visibleRows.map(row => <VariantCard key={row.id} variant={row} estimate={estimates.get(row.id) ?? null}
+                priceList={baseName} onEdit={state.canWrite && !state.busy ? () => openEditor(row) : undefined}
+                onBarcode={row.barcode ? () => setBarcode(row) : undefined}
+                onDelete={state.canWrite && !state.busy ? () => void removeVariant(row) : undefined} />)}
+            </div>
             {!visibleRows.length && <p className="empty" role="status">{state.busy ? "Consultando variantes…" : rows.length
               ? "No hay variantes que coincidan con la búsqueda."
               : "Agrega la primera variante para producir o vender este producto."}</p>}
-          </div>
-        )}
           </>}
         </div>
       </section>
@@ -260,50 +225,4 @@ export default function VariantManager({
       </Suspense>
     )}
   </>;
-}
-
-function VariantEstimate({ variant, data }: { variant: Row; data: Row }) {
-  if (!data.catalog)
-    return (
-      <>
-        Pendiente<small>Sin información de fórmula o permiso de costos.</small>
-      </>
-    );
-  const estimate = priceCost(variant, data.formulas, data.catalog, variant);
-  return (
-    <>
-      <strong>
-        {estimate.manufacturingCost == null
-          ? estimate.cost == null
-            ? "Pendiente"
-            : money(estimate.cost, variant.currency)
-          : money(estimate.manufacturingCost, variant.currency)}
-      </strong>
-      {estimate.costPerGram != null && (
-        <small>
-          {Number(estimate.midpoint).toLocaleString("es-GT", {
-            maximumFractionDigits: 2,
-          })}{" "}
-          g × {money(estimate.costPerGram, variant.currency)} / g
-        </small>
-      )}
-      {estimate.packagingUnit != null && (
-        <small>
-          Empaque por unidad: {money(estimate.packagingUnit, variant.currency)}{" "}
-          · Insumos por unidad: {money(estimate.suppliesUnit, variant.currency)}
-        </small>
-      )}
-      {estimate.manufacturingCost != null && (
-        <small>
-          Costo total con gastos: {money(estimate.cost, variant.currency)}
-        </small>
-      )}
-      {estimate.expenses != null && (
-        <small>
-          Gastos por unidad: {money(estimate.expenses, variant.currency)}
-        </small>
-      )}
-      <small>{estimate.reason}</small>
-    </>
-  );
 }
