@@ -1,0 +1,96 @@
+.shell .production-worklist { margin-block: 0 10px; }
+.production-worklist-heading, .production-title-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+}
+.production-worklist-heading { justify-content: space-between; margin-bottom: 8px; }
+.shell .production-title-row h1 { margin: 0; font-size: clamp(22px, 3vw, 28px); }
+.production-worklist-heading p, .production-draft-header p {
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: var(--admin-muted);
+}
+.production-worklist-filters {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(150px, 220px);
+  gap: 6px;
+}
+.shell .production-worklist-filters :is(input, .pool-search-field) { min-width: 0; width: 100%; min-height: 44px; }
+.production-card-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 310px), 1fr));
+  align-items: start;
+  gap: 8px;
+}
+.production-card {
+  min-width: 0;
+  padding: 9px 10px;
+  border-color: var(--production-frame, var(--admin-border));
+  overflow-wrap: anywhere;
+}
+.production-card-header, .production-card-meta, .production-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px 8px;
+  flex-wrap: wrap;
+}
+.production-card-header { justify-content: space-between; }
+.production-card-status { font-size: 12px; color: var(--production-status-text, var(--production-frame, var(--admin-muted))); }
+.shell .production-card h2 { margin: 3px 0; font-size: 16px; }
+.shell .production-card-meta { font-size: 12px; color: var(--admin-muted); margin: 3px 0; }
+.production-card-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  margin: 6px 0;
+  padding: 5px 7px;
+  border-radius: 6px;
+  background: var(--admin-secondary);
+}
+.production-card-metrics dt { color: var(--admin-muted); font-size: 11px; }
+.production-card-metrics dd { margin: 0; font-size: 14px; font-weight: 600; }
+.production-card-outputs { display: flex; flex-wrap: wrap; gap: 3px 8px; }
+.production-card-outputs:empty { display: none; }
+.production-card-actions { margin-top: 7px; }
+.shell :is(.production-card-actions, .production-worklist-heading, .production-actions-menu) button:not(.catalog-icon-button) {
+  min-height: 44px;
+  font-size: 13px;
+  padding: 5px 8px;
+  white-space: normal;
+}
+.production-card-actions > button[popovertarget] { margin-inline-start: auto; }
+.production-actions-menu {
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  width: min(220px, calc(100vw - 16px));
+  max-height: calc(100dvh - 8px);
+  overflow: auto;
+  padding: 6px;
+}
+.production-actions-menu:popover-open { display: grid; gap: 4px; }
+.shell .production-actions-menu button { justify-content: start; text-align: start; }
+.shell .production-planned-output > input { background: var(--admin-secondary); }
+.shell .production-draft-dialog :is(input[type="date"], .search-select) { min-width: 0; }
+.shell .production-draft-dialog .search-select-display {
+  display: flex;
+  align-items: center;
+  padding: 5px 8px;
+  min-height: 42px;
+  border: 1px solid var(--admin-border);
+  border-radius: 8px;
+  background: var(--admin-surface);
+  overflow-wrap: anywhere;
+}
+.shell .production-draft-dialog .search-select[data-wrap-selection]:not(:focus-within) > input {
+  position: absolute;
+  inset: 0;
+  height: 100%;
+  opacity: 0;
+}
+.shell .production-draft-dialog .search-select:focus-within .search-select-display { display: none; }
+@media (max-width: 600px) {
+  .production-worklist-filters { grid-template-columns: minmax(0, 1fr); }
+}

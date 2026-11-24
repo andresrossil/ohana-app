@@ -1,18 +1,22 @@
-import remainingCuringDaysCell from "./RemainingCuringDays";
+import { productionStatus, productionStatusLabels, productionMatches, productionDate } from "./production-catalog";
+import ProductionMenu from "./ProductionMenu";
+import FormSection from "./FormSection";
+import { scrollCompactFormToStart, useCompactFormViewport } from "./compact-form-viewport";
 import { plannedProductionUnits } from "./formula-model";
 import SearchSelect from "./SearchSelect";
 import MaterialRequirements from "./MaterialRequirements";
-import { IconDetails } from "./PoolControls";
+import { IconDetails, SearchField } from "./PoolControls";
 import { plannedLineQuantity, recipeLineKinds } from "./formula-model";
 import ResponsiveTable from "./ResponsiveTable";
 import "./production-status.css";
+import "./production-catalog.css";
 import { confirmAction } from "./ConfirmDialog";
 import { AppButton, AppIcon } from "./AppIcon";
 import Formulas from "./Formulas";
 import { request } from "./commerce";
 import AutoTextarea from "./AutoTextarea";
 import BatchTrace, { lotCode } from "./BatchTrace";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   keyedRequest,
   operation,
@@ -80,6 +84,13 @@ function ProductionBatches({
     [targetUnits, setTargetUnits] = useState(""),
     [consumed, setConsumed] = useState<Record<string, string>>({}),
     [outputUnits, setOutputUnits] = useState<Record<string, string>>({});
+  const [query, setQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const draftBody = useRef<HTMLDivElement>(null);
+  useCompactFormViewport(draftBody);
+  useEffect(() => {
+    if (mode === "start" && state.error) scrollCompactFormToStart(draftBody.current);
+  }, [mode, state.error]);
   const [yieldTiming, setYieldTiming] = useState("");
   const [weightCounts, setWeightCounts] = useState<Record<string, number>>({});
   const [calendarDate, setCalendarDate] = useState(today);
@@ -196,22 +207,22 @@ function ProductionBatches({
       factor,
       neededUnits,
     );
+  const shownBatches = batches.filter(batch =>
+    (!statusFilter || productionStatus(batch, calendarDate) === statusFilter) &&
+    productionMatches(query, lotCode(batch.batch_number), batch.product_name, batch.formula_code)
+  );
   return (
     <>
-      <section className="intro">
-        <div>
-          <p className="eyebrow">DE LA RECETA AL PRODUCTO</p>
-          <h1 className="module-title">
-            <AppIcon name="module.production" />
-            Producción
-          </h1>
-          <p>
-            Finaliza con consumos reales y registra las unidades por variante.
-            Sin curado, el producto queda disponible al confirmar. Si requiere
-            curado, se conserva su fecha de disponibilidad.
-          </p>
-        </div>
-        <div className="actions">
+      <section className="production-worklist">
+        <div className="production-worklist-heading">
+          <div>
+            <div className="production-title-row">
+              <h1 className="module-title"><AppIcon name="module.production" /> Producción</h1>
+              <AppButton type="button" className="secondary catalog-icon-button" iconKey="action.refresh"
+                aria-label="Actualizar producción" title="Actualizar" disabled={state.busy} onClick={() => state.run(load)} />
+            </div>
+            <p>Registra consumos reales y unidades por variante. Si el lote requiere curado, quedará disponible en la fecha prevista.</p>
+          </div>
           {state.canWrite && (
             <AppButton
               onClick={() => {
@@ -231,13 +242,14 @@ function ProductionBatches({
               Nueva producción
             </AppButton>
           )}
-          <AppButton
-            className="secondary"
-            disabled={state.busy}
-            onClick={() => state.run(load)}
-          >
-            Actualizar
-          </AppButton>
+        </div>
+        <div className="production-worklist-filters">
+          <SearchField aria-label="Buscar documentos de producción" placeholder="Producto, documento o código de fórmula…"
+            value={query} onChange={event => setQuery(event.target.value)} />
+          <SearchSelect aria-label="Filtrar por estado" value={statusFilter} onChange={event => setStatusFilter(event.target.value)}>
+            <option value="">Todos los estados</option>
+            {Object.entries(productionStatusLabels).map(([status, label]) => <option key={status} value={status}>{label}</option>)}
+          </SearchSelect>
         </div>
       </section>
       {state.error && !mode && (
@@ -248,25 +260,28 @@ function ProductionBatches({
       )}
       {state.notice && <p role="status">{state.notice}</p>}
       {mode && (
-        <div className="overlay">
+        <div className={mode === "start" ? "overlay compact-form-overlay" : "overlay"}>
           <section
-            className="modal operations-dialog"
+            className={mode === "start" ? "modal compact-form-dialog production-draft-dialog" : "modal operations-dialog"}
             role="dialog"
             aria-modal="true"
-            aria-label="Registrar producción"
+            aria-label={mode === "start" ? selected ? "Editar borrador" : "Nueva producción" : "Registrar producción"}
           >
-            <h2>
+            {mode === "start" ? <div className="compact-form-header production-draft-header">
+              <div><h2>{selected ? "Editar borrador" : "Nueva producción"}</h2><p>Producción en preparación</p></div>
+              <AppButton type="button" className="secondary catalog-icon-button" iconKey="action.cancel"
+                aria-label="Cerrar formulario de producción" title="Cerrar" disabled={state.busy} onClick={close} />
+            </div> : <h2>
               {
                 {
-                  start: "Producción en preparación",
                   finish: "Confirmar producción",
                   curing_complete: "Confirmar rendimiento final",
                   curing_edit: "Editar lote en curación",
                 }[mode]
               }
-            </h2>
+            </h2>}
             <>
-              {state.error && (
+              {mode !== "start" && state.error && (
                 <p className="error" role="alert">
                   <AppIcon name="status.error" />
                   {state.error}
@@ -274,6 +289,14 @@ function ProductionBatches({
               )}
             </>
             <form
+              className={mode === "start" ? "compact-form" : undefined}
+              aria-busy={mode === "start" ? state.busy : undefined}
+              onInvalidCapture={mode === "start" ? (event) => {
+                const field = event.target;
+                if (!(field instanceof HTMLElement)) return;
+                const group = field.closest("details");
+                if (group) group.open = true;
+              } : undefined}
               data-dirty-managed
               onChange={() => setDirty(true)}
               onSubmit={(e) => {
@@ -438,154 +461,179 @@ function ProductionBatches({
               }}
             >
               {mode === "start" ? (
-                <div className="settings-grid">
-                  {!selected && <label className="form-wide">
-                    <span><input type="checkbox" checked={openingStock} onChange={(e) => setOpeningStock(e.target.checked)} /> Lote de saldo inicial</span>
-                    <small>Registra un lote ya fabricado en curación. Las variantes y pesos se capturan al terminar el curado.</small>
-                  </label>}
-                  <label>
-                    Producto
-                    <SearchSelect
-                      required
-                      value={draftProduct}
-                      onChange={(e) => {
-                        setDraftProduct(e.target.value);
-                        setDraftFormula("");
-                      }}
-                    >
-                      <option value="">Seleccionar</option>
-                      {catalog.products.map((p: Row) => (
-                        <option key={p.id} value={p.id}>
-                          {p.name}
-                        </option>
-                      ))}
-                    </SearchSelect>
-                  </label>
-                  <label>
-                    Fórmula
-                    <SearchSelect
-                      name="formula"
-                      required
-                      value={draftFormula}
-                      onChange={(e) => setDraftFormula(e.target.value)}
-                    >
-                      <option value="">
-                        Elegir una versión antes de preparar
-                      </option>
-                      {formulas
-                        .filter(
-                          (f) =>
-                            f.state !== "inactive" &&
-                            f.product_id === draftProduct,
-                        )
-                        .map((f) => (
-                          <option value={f.id} key={f.id}>
-                            {f.product_name} · {f.code} · {f.name} · v
-                            {f.version}
+                <div ref={draftBody} className="compact-form-body">
+                  {state.error && <p className="error" role="alert"><AppIcon name="status.error" /> {state.error}</p>}
+                  <FormSection title="Identificación" icon="status.info">
+                    <div className="compact-form-grid">
+                      {!selected && <label className="form-wide">
+                        <span><input type="checkbox" checked={openingStock} onChange={(e) => setOpeningStock(e.target.checked)} /> Lote de saldo inicial</span>
+                        {openingStock && <small>Registra un lote ya fabricado en curación. Las variantes y pesos se capturan al terminar el curado.</small>}
+                      </label>}
+                      <label>
+                        Producto
+                        <SearchSelect
+                          required
+                          wrapSelection
+                          value={draftProduct}
+                          onChange={(e) => {
+                            setDraftProduct(e.target.value);
+                            setDraftFormula("");
+                          }}
+                        >
+                          <option value="">Seleccionar</option>
+                          {catalog.products.map((p: Row) => (
+                            <option key={p.id} value={p.id}>
+                              {p.name}
+                            </option>
+                          ))}
+                        </SearchSelect>
+                      </label>
+                      <label>
+                        Fórmula y versión
+                        <SearchSelect
+                          name="formula"
+                          wrapSelection
+                          required
+                          value={draftFormula}
+                          onChange={(e) => setDraftFormula(e.target.value)}
+                        >
+                          <option value="">
+                            Elegir una versión antes de preparar
                           </option>
-                        ))}
-                    </SearchSelect>
-                  </label>
-                  {!openingStock && <><label>
-                    Planificar por
-                    <SearchSelect
-                      value={quantityMode}
-                      onChange={(e) => {
-                        const next = e.target.value;
-                        if (next === "units")
-                          setTargetUnits(
-                            draftUnits == null ? "" : String(draftUnits),
-                          );
-                        else if (effectiveScale != null)
-                          setDraftScale(String(effectiveScale));
-                        setQuantityMode(next);
-                      }}
-                    >
-                      <option value="preparations">
-                        Preparaciones de la fórmula
-                      </option>
-                      <option value="units">Unidades a producir</option>
-                    </SearchSelect>
-                  </label>
-                  <label>
-                    {quantityMode === "units"
-                      ? "Unidades a producir"
-                      : "Preparaciones a realizar"}
-                    <input
-                      type="number"
-                      min={quantityMode === "units" ? "1" : "0.00000001"}
-                      step={quantityMode === "units" ? "1" : "any"}
-                      required
-                      value={
-                        quantityMode === "units" ? targetUnits : draftScale
-                      }
-                      onChange={(e) =>
-                        quantityMode === "units"
-                          ? setTargetUnits(e.target.value)
-                          : setDraftScale(e.target.value)
-                      }
-                    />
-                  </label>
-                  <label>
-                    Unidades previstas · automático
-                    <input
-                      name="quantity"
-                      value={draftUnits ?? ""}
-                      readOnly
-                      placeholder="Pendiente de fórmula y unidades estimadas"
-                      type="number"
-                      min="1"
-                      step="1"
-                      required
-                    />
-                    <small>
-                      {draftUnits == null
-                        ? "Define las Unidades estimadas en la fórmula para calcularlas aquí."
-                        : !Number.isInteger(draftUnits)
-                          ? "El resultado debe ser un número entero de unidades."
-                          : quantityMode === "units"
-                            ? `${draftUnits} unidades de una fórmula de ${estimating?.estimated_units}. Los materiales se ajustan proporcionalmente.`
-                            : `${estimating?.estimated_units} unidades por preparación × ${draftScale} preparaciones`}
-                    </small>
-                  </label>
-                  </>}
-                  <label>
-                    Fecha de producción
-                    <input
-                      name="date"
-                      type="date"
-                      required
-                      value={date}
-                      onChange={(e) => setDate(e.target.value)}
-                    />
-                  </label>
-                  <label>
-                    Disponibilidad estimada
-                    <input
-                      name="available_on_override"
-                      type="date"
-                      required
-                      min={date}
-                      value={availableOverride || plannedAvailable}
-                      onChange={(e) => setAvailableOverride(e.target.value)}
-                    />
-                    {availableOverride && <AppButton type="button" className="secondary" onClick={() => { setAvailableOverride(""); setDirty(true); }}>Usar fecha sugerida</AppButton>}
-                  </label>
-                  {estimating && (
-                    <p className="production-curing-notice" role="status">
-                      {availableOverride ? "Fecha de disponibilidad manual" : estimating.requires_curing
-                        ? `${estimating.curing_days} días de curado según la fórmula`
-                        : "Sin curado: disponible al confirmar la fabricación"}
-                    </p>
+                          {formulas
+                            .filter(
+                              (f) =>
+                                f.state !== "inactive" &&
+                                f.product_id === draftProduct,
+                            )
+                            .map((f) => (
+                              <option value={f.id} key={f.id}>
+                                {f.product_name} · {f.code} · {f.name} · v
+                                {f.version}
+                              </option>
+                            ))}
+                        </SearchSelect>
+                      </label>
+                    </div>
+                  </FormSection>
+                  {!openingStock && <FormSection title="Planificación" icon="action.calculate">
+                    <div className="compact-form-grid">
+                      <label className="form-wide">
+                        Planificar por
+                        <SearchSelect
+                          value={quantityMode}
+                          onChange={(e) => {
+                            const next = e.target.value;
+                            if (next === "units")
+                              setTargetUnits(
+                                draftUnits == null ? "" : String(draftUnits),
+                              );
+                            else if (effectiveScale != null)
+                              setDraftScale(String(effectiveScale));
+                            setQuantityMode(next);
+                          }}
+                        >
+                          <option value="preparations">
+                            Preparaciones de la fórmula
+                          </option>
+                          <option value="units">Unidades a producir</option>
+                        </SearchSelect>
+                      </label>
+                      <label>
+                        {quantityMode === "units"
+                          ? "Unidades a producir"
+                          : "Preparaciones a realizar"}
+                        <input
+                          type="number"
+                          inputMode={quantityMode === "units" ? "numeric" : "decimal"}
+                          min={quantityMode === "units" ? "1" : "0.00000001"}
+                          step={quantityMode === "units" ? "1" : "any"}
+                          required
+                          value={
+                            quantityMode === "units" ? targetUnits : draftScale
+                          }
+                          onChange={(e) =>
+                            quantityMode === "units"
+                              ? setTargetUnits(e.target.value)
+                              : setDraftScale(e.target.value)
+                          }
+                        />
+                      </label>
+                      <label className="production-planned-output">
+                        Unidades previstas · automático
+                        <input
+                          name="quantity"
+                          value={draftUnits ?? ""}
+                          readOnly
+                          placeholder="Pendiente de fórmula y unidades estimadas"
+                          type="number"
+                          min="1"
+                          step="1"
+                          required
+                        />
+                        <small>
+                          {draftUnits == null
+                            ? "Define las Unidades estimadas en la fórmula para calcularlas aquí."
+                            : !Number.isInteger(draftUnits)
+                              ? "El resultado debe ser un número entero de unidades."
+                              : quantityMode === "units"
+                                ? `${draftUnits} unidades de una fórmula de ${estimating?.estimated_units}. Los materiales se ajustan proporcionalmente.`
+                                : `${estimating?.estimated_units} unidades por preparación × ${draftScale} preparaciones`}
+                        </small>
+                      </label>
+                    </div>
+                  </FormSection>}
+                  <FormSection title="Fechas de producción" icon="status.pending">
+                    <div className="compact-form-grid">
+                      <label>
+                        Fecha de producción
+                        <input
+                          name="date"
+                          type="date"
+                          lang="es-GT"
+                          required
+                          value={date}
+                          onChange={(e) => setDate(e.target.value)}
+                        />
+                        {date && <small>{productionDate(date)}</small>}
+                      </label>
+                      <label>
+                        Disponibilidad estimada
+                        <input
+                          name="available_on_override"
+                          type="date"
+                          lang="es-GT"
+                          required
+                          min={date}
+                          value={availableOverride || plannedAvailable}
+                          onChange={(e) => setAvailableOverride(e.target.value)}
+                        />
+                        {(availableOverride || plannedAvailable) && <small>{productionDate(availableOverride || plannedAvailable)}</small>}
+                        {availableOverride && <AppButton type="button" className="secondary" onClick={() => { setAvailableOverride(""); setDirty(true); }}>Usar fecha sugerida</AppButton>}
+                      </label>
+                      {estimating && (
+                        <p className="production-curing-notice form-wide" role="status">
+                          {availableOverride ? "Fecha de disponibilidad manual" : estimating.requires_curing
+                            ? `${estimating.curing_days} días de curado según la fórmula`
+                            : "Sin curado: disponible al confirmar la fabricación"}
+                        </p>
+                      )}
+                    </div>
+                  </FormSection>
+                  <FormSection title="Notas" icon="status.info">
+                    <label>
+                      Notas y observaciones
+                      <textarea rows={2}
+                        name="notes"
+                        maxLength={1000}
+                        defaultValue={selected?.notes || ""}
+                      />
+                    </label>
+                  </FormSection>
+                  {estimating && !openingStock && (
+                    <MaterialRequirements company={company} formula={estimating.id}
+                      scale={factor} units={Number(draftUnits)} />
                   )}
-                  <label>
-                    Notas
-                    <textarea
-                      name="notes"
-                      maxLength={1000}
-                      defaultValue={selected?.notes || ""}
-                    />
-                  </label>
                 </div>
               ) : mode === "finish" || mode === "curing_complete" ? (
                 <>
@@ -788,16 +836,9 @@ function ProductionBatches({
                   </label>
                 </div>
               ) : null}
-              {estimating && mode === "start" && !openingStock && (
-                <MaterialRequirements
-                  company={company}
-                  formula={estimating.id}
-                  scale={factor}
-                  units={Number(draftUnits)}
-                />
-              )}
-              <div className="form-actions">
-                <AppButton disabled={state.busy}>
+              <div className={mode === "start" ? "compact-form-actions production-draft-actions" : "form-actions"}>
+                {mode === "start" && <AppButton type="button" className="secondary" disabled={state.busy} onClick={close}>Cancelar</AppButton>}
+                <AppButton type="submit" disabled={state.busy}>
                   {mode === "finish"
                     ? sendingToCuring ? "Enviar a curado/secado"
                       : finishingCuring ? "Confirmar rendimiento y terminar"
@@ -808,86 +849,82 @@ function ProductionBatches({
                         ? "Guardar cambios"
                         : openingStock ? "Registrar lote en curación" : "Guardar borrador"}
                 </AppButton>
-                <AppButton
+                {mode !== "start" && <AppButton
                   type="button"
                   className="secondary"
                   disabled={state.busy}
                   onClick={close}
                 >
                   Cancelar
-                </AppButton>
+                </AppButton>}
               </div>
             </form>
           </section>
         </div>
       )}
-      <section className="catalog">
-        <div className="table-wrap">
-          <ResponsiveTable>
-            <thead>
-              <tr>
-                <th>Documento / producto</th>
-                <th>Estado</th>
-                <th>Rendimiento</th>
-                <th>Disponibilidad estimada</th>
-                <th>Días restantes</th>
-                <th>Variantes / acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {batches.map((b) => {
-                const status = b.finalized_at ? "finished"
-                  : b.state === "curing" && b.available_on && b.available_on <= calendarDate
-                    ? "ready_to_release"
-                    : b.state;
-                return <tr key={b.id} data-production-status={status}>
-                  <td>
-                    {lotCode(b.batch_number)}
-                    <small>{b.product_name}</small>
-                    <small>{b.production_date}</small>
-                    <small>
-                      {b.formula_code
-                        ? `${b.formula_code} · v${b.formula_version}`
-                        : "Sin versión seleccionada"}
-                    </small>
-                  </td>
-                  <td>
-                    <AppIcon
-                      name={
-                        status === "ready_to_release" || b.state === "released"
-                          ? "status.success"
-                          : b.state === "cancelled"
-                            ? "status.archived"
-                            : "status.pending"
-                      }
-                    />
-                    {
-                      {
-                        finished: "Terminado",
-                        ready_to_release: "Listo para Liberar",
-                        draft: "Borrador",
-                        in_progress: "En preparación",
-                        curing: "En curación",
-                        released: "Liberado",
-                        cancelled: "Cancelado",
-                      }[status as string]
-                    }
-                  </td>
-                  <td>
-                    {b.actual_quantity ?? (b.yield_timing ? "Pendiente" : "—")} / {b.planned_quantity ?? "—"}
-                    {b.preliminary_quantity != null && <small>{b.yield_timing === "after" ? "Estimadas al enviar" : "Contadas al enviar"}: {b.preliminary_quantity}</small>}
-                    {b.opening_stock && <small>Saldo inicial{!b.confirmed ? " · Pesaje pendiente" : ""}</small>}
-                    <small>Merma: {b.scrap_quantity}</small>
-                  </td>
-                  <td>{b.available_on}</td>
-                  {remainingCuringDaysCell(b.state === "curing" ? b.available_on : null, calendarDate)}
-                  <td className="actions">
-                    <AppButton
-                      className="secondary"
-                      onClick={() => setTraceId(b.id)}
-                    >
-                      Ver documento
-                    </AppButton>
+      <section className="production-card-list" aria-label="Documentos de producción">
+        {shownBatches.map(b => {
+          const status = productionStatus(b, calendarDate);
+          const document = lotCode(b.batch_number);
+          const activeCuring = b.state === "curing";
+          const days = activeCuring && b.available_on
+            ? Math.max(0, (Date.parse(b.available_on) - Date.parse(calendarDate)) / 86_400_000)
+            : NaN;
+          const canShowMenu = state.canWrite && (
+            b.state === "draft" || b.state === "curing" || (b.state !== "cancelled" && !b.finalized_at)
+          );
+          return <article key={b.id} className="dashboard-surface production-card" data-production-status={status}>
+            <div className="production-card-header">
+              <strong>{document}</strong>
+              <span className="production-card-status">
+                <AppIcon name={status === "ready_to_release" || b.state === "released"
+                  ? "status.success" : b.state === "cancelled" ? "status.archived" : "status.pending"} />
+                {productionStatusLabels[status] || status || "—"}
+              </span>
+            </div>
+            <h2>{b.product_name}</h2>
+            <p className="production-card-meta">
+              {productionDate(b.production_date)} · {b.formula_code ? `${b.formula_code} · v${b.formula_version}` : "Sin versión seleccionada"}
+            </p>
+            <dl className="production-card-metrics">
+              <div><dt>Previstas</dt><dd>{b.planned_quantity ?? "—"}</dd></div>
+              <div><dt>{b.actual_quantity != null && (b.confirmed || b.state === "released" || b.finalized_at) ? "Confirmadas" : "Producidas"}</dt><dd>{b.actual_quantity ?? (b.yield_timing ? "Pendiente" : "—")}</dd></div>
+              <div><dt>Merma</dt><dd>{b.scrap_quantity ?? "—"}</dd></div>
+            </dl>
+            <div className="production-card-meta">
+              {b.preliminary_quantity != null && <span>{b.yield_timing === "after" ? "Estimadas al enviar" : "Contadas antes del curado"}: {b.preliminary_quantity}</span>}
+              {b.opening_stock && <span>Saldo inicial{!b.confirmed ? " · Pesaje pendiente" : ""}</span>}
+            </div>
+            <p className="production-card-meta">
+              <span>Disponibilidad estimada: {productionDate(b.available_on)}</span>
+              {Number.isFinite(days) && <span>{days === 0 ? "0 días · Listo" : days === 1 ? "1 día restante" : `${days} días restantes`}</span>}
+            </p>
+            <div className="production-card-outputs">
+                    {b.outputs?.filter((o: Row) => o.quantity > 0).map((o: Row) => (
+                      <small key={o.id}>
+                        {o.quantity} × {o.variant_name}
+                      </small>
+                    ))}
+            </div>
+            <div className="production-card-actions">
+              <AppButton type="button" className="secondary" onClick={() => setTraceId(b.id)}>Ver documento</AppButton>
+                    {state.canWrite && (b.state === "in_progress" || (b.opening_stock && b.state === "curing" && !b.confirmed)) && (
+                      <AppButton
+                        disabled={b.opening_stock && b.available_on > calendarDate && !manager}
+                        onClick={() => openYield(b, "finish")}
+                      >
+                        {b.opening_stock ? "Confirmar rendimiento final" : "Confirmar producción"}
+                      </AppButton>
+                    )}
+                    {state.canWrite && b.state === "curing" && (!b.opening_stock || b.confirmed) && (
+                      <AppButton
+                        disabled={b.available_on > calendarDate && !manager}
+                        onClick={() => openYield(b, "curing_complete")}
+                      >
+                        Confirmar rendimiento final
+                      </AppButton>
+                    )}
+              {canShowMenu && <ProductionMenu document={document}>
                     {state.canWrite && b.state !== "cancelled" && !b.finalized_at && (
                       <AppButton
                         className="danger"
@@ -967,37 +1004,13 @@ function ProductionBatches({
                         </AppButton>
                       </>
                     )}
-                    {b.outputs?.filter((o: Row) => o.quantity > 0).map((o: Row) => (
-                      <small key={o.id}>
-                        {o.quantity} × {o.variant_name}
-                      </small>
-                    ))}
-                    {state.canWrite && (b.state === "in_progress" || (b.opening_stock && b.state === "curing" && !b.confirmed)) && (
-                      <AppButton
-                        disabled={b.opening_stock && b.available_on > calendarDate && !manager}
-                        onClick={() => openYield(b, "finish")}
-                      >
-                        {b.opening_stock ? "Confirmar rendimiento final" : "Confirmar producción"}
-                      </AppButton>
-                    )}
-                    {state.canWrite && b.state === "curing" && (!b.opening_stock || b.confirmed) && (
-                      <AppButton
-                        disabled={b.available_on > calendarDate && !manager}
-                        onClick={() => openYield(b, "curing_complete")}
-                      >
-                        Confirmar rendimiento final
-                      </AppButton>
-                    )}
-                  </td>
-                </tr>;
-              })}
-            </tbody>
-          </ResponsiveTable>
-
-          {!batches.length && (
-            <p className="empty">No hay documentos de producción.</p>
-          )}
-        </div>
+              </ProductionMenu>}
+            </div>
+          </article>;
+        })}
+        {!shownBatches.length && <p className="empty" role="status">
+          {state.busy ? "Consultando producción…" : batches.length ? "No hay documentos que coincidan con los filtros." : "No hay documentos de producción."}
+        </p>}
       </section>
       {traceId && (
         <BatchTrace

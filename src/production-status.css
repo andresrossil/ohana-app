@@ -1,20 +1,25 @@
-.shell .responsive-table > tbody > tr[data-production-status="finished"] {
+.shell .responsive-table > tbody > tr[data-production-status="finished"],
+.shell .production-card[data-production-status="finished"] {
   --production-frame: var(--functional-success, #166534);
 }
 
-.shell .responsive-table > tbody > tr[data-production-status="cancelled"] {
+.shell .responsive-table > tbody > tr[data-production-status="cancelled"],
+.shell .production-card[data-production-status="cancelled"] {
   --production-frame: var(--functional-danger, #b91c1c);
 }
 
-.shell .responsive-table > tbody > tr[data-production-status="curing"] {
+.shell .responsive-table > tbody > tr[data-production-status="curing"],
+.shell .production-card[data-production-status="curing"] {
   --production-frame: #2563eb;
 }
 
-.shell .responsive-table > tbody > tr[data-production-status="ready_to_release"] {
+.shell .responsive-table > tbody > tr[data-production-status="ready_to_release"],
+.shell .production-card[data-production-status="ready_to_release"] {
   --production-frame: #795136;
 }
 
-.shell .responsive-table > tbody > tr[data-production-status="in_progress"] {
+.shell .responsive-table > tbody > tr[data-production-status="in_progress"],
+.shell .production-card[data-production-status="in_progress"] {
   --production-frame: #ca8a04;
   --production-status-text: #854d0e;
 }
