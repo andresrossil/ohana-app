@@ -1,9 +1,8 @@
 import Dashboard from "./Dashboard";
 import MoneyInput from "./MoneyInput";
-import MaterialMinimums from "./MaterialMinimums";
+import MaterialsCatalog from "./MaterialsCatalog";
 import MaterialPhoto, { uploadMaterialPhoto } from "./MaterialPhoto";
-import ProductImage from "./ProductImage";
-import { MaterialTypesProvider, MaterialTypeLabel } from "./MaterialTypesContext";
+import { MaterialTypesProvider } from "./MaterialTypesContext";
 const MaterialTypeSettings = lazy(() => import("./MaterialTypeSettings"));
 import { MarginProvider } from "./MarginBadge";
 const MarginSettings = lazy(() => import("./MarginSettings"));
@@ -34,10 +33,6 @@ import ProductsCatalog from "./ProductsCatalog";
 import OriginsSettings from "./OriginsSettings";
 
 import CatalogFields from "./CatalogFields";
-import CatalogFilters, {
-  classificationMatches,
-  originMatches,
-} from "./CatalogFilters";
 const BarcodeDialog = lazy(() => import("./BarcodeDialog"));
 import { identityPayload, matchesCatalog } from "./catalog-model";
 import CompanySettings from "./CompanySettings";
@@ -127,8 +122,6 @@ function App() {
   const [section, setSection] = useState<Section>("dashboard"),
     [configView, setConfigView] = useState("profile"),
     [expenseView, setExpenseView] = useState("overhead"),
-    [classification, setClassification] = useState(""),
-    [origin, setOrigin] = useState(""),
     [barcode, setBarcode] = useState<Row | null>(null);
   const [corporations, setCorporations] = useState<Row[]>([]),
     [canCreate, setCanCreate] = useState(false),
@@ -148,17 +141,9 @@ function App() {
   const activeCompany = companies.find((c) => c.id === company);
   useCompanyTheme(company);
   const loadVersion = useRef(0);
-  const legacyVisible =
-    section === "materials" ||
-    (section === "settings" &&
-      ["suppliers", "presentations", "units"].includes(configView));
-  const filtered = data[tab].filter(
-    (r) =>
-      matchesCatalog(r, query) &&
-      (tab !== "raw_materials" ||
-        (classificationMatches(r.classification, classification) &&
-          originMatches(r.origin_id, origin))),
-  );
+  const legacyVisible = section === "settings" &&
+    ["suppliers", "presentations", "units"].includes(configView);
+  const filtered = legacyVisible ? data[tab].filter((row) => matchesCatalog(row, query)) : [];
   const sectionTitle = sections.find((s) => s[0] === section)?.[1] || "";
   const leaveSheet = async () => {
     if (
@@ -197,8 +182,6 @@ function App() {
     setHistory(null);
     setBarcode(null);
     setQuery("");
-    setClassification("");
-    setOrigin("");
     setImportOpen(false);
     setImportNotice("");
     setSheetDirty(false);
@@ -333,8 +316,6 @@ function App() {
     setHistory(null);
     setData(emptyCatalog);
     setBarcode(null);
-    setClassification("");
-    setOrigin("");
     setQuery("");
     setSheetView(false);
     setPrices([]);
@@ -342,6 +323,30 @@ function App() {
     setRole("viewer");
     void load();
   }, [company, activeCompany?.catalog_read, activeCompany?.write]);
+  async function generateMaterialSkus() {
+    if (
+      !(await confirmAction(
+        "¿Generar los SKU faltantes? Se conservarán los existentes. Se usarán los prefijos configurados para cada tipo de material.",
+      ))
+    )
+      return;
+    setBusy(true);
+    try {
+      const r = await db.rpc(
+        "generate_missing_material_skus",
+        { p_company: company },
+      );
+      if (r.error) throw r.error;
+      setImportNotice(
+        `SKU generados: ${r.data.generated}. Sin clasificación: ${r.data.unclassified}.`,
+      );
+      await load();
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
   async function auth(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setBusy(true);
@@ -725,7 +730,7 @@ function App() {
             });
           }}
         />
-        <main className={section === "dashboard" ? "dashboard-main" : undefined}>
+        <main className={section === "dashboard" || section === "materials" ? "dashboard-main" : undefined}>
           <header>
             <span>OHANA / {sectionTitle.toUpperCase()}</span>
             <span className="badge">
@@ -1067,19 +1072,68 @@ function App() {
                   </p>
                 </section>
               )}
+              {section === "materials" && (
+                <MaterialsCatalog
+                  key={JSON.stringify([session?.user.id, activeCompany?.corporation_id, company])}
+                  company={company}
+                  rows={data.raw_materials}
+                  origins={data.catalog_origins}
+                  units={data.units}
+                  costs={materialCosts}
+                  activeSuppliers={data.suppliers.filter((row) => row.active).length}
+                  pricedPresentations={prices.filter((price) => price.active && price.amount !== null).length}
+                  canWrite={canWrite}
+                  canViewPrices={activeCompany?.manage === true}
+                  loading={loading}
+                  busy={busy}
+                  sheetView={sheetView}
+                  editing={Boolean(edit?.id)}
+                  sheet={sheetView && (
+                    <MaterialSheet
+                      currency={activeCompany?.currency}
+                      company={company}
+                      canWrite={canWrite}
+                      catalog={data}
+                      onBarcode={setBarcode}
+                      onSaved={load}
+                      onDirty={setSheetDirty}
+                    />
+                  )}
+                  formatMoney={money}
+                  onCreate={async () => {
+                    if (!(await leaveSheet())) return;
+                    setSheetView(false);
+                    setEdit(null);
+                  }}
+                  onImport={async () => {
+                    if (!(await leaveSheet())) return;
+                    setSheetView(false);
+                    setEdit(undefined);
+                    setImportNotice("");
+                    setImportOpen(true);
+                  }}
+                  onToggleSheet={async () => {
+                    if (await leaveSheet()) setSheetView(!sheetView);
+                  }}
+                  onGenerateSkus={generateMaterialSkus}
+                  onSaved={load}
+                  onSuppliers={async () => {
+                    if (await leaveSheet()) setSection("suppliers");
+                  }}
+                  onPrices={async () => {
+                    if (await leaveSheet()) setSection("prices");
+                  }}
+                  onEdit={setEdit}
+                  onBarcode={setBarcode}
+                />
+              )}
               {legacyVisible && (
                 <>
                   <section className="intro">
                     <div>
                       <p className="eyebrow">LA BASE DE CADA CREACIÓN</p>
                       <h1 className="module-title">
-                        <AppIcon
-                          name={
-                            tab === "raw_materials"
-                              ? "module.materials"
-                              : "module.settings"
-                          }
-                        />
+                        <AppIcon name="module.settings" />
                         {labels[tab]}
                       </h1>
                       <p>Conoce lo que compras. Cuida lo que creas.</p>
@@ -1090,33 +1144,15 @@ function App() {
                           disabled={loading}
                           onClick={async () => {
                             if (!(await leaveSheet())) return;
-                            if (tab === "raw_materials") setSheetView(false);
                             setEdit(null);
                           }}
                         >
-                          {tab === "raw_materials"
-                            ? "Agregar material individual"
-                            : tab === "suppliers"
+                          {tab === "suppliers"
                               ? "Agregar proveedor"
                               : tab === "units"
                                 ? "Agregar unidad"
                                 : "Agregar presentación"}
                         </AppButton>
-                        {tab === "raw_materials" && (
-                          <AppButton
-                            className="secondary"
-                            disabled={loading}
-                            onClick={async () => {
-                              if (!(await leaveSheet())) return;
-                              setSheetView(false);
-                              setEdit(undefined);
-                              setImportNotice("");
-                              setImportOpen(true);
-                            }}
-                          >
-                            Copiar de Tabla
-                          </AppButton>
-                        )}
                       </div>
                     )}
                   </section>
@@ -1166,64 +1202,6 @@ function App() {
                       </button>
                     </div>
                   </section>
-                  {tab === "raw_materials" && (
-                    <div className="sheet-view-switch">
-                      {canWrite&&<MaterialMinimums key={company} company={company} onSaved={load}/>}
-                      {canWrite && (
-                        <AppButton
-                          disabled={busy}
-                          onClick={async () => {
-                            if (
-                              !(await confirmAction(
-                                "¿Generar los SKU faltantes? Se conservarán los existentes. Se usarán los prefijos configurados para cada tipo de material.",
-                              ))
-                            )
-                              return;
-                            setBusy(true);
-                            try {
-                              const r = await db.rpc(
-                                "generate_missing_material_skus",
-                                { p_company: company },
-                              );
-                              if (r.error) throw r.error;
-                              setImportNotice(
-                                `SKU generados: ${r.data.generated}. Sin clasificación: ${r.data.unclassified}.`,
-                              );
-                              await load();
-                            } catch (e: any) {
-                              setError(e.message);
-                            } finally {
-                              setBusy(false);
-                            }
-                          }}
-                        >
-                          Generar SKU faltantes
-                        </AppButton>
-                      )}
-                      <AppButton
-                        className="secondary"
-                        onClick={async () => {
-                          if (await leaveSheet()) setSheetView(!sheetView);
-                        }}
-                      >
-                        {sheetView
-                          ? "Volver al catálogo"
-                          : "Editar catálogo en tabla"}
-                      </AppButton>
-                    </div>
-                  )}
-                  {tab === "raw_materials" && sheetView ? (
-                    <MaterialSheet
-                      currency={activeCompany?.currency}
-                      key={company}
-                      company={company}
-                      canWrite={canWrite}
-                      catalog={data}
-                      onBarcode={setBarcode}
-                      onSaved={load}
-                      onDirty={setSheetDirty}
-                    />
-                  ) : (
                     <section className="catalog">
                       <div className="toolbar">
                         <h2>
@@ -1236,15 +1214,6 @@ function App() {
                           onChange={(e) => setQuery(e.target.value)}
                         />
                       </div>
-                      {tab === "raw_materials" && (
-                        <CatalogFilters
-                          classification={classification}
-                          onClassification={setClassification}
-                          origin={origin}
-                          onOrigin={setOrigin}
-                          origins={data.catalog_origins}
-                        />
-                      )}{" "}
                       {loading ? (
                         <p className="empty" role="status">
                           Cargando catálogo…
@@ -1266,15 +1235,6 @@ function App() {
                           <ResponsiveTable>
                             <thead>
                               <tr>
-                                {tab === "raw_materials" && (
-                                  <>
-                                    <th>SKU</th>
-                                    <th>Clasificación</th>
-                                    <th>Origen</th>
-                                    <th>Código de barras</th>
-                                    <th>Inventario mínimo</th>
-                                  </>
-                                )}
                                 {tab === "presentations" && (
                                   <>
                                     <th>SKU</th>
@@ -1283,15 +1243,12 @@ function App() {
                                 )}
                                 <th>Nombre</th>
                                 <th>
-                                  {tab === "raw_materials"
-                                    ? "Unidad base"
-                                    : tab === "suppliers"
+                                  {tab === "suppliers"
                                       ? "Contacto"
                                       : tab === "units"
                                         ? "Equivalencia base"
                                         : "Proveedor / contenido"}
                                 </th>
-                                {tab === "raw_materials" && <th>Costo actual</th>}
                                 <th>
                                   {tab === "presentations"
                                     ? "Precio vigente"
@@ -1305,25 +1262,6 @@ function App() {
                                 const price = prices.find((p) => p.id === r.id);
                                 return (
                                   <tr key={r.id}>
-                                    {tab === "raw_materials" && (
-                                      <>
-                                        <td>{r.sku || "—"}</td>
-                                        <td>
-                                          <MaterialTypeLabel typeKey={r.classification}/>
-                                        </td>
-                                        <td>
-                                          <CatalogBadge
-                                            origin={
-                                              data.catalog_origins.find(
-                                                (o) => o.id === r.origin_id,
-                                              )?.name || "Pendiente"
-                                            }
-                                          />
-                                        </td>
-                                        <td>{r.barcode || "—"}</td>
-                                        <td data-sort-value={r.minimum_stock}>{r.minimum_stock==null?"—":Number(r.minimum_stock).toLocaleString("es-GT",{maximumFractionDigits:8})}</td>
-                                      </>
-                                    )}
                                     {tab === "presentations" && (
                                       <>
                                         <td>{r.sku || "Pendiente"}</td>
@@ -1331,7 +1269,6 @@ function App() {
                                       </>
                                     )}
                                     <td>
-                                      {tab === "raw_materials" && r.photo_path && <ProductImage path={r.photo_path} name={r.name} />}
                                       <strong className="admin-name">
                                         {r.name}
                                       </strong>
@@ -1348,9 +1285,7 @@ function App() {
                                       </small>
                                     </td>
                                     <td>
-                                      {tab === "raw_materials" ? (
-                                        name("units", r.unit_id)
-                                      ) : tab === "suppliers" ? (
+                                      {tab === "suppliers" ? (
                                         r.contact || "—"
                                       ) : tab === "units" ? (
                                         `${r.base_factor} ${r.dimension === "mass" ? "g" : r.dimension === "volume" ? "ml" : "ud"}`
@@ -1364,11 +1299,6 @@ function App() {
                                         </>
                                       )}
                                     </td>
-                                    {tab === "raw_materials" && (
-                                      <td data-sort-value={materialCosts[r.id]?.unit_cost ?? ""}>
-                                        {materialCosts[r.id]?.unit_cost == null ? "—" : money(Number(materialCosts[r.id].unit_cost), materialCosts[r.id].currency)}
-                                      </td>
-                                    )}
                                     <td>
                                       {tab === "presentations" ? (
                                         <>
@@ -1416,9 +1346,7 @@ function App() {
                                           Editar
                                         </AppButton>
                                       )}
-                                      {(tab === "raw_materials" ||
-                                        tab === "presentations") &&
-                                        r.barcode && (
+                                      {tab === "presentations" && r.barcode && (
                                           <AppButton
                                             onClick={() => setBarcode(r)}
                                           >
@@ -1456,7 +1384,6 @@ function App() {
                         </div>
                       )}
                     </section>
-                  )}
                   <footer>
                     OHANA · Pequeños detalles, grandes creaciones.
                   </footer>

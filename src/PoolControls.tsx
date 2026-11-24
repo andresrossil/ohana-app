@@ -1,7 +1,7 @@
 import { Children, cloneElement, isValidElement, useState } from "react";
 import type {
   DetailsHTMLAttributes,
-  InputHTMLAttributes,
+  ComponentPropsWithRef,
   ReactNode,
 } from "react";
 import { AppIcon } from "./AppIcon";
@@ -35,7 +35,7 @@ export function IconDetails({
     </details>
   );
 }
-export function SearchField(props: InputHTMLAttributes<HTMLInputElement>) {
+export function SearchField(props: ComponentPropsWithRef<"input">) {
   return (
     <span className="pool-search-field">
       <AppIcon name="action.search" />

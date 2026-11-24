@@ -62,11 +62,12 @@ export default forwardRef<
   HTMLTableElement,
   TableHTMLAttributes<HTMLTableElement> & {
     showAllMobileFields?: boolean;
+    compactRowActions?: boolean;
     sortable?: boolean;
     onSortRows?: (indexes: number[]) => void;
   }
 >(function ResponsiveTable(
-  { children, className, onInvalidCapture, onSortRows, showAllMobileFields, sortable = true, ...props },
+  { children, className, onInvalidCapture, onSortRows, showAllMobileFields, compactRowActions, sortable = true, ...props },
   ref,
 ) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set()),
@@ -336,6 +337,29 @@ export default forwardRef<
                           (c.props.colSpan || 1) > 1,
                       ),
                       extra = visible.some((v) => !v);
+                    const toggleLabel = isOpen ? "Menos información" : "Más información";
+                    const toggle = extra && (
+                      <AppButton
+                        type="button"
+                        className={compactRowActions ? "secondary catalog-icon-button" : "secondary"}
+                        iconKey={isOpen ? "action.collapse" : "action.expand"}
+                        aria-expanded={isOpen}
+                        aria-label={toggleLabel + " de la fila " + (rowIndex + 1)}
+                        title={compactRowActions ? toggleLabel : undefined}
+                        onPointerDown={(e) => e.stopPropagation()}
+                        onKeyDown={(e) => e.stopPropagation()}
+                        onClick={() =>
+                          setExpanded((old) => {
+                            const next = new Set(old);
+                            if (next.has(key)) next.delete(key);
+                            else next.add(key);
+                            return next;
+                          })
+                        }
+                      >
+                        {!compactRowActions && toggleLabel}
+                      </AppButton>
+                    );
                     return cloneElement(
                       row,
                       {
@@ -352,7 +376,7 @@ export default forwardRef<
                           const afterButtons = firstButton < 0 ? -1 :
                             content.findIndex((node, index) => index > firstButton && !isActionButton(node));
                           const end = afterButtons < 0 ? content.length : afterButtons;
-                          const actionContent = firstButton >= 0 && end - firstButton > 2 ? <>
+                          const actionContent = !compactRowActions && firstButton >= 0 && end - firstButton > 2 ? <>
                             {content.slice(0, firstButton)}
                             <TableActions primary={content[firstButton]} secondary={content.slice(firstButton + 1, end)} />
                             {content.slice(end)}
@@ -384,41 +408,13 @@ export default forwardRef<
                                 </span>
                               )}
                               {actionContent}
+                              {compactRowActions && actions && toggle}
                             </>,
                           );
                         })}
-                        {extra && (
-                          <td
-                            className="mobile-row-toggle"
-                            colSpan={Math.max(1, cells.length)}
-                          >
-                            <AppButton
-                              type="button"
-                              className="secondary"
-                              iconKey={
-                                isOpen ? "action.collapse" : "action.expand"
-                              }
-                              aria-expanded={isOpen}
-                              aria-label={
-                                (isOpen
-                                  ? "Menos información"
-                                  : "Más información") +
-                                " de la fila " +
-                                (rowIndex + 1)
-                              }
-                              onPointerDown={(e) => e.stopPropagation()}
-                              onKeyDown={(e) => e.stopPropagation()}
-                              onClick={() =>
-                                setExpanded((old) => {
-                                  const next = new Set(old);
-                                  if (next.has(key)) next.delete(key);
-                                  else next.add(key);
-                                  return next;
-                                })
-                              }
-                            >
-                              {isOpen ? "Menos información" : "Más información"}
-                            </AppButton>
+                        {!compactRowActions && toggle && (
+                          <td className="mobile-row-toggle" colSpan={Math.max(1, cells.length)}>
+                            {toggle}
                           </td>
                         )}
                       </>,

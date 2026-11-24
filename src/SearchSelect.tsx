@@ -65,11 +65,13 @@ export function SortedDatalist({
 export default function SearchSelect(
   props: React.SelectHTMLAttributes<HTMLSelectElement> & {
     hideGroupLabels?: boolean;
+    wrapSelection?: boolean;
   },
 ) {
   const {
     children,
     hideGroupLabels = false,
+    wrapSelection = false,
     value,
     defaultValue,
     onChange,
@@ -127,7 +129,10 @@ export default function SearchSelect(
     }
   }
   return (
-    <span className="search-select" style={style}>
+    <span className="search-select" style={style} data-wrap-selection={wrapSelection || undefined}>
+      {wrapSelection && <span className="search-select-display" aria-hidden="true">
+        {current?.value ? (hideGroupLabels ? current.text : display(current)) : entries.find((entry) => !entry.value)?.text}
+      </span>}
       <input
         {...(rest as unknown as React.InputHTMLAttributes<HTMLInputElement>)}
         data-search-select="true"

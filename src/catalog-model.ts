@@ -4,9 +4,13 @@ import {
 } from "./material-types-model.ts";
 import { normalize } from "./sheet-model.ts";
 import type { CatalogRow } from "./sheet-model";
-export function matchesCatalog(row: CatalogRow, query: string) {
-  return [row.name, row.sku, row.barcode, row.alternative_name].some((v) =>
-    normalize(String(v || "")).includes(normalize(query)),
+export function matchesCatalog(row: CatalogRow, query: string, ignoreAccents = false) {
+  const comparable = ignoreAccents
+    ? (value: string) => normalize(value).normalize("NFD").replace(/\p{M}/gu, "")
+    : normalize;
+  const term = comparable(query);
+  return !term || [row.name, row.sku, row.barcode, row.alternative_name].some((value) =>
+    comparable(String(value || "")).includes(term),
   );
 }
 export function prefixFor(

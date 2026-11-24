@@ -1,11 +1,11 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { supabase as db } from "./client";
 import { AppButton, AppIcon } from "./AppIcon";
 import ResponsiveTable from "./ResponsiveTable";
 import SearchSelect from "./SearchSelect";
 import { useOperation, type Row } from "./operations";
 
-export default function MaterialMinimums({company,onSaved}:{company:string;onSaved:()=>Promise<void>}) {
+export default function MaterialMinimums({company,onSaved,renderTrigger}:{company:string;onSaved:()=>Promise<void>;renderTrigger:(trigger:ReactNode)=>ReactNode}) {
  const state=useOperation(company,"catalog");
  const [plan,setPlan]=useState<Row|null>(null),[choices,setChoices]=useState<Record<string,string>>({}),[result,setResult]=useState<Row|null>(null);
  const num=(n:any)=>n==null?"—":Number(n).toLocaleString("es-GT",{maximumFractionDigits:8});
@@ -15,9 +15,9 @@ export default function MaterialMinimums({company,onSaved}:{company:string;onSav
   if(r.error)throw r.error;return r.data;
  }
  return <>
-  <AppButton className="secondary" disabled={state.busy||!state.canWrite} onClick={()=>state.run(async()=>{
+  {renderTrigger(<AppButton iconKey="action.calculate" className="secondary" disabled={state.busy||!state.canWrite} onClick={()=>state.run(async()=>{
    setResult(null);setChoices({});setPlan(await call("preview"));
-  })}>Calcular mínimos</AppButton>
+  })}>Calcular mínimos</AppButton>)}
   {(plan||result||state.error)&&<div className="overlay"><section className="modal operations-dialog" role="dialog" aria-modal="true" aria-label="Calcular inventarios mínimos" aria-busy={state.busy}>
    <header className="hierarchy-toolbar"><h2>Inventarios mínimos</h2><AppButton className="secondary" disabled={state.busy} onClick={()=>{setPlan(null);setResult(null);state.setError("");}}>Cerrar</AppButton></header>
    {state.error&&<p className="error" role="alert"><AppIcon name="status.error"/>{state.error}</p>}

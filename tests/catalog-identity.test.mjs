@@ -195,6 +195,15 @@ test("prefix suggestions, searches and personalized blank barcodes", () => {
   assert.equal(matchesCatalog(materials[0], "personal-99"), true);
   assert.equal(matchesCatalog(materials[0], "M0099"), true);
 });
+test("material catalog search ignores accents and case in names, SKUs and barcodes", () => {
+  const material = { ...materials[0], name: "MÁNTECA DE CACAO" };
+  assert.equal(matchesCatalog(material, "  manteca de Cacao ", true), true);
+  assert.equal(matchesCatalog(material, "m0099", true), true);
+  assert.equal(matchesCatalog(material, "PeRsOnAl-99", true), true);
+  assert.equal(matchesCatalog(material, "   ", true), true);
+  assert.equal(matchesCatalog(material, "manteca de karité", true), false);
+  assert.equal(matchesCatalog(material, "manteca de cacao"), false);
+});
 test("VS only colors strictly lower or higher comparable prices", () => {
   assert.equal(comparison(-1), "lower");
   assert.equal(comparison(1), "higher");

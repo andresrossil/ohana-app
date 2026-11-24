@@ -20,12 +20,14 @@ export default function CatalogFilters({
   origin,
   onOrigin,
   origins,
+  wrapSelection,
 }: {
   classification?: string;
   onClassification?: (value: string) => void;
   origin: string;
   onOrigin: (value: string) => void;
   origins: CatalogRow[];
+  wrapSelection?: boolean;
 }) {
   const types = useMaterialTypes();
   return (
@@ -36,6 +38,7 @@ export default function CatalogFilters({
             <AppIcon name="control.filter" /> Clasificación
           </span>
           <SearchSelect
+            wrapSelection={wrapSelection}
             value={classification}
             onChange={(e) => onClassification(e.target.value)}
           >
@@ -53,7 +56,7 @@ export default function CatalogFilters({
         <span className="field-caption">
           <AppIcon name="control.filter" /> Origen
         </span>
-        <SearchSelect value={origin} onChange={(e) => onOrigin(e.target.value)}>
+        <SearchSelect wrapSelection={wrapSelection} value={origin} onChange={(e) => onOrigin(e.target.value)}>
           <option value="">Todos los orígenes</option>
           {origins.map((o) => (
             <option key={o.id} value={o.id}>
