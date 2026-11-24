@@ -1,4 +1,5 @@
-import { AppButton } from "./AppIcon";
+import FormSection from "./FormSection";
+import { AppButton, AppIcon } from "./AppIcon";
 import type { CatalogRow } from "./sheet-model";
 import CompanyLogo from "./CompanyBrand";
 export default function CompanyPicker({
@@ -32,12 +33,7 @@ export default function CompanyPicker({
         const name =
           corporation?.name || list[0]?.corporation_name || "Empresas";
         return (
-          <section
-            className="company-corporation-group"
-            key={id}
-            aria-label={name}
-          >
-            <h2>{name}</h2>
+          <FormSection title={name} icon="module.settings" key={id}>
             <div className="company-cards">
               {list.map((c) => (
                 <button
@@ -48,6 +44,7 @@ export default function CompanyPicker({
                 >
                   <CompanyLogo company={c} />
                   <strong>{c.name}</strong>
+                  <AppIcon name="action.expand" />
                 </button>
               ))}
             </div>
@@ -56,13 +53,13 @@ export default function CompanyPicker({
                 No hay empresas activas disponibles en esta corporación.
               </p>
             )}
-          </section>
+          </FormSection>
         );
       })}
       {(canCreate ||
         companies.some((c) => c.manage) ||
         corporations.some((c) => c.manage)) && (
-        <AppButton onClick={onManage}>
+        <AppButton type="button" className="secondary company-manage-action" iconKey="action.access" onClick={onManage}>
           Administrar corporaciones y empresas
         </AppButton>
       )}

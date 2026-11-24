@@ -1,7 +1,7 @@
 import SearchSelect from "./SearchSelect";
 import { confirmAction } from "./ConfirmDialog";
 import { AppButton } from "./AppIcon";
-import { SearchField } from "./PoolControls";
+import { IconDetails, SearchField } from "./PoolControls";
 import { useEffect, useState } from "react";
 import { request } from "./commerce";
 import { AppIcon, notifyIconsChanged } from "./AppIcon";
@@ -24,6 +24,7 @@ export default function IconSettings({
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
     [notice, setNotice] = useState("");
+  const [selected, setSelected] = useState<Record<string, string>>({});
   const [search, setSearch] = useState(""),
     [category, setCategory] = useState("Todos"),
     [picker, setPicker] = useState<{ key: string; index?: number } | null>(
@@ -38,6 +39,7 @@ export default function IconSettings({
     setDirty(false);
     setError("");
     setPicker(null);
+    setSelected({});
     request("company_icon_pools", { p_company: company })
       .then((r) => {
         if (live) {
@@ -77,7 +79,7 @@ export default function IconSettings({
     setError("");
   }
   function choose(name: string) {
-    if (!picker) return;
+    if (!picker || !editable) return;
     const pool = pools[picker.key] || defaultIconPools[picker.key],
       options = [...pool.options];
     if (options.some((n, i) => n === name && i !== picker.index)) {
@@ -93,6 +95,7 @@ export default function IconSettings({
       options[picker.index] = name;
     }
     update(picker.key, { options, active });
+    setSelected(previous => ({ ...previous, [picker.key]: name }));
     setPicker(null);
   }
   const norm = (s: string) =>
@@ -104,7 +107,7 @@ export default function IconSettings({
     (e) =>
       (category === "Todos" || e.category === category) &&
       norm(
-        [e.label, e.key, e.category, ...(pools[e.key]?.options || [])].join(
+        [e.label, e.key, e.category, ...((pools[e.key] || defaultIconPools[e.key])?.options || [])].join(
           " ",
         ),
       ).includes(norm(search)),
@@ -130,19 +133,17 @@ export default function IconSettings({
       n.includes(aliases[term] || term) &&
       !pool?.options.some((old, i) => old === n && i !== picker?.index),
   );
-  if (loading) return <p role="status">Cargando pools de iconos…</p>;
+  if (loading) return <p role="status">Cargando iconos…</p>;
   return (
     <section className="icon-settings" aria-busy={busy}>
       <div className="hierarchy-toolbar">
         <div>
-          <h3>Pools de iconos por empresa</h3>
-          <p className="muted">
-            Hasta cinco opciones por función. El resaltado es el icono activo;
-            los colores de estado se conservan.
-          </p>
+          <h3>Iconos por empresa</h3>
+          <p className="muted">Selecciona el icono activo para cada función. Puedes administrar hasta cinco alternativas por función.</p>
         </div>
         <AppButton
-          className="secondary"
+          type="button" className="secondary catalog-icon-button" iconKey="action.refresh"
+          aria-label="Restaurar todos los iconos" title="Restaurar todos los iconos"
           disabled={!editable}
           onClick={async () => {
             if (
@@ -151,13 +152,12 @@ export default function IconSettings({
               )
             ) {
               setPools(structuredClone(defaultIconPools));
+              setSelected({});
               setDirty(true);
               setNotice("");
             }
           }}
-        >
-          Restaurar todos
-        </AppButton>
+        />
       </div>
       {error && (
         <p className="error" role="alert">
@@ -188,122 +188,68 @@ export default function IconSettings({
           </SearchSelect>
         </label>
       </div>
-      {categories.map((c) => {
-        const entries = filtered.filter((e) => e.category === c);
-        return (
-          entries.length > 0 && (
-            <section className="icon-pool-category" key={c}>
-              <h4>{c}</h4>
-              <div className="icon-pool-list">
-                {entries.map((e) => {
-                  const p = pools[e.key] || defaultIconPools[e.key];
-                  return (
-                    <div
-                      className={
-                        "icon-pool-row pool-" + e.key.replaceAll(".", "-")
-                      }
-                      key={e.key}
-                    >
-                      <div className="icon-pool-label">
-                        <strong>{e.label}</strong>
-                        <small>{e.key}</small>
-                      </div>
-                      <div className="icon-pool-options">
-                        {p.options.map((name, i) => (
-                          <div className="icon-pool-option" key={name}>
-                            <AppButton
-                              type="button"
-                              className={
-                                "secondary icon-pool-choice " +
-                                (p.active === name ? "is-active" : "")
-                              }
-                              title={
-                                name + (p.active === name ? " · Activo" : "")
-                              }
-                              aria-label={
-                                "Activar " + name + " para " + e.label
-                              }
-                              aria-pressed={p.active === name}
-                              disabled={!editable}
-                              onClick={() => {
-                                if (p.active !== name)
-                                  update(e.key, { ...p, active: name });
-                              }}
-                            >
-                              <AppIcon name={e.key} override={name} />
-                            </AppButton>
-                            <div className="icon-pool-tools">
-                              <AppButton
-                                type="button"
-                                className="secondary"
-                                disabled={!editable}
-                                title="Reemplazar opción"
-                                aria-label={
-                                  "Reemplazar " + name + " de " + e.label
-                                }
-                                onClick={() => {
-                                  setPicker({ key: e.key, index: i });
-                                  setQuery("");
-                                  setCount(40);
-                                }}
-                              >
-                                <AppIcon name="action.edit" />
-                              </AppButton>
-                              <AppButton
-                                type="button"
-                                className="secondary"
-                                disabled={!editable || p.options.length === 1}
-                                title="Quitar opción"
-                                aria-label={"Quitar " + name + " de " + e.label}
-                                onClick={() => {
-                                  const options = p.options.filter(
-                                    (_, index) => index !== i,
-                                  );
-                                  update(e.key, {
-                                    options,
-                                    active:
-                                      p.active === name ? options[0] : p.active,
-                                  });
-                                }}
-                              >
-                                <AppIcon name="action.delete" />
-                              </AppButton>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                      <div className="icon-pool-controls">
-                        <AppButton
-                          className="secondary"
-                          disabled={!editable || p.options.length >= 5}
-                          onClick={() => {
-                            setPicker({ key: e.key });
-                            setQuery("");
-                            setCount(40);
-                          }}
-                        >
-                          Agregar
-                        </AppButton>
-                        <AppButton
-                          className="secondary"
-                          disabled={!editable}
-                          onClick={() =>
-                            update(
-                              e.key,
-                              structuredClone(defaultIconPools[e.key]),
-                            )
-                          }
-                        >
-                          Restaurar
-                        </AppButton>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </section>
-          )
-        );
+      {categories.map(c => {
+        const entries = filtered.filter(e => e.category === c);
+        return <IconDetails className="icon-pool-category compact-icon-category" key={c} hidden={!entries.length}>
+          <summary>{c}</summary>
+          <div className="icon-pool-list">
+            {entries.map(e => {
+              const pool = pools[e.key] || defaultIconPools[e.key];
+              const chosen = selected[e.key];
+              const index = pool.options.indexOf(chosen);
+              function openPicker(index?: number) {
+                setPicker({ key: e.key, index });
+                setQuery("");
+                setCount(40);
+              }
+              return <article className={"icon-pool-row pool-" + e.key.replaceAll(".", "-")} key={e.key}>
+                <div className="icon-pool-label">
+                  <strong>{e.label}</strong>
+                  <small>{e.key}</small>
+                </div>
+                <AppButton type="button" className="secondary catalog-icon-button icon-pool-restore" iconKey="action.refresh"
+                  aria-label={"Restaurar iconos de " + e.label} title={"Restaurar iconos de " + e.label}
+                  disabled={!editable}
+                  onClick={async () => {
+                    if (!(await confirmAction(`¿Restaurar los iconos predeterminados de «${e.label}»? Los cambios se aplicarán al guardar.`))) return;
+                    update(e.key, structuredClone(defaultIconPools[e.key]));
+                    setSelected(previous => ({ ...previous, [e.key]: "" }));
+                  }} />
+                <div className="icon-pool-options" role="group" aria-label={"Alternativas de " + e.label}>
+                  {pool.options.map(name => <AppButton
+                    type="button" className={"secondary icon-pool-choice" + (pool.active === name ? " is-active" : "")}
+                    aria-pressed={name === chosen} data-managing={name === chosen || undefined}
+                    aria-label={name + (pool.active === name ? " · activo" : "")}
+                    title={name + (pool.active === name ? " · activo" : "")}
+                    disabled={!editable} key={name} onClick={() => setSelected(previous => ({ ...previous, [e.key]: name }))}>
+                    <AppIcon name={e.key} override={name} />
+                    {pool.active === name && <small>Activo</small>}
+                  </AppButton>)}
+                </div>
+                <div className="icon-pool-selection">
+                  <small>{index < 0 ? "Selecciona una alternativa para administrarla." : `Seleccionada: ${chosen}`}</small>
+                  <AppButton type="button" className="secondary" iconKey="action.confirm"
+                    disabled={!editable || index < 0 || pool.active === chosen}
+                    onClick={() => update(e.key, { ...pool, active: chosen })}>Usar icono</AppButton>
+                </div>
+                <div className="icon-pool-controls" role="group" aria-label={"Administrar alternativas de " + e.label}>
+                  <AppButton type="button" className="secondary" iconKey="action.add"
+                    disabled={!editable || pool.options.length >= 5} onClick={() => openPicker()}>Agregar alternativa</AppButton>
+                  <AppButton type="button" className="secondary" iconKey="action.edit"
+                    disabled={!editable || index < 0} onClick={() => openPicker(index)}>Editar seleccionada</AppButton>
+                  <AppButton type="button" className="secondary" iconKey="action.delete"
+                    disabled={!editable || index < 0 || pool.options.length === 1}
+                    onClick={async () => {
+                      if (!(await confirmAction(`¿Quitar «${chosen}» de «${e.label}»? Los cambios se aplicarán al guardar.`))) return;
+                      const options = pool.options.filter(name => name !== chosen);
+                      update(e.key, { options, active: pool.active === chosen ? options[0] : pool.active });
+                      setSelected(previous => ({ ...previous, [e.key]: "" }));
+                    }}>Eliminar seleccionada</AppButton>
+                </div>
+              </article>;
+            })}
+          </div>
+        </IconDetails>;
       })}
       {!filtered.length && (
         <p>No hay funciones que coincidan con la búsqueda.</p>

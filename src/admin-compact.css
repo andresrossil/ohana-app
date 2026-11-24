@@ -1,0 +1,141 @@
+.shell .company-picker {
+  width: min(100%, 960px);
+  padding: 12px 0 20px;
+  margin-inline: auto;
+}
+.shell .company-picker h1 { margin: 2px 0 8px; font-size: clamp(22px, 4vw, 28px); }
+.shell .company-picker .eyebrow { margin: 0; }
+.shell .company-picker .company-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+  gap: 6px;
+  margin: 0;
+}
+.shell .company-picker .company-card {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 5px 8px;
+  border-radius: 8px;
+  text-align: start;
+}
+.shell .company-picker .company-card strong { font-size: 14px; overflow-wrap: anywhere; white-space: normal; }
+.shell .company-picker .company-logo {
+  width: 38px;
+  height: 38px;
+  min-width: 0;
+  min-height: 0;
+  font-size: 19px;
+  border-radius: 6px;
+}
+.shell .company-picker .company-logo img { width: 100%; height: 100%; object-fit: contain; }
+.shell .company-picker .company-logo.official-logo img { position: static; transform: none; }
+.shell .company-picker p.muted { margin: 3px 0; }
+.shell .company-picker .company-manage-action { margin-top: 8px; min-height: 44px; padding: 6px 8px; font-size: 13px; white-space: normal; }
+
+.shell .org-hierarchy { padding: 8px 0 18px; }
+.shell .org-hierarchy > .hierarchy-toolbar { gap: 6px; margin: 0 0 6px; }
+.shell .org-hierarchy > .hierarchy-toolbar :is(h2, p) { margin: 0; }
+.shell .org-hierarchy > .hierarchy-toolbar h2 { font-size: 20px; }
+.shell .org-hierarchy > .hierarchy-toolbar button { min-height: 44px; padding: 5px 8px; font-size: 13px; }
+.shell .org-hierarchy > label { margin-bottom: 6px; max-width: 480px; }
+.shell .org-hierarchy .corporation-node { margin: 6px 0; padding: 0; border-radius: 8px; }
+.shell .org-hierarchy .corporation-node .hierarchy-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 6px;
+  padding: 5px 7px;
+  align-items: center;
+}
+.shell .org-hierarchy .corporation-title {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 6px;
+  padding: 3px;
+  min-height: 44px;
+  border: 0;
+  background: transparent;
+  color: var(--admin-heading);
+  text-align: start;
+  white-space: normal;
+}
+.shell .org-hierarchy .tree-label { min-width: 0; overflow-wrap: anywhere; }
+.shell .org-hierarchy :is(.tree-label strong, .tree-label small) { display: block; }
+.shell .org-hierarchy .tree-actions { display: flex; gap: 3px; justify-content: end; }
+.shell .org-hierarchy .tree-actions > .catalog-icon-button { flex: 0 0 44px; min-height: 44px; padding: 0; }
+.shell .org-hierarchy .company-branches { padding: 0 0 0 13px; margin: 0; }
+.shell .org-hierarchy .company-node { border: 0; border-top: 1px solid var(--admin-border); border-radius: 0; margin: 0; }
+.shell .org-hierarchy .company-branches p { padding-inline: 8px; }
+
+.shell .icon-settings > .hierarchy-toolbar { gap: 6px; margin-bottom: 6px; }
+.shell .icon-settings > .hierarchy-toolbar :is(h3, p) { margin: 0; }
+.shell .icon-settings > .hierarchy-toolbar h3 { font-size: 20px; }
+.shell .icon-settings > .hierarchy-toolbar p { font-size: 13px; }
+.shell .icon-settings > .settings-grid { gap: 6px; margin-bottom: 8px; }
+.shell .icon-settings > .settings-grid label { margin: 0; min-width: 0; }
+.shell .compact-icon-category { border: 1px solid var(--admin-border); border-radius: 8px; margin-top: 6px; }
+.shell .compact-icon-category[hidden] { display: none; }
+.shell .compact-icon-category > summary {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 4px 8px;
+  color: var(--admin-heading);
+  font-weight: 650;
+}
+.shell .compact-icon-category .icon-pool-list {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 290px), 1fr));
+  gap: 6px;
+  padding: 0 6px 6px;
+}
+.shell .compact-icon-category .icon-pool-row { grid-template-columns: minmax(0, 1fr) auto; gap: 6px; padding: 6px 8px; min-width: 0; }
+.shell .compact-icon-category .icon-pool-label { grid-area: 1 / 1; min-width: 0; overflow-wrap: anywhere; }
+.shell .compact-icon-category .icon-pool-restore { grid-area: 1 / 2; }
+.shell .compact-icon-category .icon-pool-options {
+  grid-column: 1 / -1;
+  grid-row: auto;
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+.shell .compact-icon-category .icon-pool-choice {
+  width: 44px;
+  min-width: 44px;
+  min-height: 46px;
+  display: grid;
+  justify-items: center;
+  padding: 3px;
+  gap: 1px;
+}
+.shell .compact-icon-category .icon-pool-choice.is-active {
+  border: 2px solid var(--admin-primary);
+  outline: none;
+  background: var(--admin-secondary);
+}
+.shell .compact-icon-category .icon-pool-choice[data-managing] {
+  outline: 2px dashed var(--admin-primary);
+  outline-offset: 1px;
+}
+.shell .compact-icon-category .icon-pool-choice:focus-visible { outline: 2px solid var(--admin-primary); }
+.icon-pool-choice small { font-size: 9px; line-height: 1; }
+.shell .compact-icon-category :is(.icon-pool-selection, .icon-pool-controls) {
+  grid-column: 1 / -1;
+  grid-row: auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+}
+.shell .compact-icon-category .icon-pool-selection { justify-content: space-between; }
+.shell .compact-icon-category .icon-pool-selection small { overflow-wrap: anywhere; }
+.shell .compact-icon-category :is(.icon-pool-selection, .icon-pool-controls) > button {
+  min-height: 44px;
+  min-width: 0;
+  padding: 4px 6px;
+  white-space: normal;
+  font-size: 12px;
+}
+.shell .icon-settings .icon-pool-save { padding: 6px 0 max(6px, env(safe-area-inset-bottom)); }

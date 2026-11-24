@@ -169,6 +169,14 @@ function App() {
     );
   };
   const canWrite = role !== "viewer" && !!activeCompany?.write;
+  const managingStructure = section === "settings" && configView === "structure";
+  const managingAppearance = section === "settings" && configView === "appearance";
+  const hasStructureAccess = canCreate || companies.some(item => item.manage) || corporations.some(item => item.manage);
+  const accessLabel = managingStructure
+    ? hasStructureAccess ? "Acceso de administración" : "Solo lectura"
+    : managingAppearance && activeCompany?.manage ? "Acceso de administración"
+    : !company ? "Selección de empresa"
+    : role === "viewer" ? "Solo lectura" : "Acceso de edición";
   const currentCompany = useRef(company);
   currentCompany.current = company;
   function chooseCompany(id: string) {
@@ -734,7 +742,7 @@ function App() {
           <header>
             <span>OHANA / {sectionTitle.toUpperCase()}</span>
             <span className="badge">
-              {role === "viewer" ? "Solo lectura" : "Acceso de edición"}
+              {accessLabel}
             </span>
           </header>
           {importNotice && (
@@ -1752,3 +1760,5 @@ import "./materials-catalog.css";
 
 import "./compact-form.css";
 import "./products-catalog.css";
+
+import "./admin-compact.css";

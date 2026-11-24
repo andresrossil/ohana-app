@@ -1,4 +1,5 @@
 import { DISCLOSURE_INITIALLY_OPEN } from "./disclosure-default";
+import CatalogBadge from "./CatalogBadge";
 import SearchSelect from "./SearchSelect";
 import { confirmAction } from "./ConfirmDialog";
 import { IconDetails, SearchField } from "./PoolControls";
@@ -357,28 +358,23 @@ export default function OrganizationAdmin({
           return (
             <section className="corporation-node" key={g.id}>
               <div className="hierarchy-row">
-                <AppButton
-                  className="secondary tree-toggle"
-                  aria-expanded={isOpen}
-                  aria-label={(isOpen ? "Contraer " : "Expandir ") + g.name}
-                  onClick={() => toggle(g.id)}
-                >
-                  <AppIcon
-                    name={isOpen ? "action.collapse" : "action.expand"}
-                  />
-                </AppButton>
-                <div className="tree-label">
-                  <strong>{g.name}</strong>
-                  <small>
-                    {children.length} empresa(s) autorizada(s)
-                    {g.active === false ? " · Inactiva" : ""}
-                  </small>
-                </div>
+                <button type="button" className="tree-label corporation-title" aria-expanded={isOpen} onClick={() => toggle(g.id)}>
+                  <AppIcon name={isOpen ? "action.collapse" : "action.expand"} />
+                  <span>
+                    <strong>{g.name}</strong>
+                    <small>
+                      {children.length} {children.length === 1 ? "empresa autorizada" : "empresas autorizadas"}
+                      {g.active === false ? " · Inactiva" : ""}
+                    </small>
+                  </span>
+                </button>
                 <div className="tree-actions">
                   {g.manage && (
                     <>
                       <AppButton
-                        className="secondary"
+                        className="secondary catalog-icon-button"
+                        type="button" iconKey="action.edit"
+                        aria-label={"Editar corporación " + g.name} title={"Editar corporación " + g.name}
                         onClick={() =>
                           open({
                             type: "rename_corporation",
@@ -386,23 +382,11 @@ export default function OrganizationAdmin({
                             row: g,
                           })
                         }
-                      >
-                        Editar
-                      </AppButton>
+                       />
                       <AppButton
-                        className="secondary"
-                        onClick={() =>
-                          open({
-                            type: "create_company",
-                            title: "Agregar empresa a " + g.name,
-                            parent: g.id,
-                          })
-                        }
-                      >
-                        Agregar empresa
-                      </AppButton>
-                      <AppButton
-                        className="secondary"
+                        className="secondary catalog-icon-button"
+                        type="button" iconKey="action.access"
+                        aria-label={"Administrar accesos de " + g.name} title={"Administrar accesos de " + g.name}
                         onClick={() =>
                           open({
                             type: "access_corp",
@@ -410,9 +394,19 @@ export default function OrganizationAdmin({
                             row: g,
                           })
                         }
-                      >
-                        Accesos
-                      </AppButton>
+                       />
+                      <AppButton
+                        className="secondary catalog-icon-button"
+                        type="button" iconKey="action.add"
+                        aria-label={"Agregar empresa a " + g.name} title={"Agregar empresa a " + g.name}
+                        onClick={() =>
+                          open({
+                            type: "create_company",
+                            title: "Agregar empresa a " + g.name,
+                            parent: g.id,
+                          })
+                        }
+                       />
                     </>
                   )}
                 </div>
@@ -423,15 +417,15 @@ export default function OrganizationAdmin({
                     <div className="hierarchy-row company-node" key={c.id}>
                       <div className="tree-label">
                         <strong>{c.name}</strong>
-                        <small>
-                          {c.active !== false ? "Activa" : "Inactiva"}
-                        </small>
+                        <CatalogBadge active={c.active !== false} label={c.active !== false ? "Activa" : "Inactiva"} />
                       </div>
                       <div className="tree-actions">
                         {c.manage && (
                           <>
                             <AppButton
-                              className="secondary"
+                              className="secondary catalog-icon-button"
+                              type="button" iconKey="action.edit"
+                              aria-label={"Editar empresa " + c.name} title={"Editar empresa " + c.name}
                               onClick={() =>
                                 open({
                                   type: "edit_company",
@@ -439,11 +433,11 @@ export default function OrganizationAdmin({
                                   row: c,
                                 })
                               }
-                            >
-                              Editar
-                            </AppButton>
+                             />
                             <AppButton
-                              className="secondary"
+                              className="secondary catalog-icon-button"
+                              type="button" iconKey="action.access"
+                              aria-label={"Administrar accesos de " + c.name} title={"Administrar accesos de " + c.name}
                               onClick={() =>
                                 open({
                                   type: "access_company",
@@ -451,17 +445,12 @@ export default function OrganizationAdmin({
                                   row: c,
                                 })
                               }
-                            >
-                              Accesos
-                            </AppButton>
+                             />
                             {onConfigure && (
-                              <AppButton
-                                className="secondary"
-                                disabled={c.active === false}
-                                onClick={() => onConfigure(c.id)}
-                              >
-                                Configuración
-                              </AppButton>
+                              <AppButton type="button" className="secondary catalog-icon-button"
+                                iconKey="module.settings" disabled={c.active === false}
+                                aria-label={"Configurar " + c.name} title={"Configurar " + c.name}
+                                onClick={() => onConfigure(c.id)} />
                             )}
                           </>
                         )}
