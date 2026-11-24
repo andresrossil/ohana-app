@@ -1747,3 +1747,4 @@ import "./mobile.css";
 
 import "./layout-polish.css";
 import "./app-chrome.css";
+import "./materials-catalog.css";

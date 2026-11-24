@@ -10,7 +10,6 @@ import { SearchField } from "./PoolControls";
 import ProductImage from "./ProductImage";
 import ResponsiveTable from "./ResponsiveTable";
 import type { CatalogRow } from "./sheet-model";
-import "./materials-catalog.css";
 
 type Material = CatalogRow & { active?: boolean };
 const statusOptions = [
