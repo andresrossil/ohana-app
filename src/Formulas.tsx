@@ -1770,7 +1770,7 @@ export default function Formulas({
                   </section>
                 )}
               </IconDetails>
-              <IconDetails className="formula-disclosure" open={Boolean(draft.intermediates?.length)}>
+              <IconDetails className="formula-disclosure">
                 <summary>Productos intermedios</summary>
                 {(draft.intermediates || []).map((line: Row, index: number) => {
                   const options = (catalog.intermediate_options || []) as Row[];
@@ -1945,7 +1945,6 @@ export default function Formulas({
               )}
               <IconDetails
                 className="formula-disclosure"
-                open={mode === "notes"}
               >
                 <summary>Notas administrativas</summary>
                 <label className="form-wide">

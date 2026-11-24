@@ -1,3 +1,4 @@
+import { DISCLOSURE_INITIALLY_OPEN } from "./disclosure-default";
 import TableActions from "./TableActions";
 import {
   Children,
@@ -70,8 +71,9 @@ export default forwardRef<
   { children, className, onInvalidCapture, onSortRows, showAllMobileFields, compactRowActions, sortable = true, ...props },
   ref,
 ) {
-  const [expanded, setExpanded] = useState<Set<string>>(new Set()),
+  const [overrides, setOverrides] = useState<Set<string>>(new Set()),
     parts = elements(children);
+  const isExpanded = (key: string) => overrides.has(key) ? !DISCLOSURE_INITIALLY_OPEN : DISCLOSURE_INITIALLY_OPEN;
   const table = useRef<HTMLTableElement | null>(null);
   const [sort, setSort] = useState<{
     column: number;
@@ -238,9 +240,14 @@ export default forwardRef<
           onInvalidCapture?.(e);
           const row = (e.target as HTMLElement).closest("tr"),
             key = row?.dataset.mobileKey;
-          if (key && !expanded.has(key)) {
+          if (key && !isExpanded(key)) {
             e.preventDefault();
-            setExpanded((old) => new Set([...old, key]));
+            setOverrides((old) => {
+              const next = new Set(old);
+              if (DISCLOSURE_INITIALLY_OPEN) next.delete(key);
+              else next.add(key);
+              return next;
+            });
             requestAnimationFrame(() => {
               const target = e.target as HTMLInputElement;
               target.focus();
@@ -328,7 +335,7 @@ export default forwardRef<
                   ).map(({ row, index: rowIndex, key }) => {
                     if (row.type !== "tr") return row;
                     const cells = elements(row.props.children),
-                      isOpen = expanded.has(key),
+                      isOpen = isExpanded(key),
                       visible = cells.map(
                         (c, i) =>
                           showAllMobileFields || c.props["data-mobile-visible"] || primary.has(i) ||
@@ -349,7 +356,7 @@ export default forwardRef<
                         onPointerDown={(e) => e.stopPropagation()}
                         onKeyDown={(e) => e.stopPropagation()}
                         onClick={() =>
-                          setExpanded((old) => {
+                          setOverrides((old) => {
                             const next = new Set(old);
                             if (next.has(key)) next.delete(key);
                             else next.add(key);

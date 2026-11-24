@@ -15,10 +15,11 @@ export async function uploadMaterialPhoto(file: File, company: string) {
   return path;
 }
 
-export default function MaterialPhoto({ path, name = "material", compact, onChange }: {
+export default function MaterialPhoto({ path, name = "material", compact, noun = "imagen", onChange }: {
   path?: string | null;
   name?: string;
   compact?: boolean;
+  noun?: "imagen" | "fotografía";
   onChange?: () => void;
 }) {
   const [preview, setPreview] = useState("");
@@ -31,7 +32,7 @@ export default function MaterialPhoto({ path, name = "material", compact, onChan
       {preview ? <img src={preview} alt="" /> : <AppIcon name="module.products" />}
     </div>
     <div className="compact-photo-content">
-      <strong>Imagen del material</strong>
+      <strong>{noun === "imagen" ? "Imagen del material" : "Fotografía del producto"}</strong>
       <input ref={picker} name="photo" type="file" accept="image/png,image/jpeg,image/webp" hidden
         onChange={(event) => {
           const file = event.currentTarget.files?.[0];
@@ -48,7 +49,7 @@ export default function MaterialPhoto({ path, name = "material", compact, onChan
         }} />
       <div className="compact-photo-actions">
         <AppButton type="button" className="secondary" iconKey="action.upload" onClick={() => picker.current?.click()}>
-          {preview ? "Reemplazar imagen" : "Cargar imagen"}
+          {preview ? `Reemplazar ${noun}` : `Cargar ${noun}`}
         </AppButton>
         {(preview || error) && <AppButton type="button" className="secondary" iconKey="action.cancel" onClick={() => {
           if (picker.current) {

@@ -1,3 +1,4 @@
+import { DISCLOSURE_INITIALLY_OPEN } from "./disclosure-default";
 import { Children, cloneElement, isValidElement, useState } from "react";
 import type {
   DetailsHTMLAttributes,
@@ -8,12 +9,14 @@ import { AppIcon } from "./AppIcon";
 export function IconDetails({
   children,
   onToggle,
+  open: requestedOpen = DISCLOSURE_INITIALLY_OPEN,
   ...props
 }: DetailsHTMLAttributes<HTMLDetailsElement>) {
-  const [open, setOpen] = useState(!!props.open);
+  const [open, setOpen] = useState(requestedOpen);
   return (
     <details
       {...props}
+      open={requestedOpen}
       className={"pool-details " + (props.className || "")}
       onToggle={(e) => {
         setOpen(e.currentTarget.open);

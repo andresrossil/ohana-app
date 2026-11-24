@@ -1,7 +1,8 @@
+import { DISCLOSURE_INITIALLY_OPEN } from "./disclosure-default";
 import type { ReactNode } from "react";
 import { AppIcon } from "./AppIcon";
 
-export default function FormSection({ title, icon, initiallyOpen, children }: {
+export default function FormSection({ title, icon, initiallyOpen = DISCLOSURE_INITIALLY_OPEN, children }: {
   title: string;
   icon: string;
   initiallyOpen?: boolean;

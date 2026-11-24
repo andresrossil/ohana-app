@@ -1,10 +1,11 @@
+import { DISCLOSURE_INITIALLY_OPEN } from "./disclosure-default";
 import { useEffect, useState, type ReactNode } from "react";
 import { Bell, ChevronDown, ChevronRight } from "lucide-react";
 import { supabase } from "./client";
 import { money } from "./operations";
 import ResponsiveTable from "./ResponsiveTable";
 import { AppButton, AppIcon } from "./AppIcon";
-import { SearchField } from "./PoolControls";
+import { IconDetails, SearchField } from "./PoolControls";
 import { settlementNumber } from "./courier-account";
 import { lotCode } from "./BatchTrace";
 import { curingCount, summarizeCuringProducts, useCuringProduction } from "./CuringProduction";
@@ -61,7 +62,7 @@ function DashboardPanel({ id, title, subtitle, icon, count, open, toggle, childr
       {count != null && <span className="dashboard-count">{count}</span>}
       <ChevronDown size={18} aria-hidden="true" />
     </button></h2>
-    <div id={`dashboard-${id}-content`} hidden={!open} className="dashboard-panel-content">{open && children}</div>
+    <div id={`dashboard-${id}-content`} hidden={!open} className="dashboard-panel-content">{children}</div>
   </section>;
 }
 function Pending({ label, count, icon, onClick }: { label: string; count: number; icon: string; onClick?: () => void }) {
@@ -84,7 +85,7 @@ export default function Dashboard({ company, currency, companyName, corporationN
   const [stockQuery, setStockQuery] = useState("");
   const [materialQuery, setMaterialQuery] = useState("");
   const [curingQuery, setCuringQuery] = useState("");
-  const [selectedGroup, setSelectedGroup] = useState<string | null>(null);
+  const [lotGroupOpens, setLotGroupOpens] = useState<Record<string, boolean>>({});
   const { batches, error: curingError, date } = useCuringProduction(onProduction ? company : null);
   useEffect(() => {
     let active = true;
@@ -135,7 +136,7 @@ export default function Dashboard({ company, currency, companyName, corporationN
   const missing = (key: string) => Number(data?.[key]) > 0 ? `Valor parcial · ${number(Number(data?.[key]))} sin precio o costo` : undefined;
   const previous = Number(data?.sales_previous);
   const variation = previous > 0 && data?.sales_current != null ? number((Number(data.sales_current) / previous - 1) * 100) + " %" : "—";
-  const toggle = (id: Panel) => setOpens(current => ({ ...current, [id]: !current[id] }));
+  const toggle = (id: Panel) => setOpens(current => ({ ...current, [id]: !(current[id] ?? DISCLOSURE_INITIALLY_OPEN) }));
   const reveal = (id: Panel) => {
     setOpens(current => ({ ...current, [id]: true }));
     requestAnimationFrame(() => document.getElementById(`dashboard-${id}`)?.scrollIntoView({ block: "start" }));
@@ -190,7 +191,7 @@ export default function Dashboard({ company, currency, companyName, corporationN
       </div>
     </section>}
     {data?.available_products && <DashboardPanel id="stock" title="Productos disponibles" subtitle="Inventario y curación/secado"
-      icon="module.products" open={!!opens.stock} toggle={() => toggle("stock")}>
+      icon="module.products" open={opens.stock ?? DISCLOSURE_INITIALLY_OPEN} toggle={() => toggle("stock")}>
       <SearchField aria-label="Filtrar productos" placeholder="Buscar producto, SKU o variante…" value={stockQuery}
         onChange={event => setStockQuery(event.target.value)} />
       {stock.length ? <ul className="dashboard-records">{stock.map(row => <li className="dashboard-record" key={row.id}>
@@ -208,7 +209,7 @@ export default function Dashboard({ company, currency, companyName, corporationN
       </li>)}</ul> : <p className="dashboard-empty">{stockQuery.trim() ? "No hay productos que coincidan con la búsqueda." : "No hay productos disponibles ni en curación/secado."}</p>}
     </DashboardPanel>}
     {settlements && <DashboardPanel id="settlements" title="Liquidaciones pendientes" icon="module.settlements"
-      count={settlements.length} open={!!opens.settlements} toggle={() => toggle("settlements")}>
+      count={settlements.length} open={opens.settlements ?? DISCLOSURE_INITIALLY_OPEN} toggle={() => toggle("settlements")}>
       {settlements.length ? <ul className="dashboard-records">{settlements.map(row => <li className="dashboard-record dashboard-settlement" key={row.id}>
         <div className="dashboard-record-name"><strong>{settlementNumber(row.number)} · {row.courier}</strong>
           <small>{dateLabel(row.date)} · {row.state === "draft" ? "Borrador" : row.state === "partial" ? "Pago parcial" : "Pendiente"}</small>
@@ -220,7 +221,7 @@ export default function Dashboard({ company, currency, companyName, corporationN
       </li>)}</ul> : <p className="dashboard-empty">No hay liquidaciones pendientes</p>}
     </DashboardPanel>}
     {hasReorder && <DashboardPanel id="reorder" title="Reorden de materiales" count={low} icon="status.warning"
-      open={!!opens.reorder} toggle={() => toggle("reorder")}>
+      open={opens.reorder ?? DISCLOSURE_INITIALLY_OPEN} toggle={() => toggle("reorder")}>
       <SearchField aria-label="Filtrar materiales" placeholder="Buscar material o SKU…" value={materialQuery}
         onChange={event => setMaterialQuery(event.target.value)} />
       {reorder.length ? <ul className="dashboard-records">{reorder.map(row => {
@@ -240,7 +241,7 @@ export default function Dashboard({ company, currency, companyName, corporationN
           </div>
         </li>;
       })}</ul> : <p className="dashboard-empty">{materialQuery.trim() ? "No hay materiales que coincidan con la búsqueda." : "No hay materiales bajo el mínimo."}</p>}
-      {!!data?.suggested_production?.length && <details className="dashboard-suggested">
+      {!!data?.suggested_production?.length && <IconDetails className="dashboard-suggested">
         <summary>Producción sugerida</summary>
         <div className="table-wrap"><ResponsiveTable showAllMobileFields>
           <thead><tr><th>Producto</th><th>Disponible total</th><th>Mínimo</th><th>Unidades sugeridas</th></tr></thead>
@@ -249,10 +250,10 @@ export default function Dashboard({ company, currency, companyName, corporationN
             <td data-sort-value={row.minimum}>{number(row.minimum)}</td><td data-sort-value={row.suggested}>{number(row.suggested)}</td>
           </tr>)}</tbody>
         </ResponsiveTable></div>
-      </details>}
+      </IconDetails>}
     </DashboardPanel>}
     {onProduction && <DashboardPanel id="curing" title="Lotes en curación" count={ready} icon="status.pending"
-      open={!!opens.curing} toggle={() => toggle("curing")}>
+      open={opens.curing ?? DISCLOSURE_INITIALLY_OPEN} toggle={() => toggle("curing")}>
       <div className="dashboard-curing-notice" data-pending={ready > 0}>
         <Bell size={18} aria-hidden="true" /><span><strong>{ready === 1 ? "1 lote listo" : `${ready} lotes listos`}</strong>
           <small>Para confirmar o liberar</small></span>
@@ -268,17 +269,17 @@ export default function Dashboard({ company, currency, companyName, corporationN
           const isReady = !!row.availableOn && row.availableOn <= date;
           const confirmation = group.some(batch => batch.opening_stock && !batch.confirmed);
           const release = group.some(batch => !batch.opening_stock || batch.confirmed);
-          const expanded = selectedGroup === id;
+          const expanded = lotGroupOpens[id] ?? DISCLOSURE_INITIALLY_OPEN;
           return <li key={id}>
             <button type="button" className="dashboard-record dashboard-curing-row" data-pending={isReady}
-              aria-expanded={expanded} onClick={() => setSelectedGroup(expanded ? null : id)}>
+              aria-expanded={expanded} onClick={() => setLotGroupOpens(current => ({ ...current, [id]: !(current[id] ?? DISCLOSURE_INITIALLY_OPEN) }))}>
               <span className="dashboard-record-name"><strong>{row.name}</strong><small>
                 <AppIcon name={isReady ? "status.success" : "status.pending"} /> {isReady
                   ? [confirmation && "Listo para confirmar", release && "Listo para liberar"].filter(Boolean).join(" · ")
                   : "En curación"} · {dateLabel(row.availableOn)}</small></span>
               <span className="dashboard-curing-totals"><span><strong>{row.lots}</strong> {row.lots === 1 ? "lote" : "lotes"}</span>
                 <span><strong>{row.known ? curingCount.format(row.total) : "—"}</strong> unidades teóricas{row.known && row.missing ? " · parcial" : ""}</span></span>
-              <ChevronRight size={18} aria-hidden="true" />
+              <AppIcon name={expanded ? "action.collapse" : "action.expand"} />
             </button>
             {expanded && <ul className="dashboard-lot-links">{group.map(batch => <li key={batch.id}>
               <AppButton type="button" className="secondary" onClick={() => onProduction(batch.id)}>{lotCode(batch.batch_number)} · Ver documento</AppButton>

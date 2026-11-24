@@ -1,3 +1,4 @@
+import { DISCLOSURE_INITIALLY_OPEN } from "./disclosure-default";
 import { onIdleRefresh } from "./idle-refresh";
 import SearchSelect from "./SearchSelect";
 import { AppIcon, AppButton } from "./AppIcon";
@@ -66,11 +67,11 @@ export default function Sidebar({
     [collapsed, setCollapsed] = useState(false),
     [profile, setProfile] = useState({ name: "", photo: "" });
   const activeCategory = categories.find(({ items }) => items.includes(section))?.id;
-  const [expanded, setExpanded] = useState<string | undefined>();
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const profileMenu = useRef<HTMLDetailsElement>(null);
   const drawer = useRef<HTMLElement>(null),
     toggle = useRef<HTMLButtonElement>(null);
-  const closeMenu = () => { setOpen(false); setExpanded(undefined); };
+  const closeMenu = () => { setOpen(false); };
   const toggleMenu = () => { if (open) closeMenu(); else setOpen(true); };
   useEffect(closeMenu, [section, company]);
   useEffect(() => {
@@ -305,7 +306,7 @@ export default function Sidebar({
             {categories.map(({ id, label, icon, items }) => {
               const visible = items.filter(canShow);
               if (!visible.length) return null;
-              const isExpanded = expanded === id;
+              const isExpanded = expanded[id] ?? DISCLOSURE_INITIALLY_OPEN;
               const contentId = `ohana-nav-${id}`;
               return <div className="sidebar-category" key={id}>
                 <button
@@ -313,7 +314,7 @@ export default function Sidebar({
                   className={activeCategory === id && !isExpanded ? "sidebar-category-toggle selected" : "sidebar-category-toggle"}
                   aria-expanded={isExpanded}
                   aria-controls={contentId}
-                  onClick={() => setExpanded(previous => previous === id ? undefined : id)}
+                  onClick={() => setExpanded(previous => ({ ...previous, [id]: !(previous[id] ?? DISCLOSURE_INITIALLY_OPEN) }))}
                 >
                   <span aria-hidden="true"><NavIcon name={icon} /></span>
                   {label}

@@ -1,3 +1,4 @@
+import { DISCLOSURE_INITIALLY_OPEN } from "./disclosure-default";
 import { usePreparationChecklist } from "./preparation-checklist";
 import { useEffect, useState } from "react";
 import { AppButton, AppIcon } from "./AppIcon";
@@ -11,7 +12,7 @@ export default function MaterialRequirements({
   formula,
   scale = 1,
   units = null,
-  initialOpen = false,
+  initialOpen = DISCLOSURE_INITIALLY_OPEN,
   checklistUser,
 }: {
   company: string;

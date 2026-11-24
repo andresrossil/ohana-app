@@ -1,7 +1,7 @@
 import { useMaterialTypes } from "./MaterialTypesContext";
 import SearchSelect from "./SearchSelect";
 import { AppButton, AppIcon } from "./AppIcon";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { supabase as db } from "./client";
 import type { CatalogRow } from "./sheet-model";
 import { linkedBarcode, prefixFor } from "./catalog-model";
@@ -12,6 +12,7 @@ export default function CatalogFields({
   item,
   origins,
   compact = false,
+  fieldMessage,
   requestCodes = async (requests) => {
     const { data, error } = await db.rpc("suggest_catalog_skus", {
       p_company: company,
@@ -26,6 +27,7 @@ export default function CatalogFields({
   item?: CatalogRow | null;
   origins: CatalogRow[];
   compact?: boolean;
+  fieldMessage?: (name: string) => ReactNode;
   requestCodes?: (
     requests: { key: string; prefix: string }[],
   ) => Promise<{ key: string; sku: string }[]>;
@@ -89,7 +91,7 @@ export default function CatalogFields({
   const originField = (
       <label>
         Origen
-        <SearchSelect wrapSelection={compact} name="origin_id" defaultValue={item?.origin_id || ""}>
+        <SearchSelect wrapSelection={compact} data-validation-field={compact ? "origin_id" : undefined} name="origin_id" defaultValue={item?.origin_id || ""}>
           <option value="">Pendiente de definir</option>
           {origins
             .filter((o) => o.active || o.id === item?.origin_id)
@@ -100,6 +102,7 @@ export default function CatalogFields({
               </option>
             ))}
         </SearchSelect>
+        {fieldMessage?.("origin_id")}
       </label>
   );
   return (
@@ -129,8 +132,8 @@ export default function CatalogFields({
           </SearchSelect>
         </label>
       )}
-      {compact && originField}
-      <label className={compact ? "form-wide" : undefined}>
+      {compact && kind === "material" && originField}
+      <label className={compact && kind === "material" ? "form-wide" : undefined}>
         SKU (opcional)
         <div className="sku-field">
           <input
@@ -151,8 +154,9 @@ export default function CatalogFields({
             {busy ? "Sugiriendo…" : "Sugerir"}
           </AppButton>
         </div>
+        {fieldMessage?.("sku")}
       </label>
-      {!compact && originField}
+      {(!compact || kind === "product") && originField}
       <label className={compact ? "form-wide" : undefined}>
         Código de barras (opcional)
         <input
@@ -167,6 +171,7 @@ export default function CatalogFields({
             setBarcode(e.target.value);
           }}
         />
+        {fieldMessage?.("barcode")}
       </label>
       <label className={compact ? "check-label form-wide" : "check-label"}>
         <input

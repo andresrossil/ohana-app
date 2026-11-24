@@ -730,7 +730,7 @@ function App() {
             });
           }}
         />
-        <main className={section === "dashboard" || section === "materials" ? "dashboard-main" : undefined}>
+        <main className={["dashboard", "materials", "products"].includes(section) ? "dashboard-main" : undefined}>
           <header>
             <span>OHANA / {sectionTitle.toUpperCase()}</span>
             <span className="badge">
@@ -1751,3 +1751,4 @@ import "./app-chrome.css";
 import "./materials-catalog.css";
 
 import "./compact-form.css";
+import "./products-catalog.css";

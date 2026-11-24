@@ -1,3 +1,4 @@
+import { IconDetails } from "./PoolControls";
 import { useEffect, useState } from "react";
 import { AppButton, AppIcon } from "./AppIcon";
 import SearchSelect from "./SearchSelect";
@@ -490,7 +491,7 @@ export default function Kardex({
             </ResponsiveTable>
           </div>
           {!!products.size && (
-            <details>
+            <IconDetails>
               <summary>Totales por producto</summary>
               <div className="table-wrap">
                 <ResponsiveTable>
@@ -525,7 +526,7 @@ export default function Kardex({
                   </tbody>
                 </ResponsiveTable>
               </div>
-            </details>
+            </IconDetails>
           )}
         </section>
       )}

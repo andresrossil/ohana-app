@@ -6,7 +6,9 @@ import { AppButton, AppIcon } from "./AppIcon";
 import { orderedProducts } from "./product-view";
 import ProductImage from "./ProductImage";
 import VariantManager from "./VariantManager";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useLayoutEffect, useRef } from "react";
+import ProductCreateForm from "./ProductCreateForm";
+import ProductActions from "./ProductActions";
 import type { ComponentProps, FormEvent } from "react";
 import { supabase as db } from "./client";
 import type { CatalogRow } from "./sheet-model";
@@ -51,6 +53,15 @@ export default function ProductsCatalog({
     [origin, setOrigin] = useState(""),
     [busy, setBusy] = useState(false),
     [error, setError] = useState("");
+  const saving = useRef(false);
+  const createPosition = useRef<{ trigger: HTMLButtonElement; top: number } | null>(null);
+  useLayoutEffect(() => {
+    if (edit !== undefined || !createPosition.current) return;
+    const { trigger, top } = createPosition.current;
+    createPosition.current = null;
+    trigger.focus({ preventScroll: true });
+    if (window.scrollY !== top) window.scrollTo({ top, behavior: "instant" });
+  }, [edit]);
   const [sort, setSort] = useState<{
     column: string;
     direction: "asc" | "desc";
@@ -109,7 +120,8 @@ export default function ProductsCatalog({
   );
   async function save(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (!canWrite) return;
+    if (!canWrite || saving.current) return;
+    saving.current = true;
     setBusy(true);
     setError("");
     try {
@@ -171,14 +183,16 @@ export default function ProductsCatalog({
     } catch (e: any) {
       setError(e.message);
     } finally {
+      saving.current = false;
       setBusy(false);
     }
   }
   return (
     <>
-      <section className="intro">
+      <div className="products-home">
+      <section className="products-heading dashboard-welcome">
         <div>
-          <p className="eyebrow">LO QUE CREAS</p>
+          <span>Lo que creas</span>
           <h1 className="module-title">
             <AppIcon name="module.products" />
             Productos
@@ -187,18 +201,20 @@ export default function ProductsCatalog({
         </div>
         {canWrite && (
           <AppButton
-            onClick={() => {
+            type="button" iconKey="action.add"
+            onClick={event => {
+              createPosition.current = { trigger: event.currentTarget, top: window.scrollY };
               setError("");
               setEdit(null);
             }}
           >
-            Agregar producto
+            Nuevo
           </AppButton>
         )}
       </section>
-      <section className="catalog">
-        <div className="toolbar">
-          <h2>
+      <section className="dashboard-surface products-catalog">
+        <div className="products-toolbar">
+          <h2 className="dashboard-section-heading">
             Tu catálogo <small>{products.length}</small>
           </h2>
           <SearchField
@@ -207,36 +223,36 @@ export default function ProductsCatalog({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
+          <CatalogFilters origin={origin} onOrigin={setOrigin} origins={origins} wrapSelection />
         </div>
-        <CatalogFilters
-          origin={origin}
-          onOrigin={setOrigin}
-          origins={origins}
-        />
         <div className="table-wrap">
-          <ResponsiveTable>
+          <ResponsiveTable className="products-table" compactRowActions>
             <thead>
               <tr>
-                {sortHeader("sku", "SKU")}
                 {sortHeader("name", "Producto")}
+                {sortHeader("sku", "SKU")}
                 {sortHeader("origin", "Origen")}
                 {sortHeader("barcode", "Código de barras")}
                 {sortHeader("active", "Estado")}
                 {sortHeader("created_at", "Fecha de creación")}
+                <th>Variantes y existencias</th>
                 <th>Acciones</th>
               </tr>
             </thead>
             <tbody>
               {filtered.map((p) => (
                 <tr key={p.id}>
-                  <td>{p.sku || "—"}</td>
-                  <td>
-                    <div className="catalog-photo">
-                      <ProductImage path={p.photo_path} name={p.name} />
+                  <td className="product-identity">
+                    <div className="product-identity-content">
+                      <div className="product-thumb"><ProductImage path={p.photo_path} name={p.name} /></div>
+                      <div>
+                        <strong className="admin-name">{p.name}</strong>
+                        <div className="product-mobile-identity"><small>{p.sku || "—"}</small> <CatalogBadge active={p.active} /></div>
+                      </div>
                     </div>
-                    <strong className="admin-name">{p.name}</strong>
-                    <small>{p.notes}</small>
+                    {p.notes && <small className="product-row-notes">{p.notes}</small>}
                   </td>
+                  <td className="product-desktop-identity">{p.sku || "—"}</td>
                   <td>
                     <CatalogBadge
                       origin={
@@ -246,35 +262,21 @@ export default function ProductsCatalog({
                     />
                   </td>
                   <td>{p.barcode || "—"}</td>
-                  <td>
-                    <span className={`status ${p.active ? "" : "inactive"}`}>
-                      <CatalogBadge active={p.active} />
-                    </span>
-                  </td>
+                  <td className="product-desktop-identity"><CatalogBadge active={p.active} /></td>
                   <td>
                     {p.created_at && Number.isFinite(Date.parse(p.created_at))
                       ? new Date(p.created_at).toLocaleString("es-GT")
                       : "—"}
                   </td>
-                  <td className="actions">
-                    <AppButton onClick={() => setVariantProduct(p)}>
+                  <td data-mobile-visible className="product-variants-action">
+                    <AppButton type="button" className="secondary" iconKey="module.inventory" onClick={() => setVariantProduct(p)}>
                       Variantes y existencias
                     </AppButton>
-                    {canWrite && (
-                      <AppButton
-                        onClick={() => {
-                          setError("");
-                          setEdit(p);
-                        }}
-                      >
-                        Editar
-                      </AppButton>
-                    )}
-                    {p.barcode && (
-                      <AppButton onClick={() => onBarcode(p)}>
-                        Código de barras
-                      </AppButton>
-                    )}
+                  </td>
+                  <td className="actions product-row-actions">
+                    {(canWrite || p.barcode) && <ProductActions name={p.name}
+                      onEdit={canWrite ? () => { setError(""); setEdit(p); } : undefined}
+                      onBarcode={p.barcode ? () => onBarcode(p) : undefined} />}
                   </td>
                 </tr>
               ))}
@@ -289,6 +291,7 @@ export default function ProductsCatalog({
           )}
         </div>
       </section>
+      </div>
       {variantProduct && (
         <VariantManager
           company={company}
@@ -297,7 +300,9 @@ export default function ProductsCatalog({
           onClose={() => setVariantProduct(null)}
         />
       )}
-      {edit !== undefined && (
+      {edit === null && canWrite && <ProductCreateForm company={company} origins={origins} units={units}
+        requestCodes={requestCodes} busy={busy} error={error} onSave={save} onClose={() => setEdit(undefined)} />}
+      {edit && (
         <div className="overlay">
           <section
             className="modal"
@@ -313,7 +318,7 @@ export default function ProductsCatalog({
             >
               ×
             </AppButton>
-            <h2>{edit ? "Editar producto" : "Nuevo producto"}</h2>
+            <h2>Editar producto</h2>
             <form onSubmit={save} aria-busy={busy}>
               <label>
                 Nombre

@@ -1,3 +1,4 @@
+import { DISCLOSURE_INITIALLY_OPEN } from "./disclosure-default";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { EllipsisVertical, Table2 } from "lucide-react";
 import { AppButton, AppIcon } from "./AppIcon";
@@ -65,7 +66,7 @@ export default function MaterialsCatalog({
   const [classification, setClassification] = useState("");
   const [origin, setOrigin] = useState("");
   const [status, setStatus] = useState<(typeof statusOptions)[number][0]>("all");
-  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(DISCLOSURE_INITIALLY_OPEN);
   const menu = useRef<HTMLDetailsElement>(null);
   const search = useRef<HTMLInputElement>(null);
   const editPosition = useRef<{ scroll: number; trigger: HTMLButtonElement } | null>(null);
@@ -178,7 +179,8 @@ export default function MaterialsCatalog({
           <AppButton type="button" className="secondary materials-filter-toggle" iconKey="control.filter"
             aria-expanded={filtersOpen} aria-controls="materials-filters"
             onClick={() => setFiltersOpen(!filtersOpen)}>
-            Filtros{filtersCount > 0 ? ` (${filtersCount})` : ""}
+            <AppIcon name="control.filter" /> Filtros{filtersCount > 0 ? ` (${filtersCount})` : ""}
+            <AppIcon name={filtersOpen ? "action.collapse" : "action.expand"} />
           </AppButton>
         </div>
         <div className="materials-filters" id="materials-filters" data-open={filtersOpen}>

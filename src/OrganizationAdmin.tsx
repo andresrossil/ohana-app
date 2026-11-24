@@ -1,3 +1,4 @@
+import { DISCLOSURE_INITIALLY_OPEN } from "./disclosure-default";
 import SearchSelect from "./SearchSelect";
 import { confirmAction } from "./ConfirmDialog";
 import { IconDetails, SearchField } from "./PoolControls";
@@ -246,22 +247,13 @@ export default function OrganizationAdmin({
   onSaved: () => Promise<void>;
   onConfigure?: (id: string) => void;
 }) {
-  const [searchCollapsed, setSearchCollapsed] = useState<
-      Record<string, boolean>
-    >({}),
-    [query, setQuery] = useState(""),
+  const [query, setQuery] = useState(""),
     [dialog, setDialog] = useState<any>(null),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
     [notice, setNotice] = useState(""),
     [dirty, setDirty] = useState(false),
-    [expanded, setExpanded] = useState<Record<string, boolean>>(() => {
-      try {
-        return JSON.parse(sessionStorage.getItem("ohana.hierarchy") || "{}");
-      } catch {
-        return {};
-      }
-    });
+    [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const groups = [...corporations];
   for (const c of companies)
     if (c.corporation_id && !groups.some((g) => g.id === c.corporation_id))
@@ -285,17 +277,7 @@ export default function OrganizationAdmin({
     setDialog(null);
   }
   function toggle(id: string) {
-    if (query.trim()) {
-      setSearchCollapsed((old) => ({ ...old, [id]: !old[id] }));
-      return;
-    }
-    setExpanded((old) => {
-      const next = { ...old, [id]: !(old[id] ?? true) };
-      try {
-        sessionStorage.setItem("ohana.hierarchy", JSON.stringify(next));
-      } catch {}
-      return next;
-    });
+    setExpanded((old) => ({ ...old, [id]: !(old[id] ?? DISCLOSURE_INITIALLY_OPEN) }));
   }
   async function save(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -349,7 +331,6 @@ export default function OrganizationAdmin({
           value={query}
           onChange={(e) => {
             setQuery(e.target.value);
-            setSearchCollapsed({});
           }}
           placeholder="Buscar por nombre…"
         />
@@ -372,7 +353,7 @@ export default function OrganizationAdmin({
                 g.name.toLocaleLowerCase().includes(q) ||
                 c.name.toLocaleLowerCase().includes(q),
             ),
-            isOpen = q ? !searchCollapsed[g.id] : (expanded[g.id] ?? true);
+            isOpen = expanded[g.id] ?? DISCLOSURE_INITIALLY_OPEN;
           return (
             <section className="corporation-node" key={g.id}>
               <div className="hierarchy-row">
