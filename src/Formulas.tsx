@@ -519,6 +519,7 @@ export default function Formulas({
     });
   }
   async function changeState(f: Row, next: string) {
+    if (!state.canWrite || state.busy || f.state === next) return;
     if (
       !(await confirmAction(
         `¿Marcar ${f.code} · v${f.version} como ${labels[next].toLowerCase()}?${next === "current" ? " La otra versión vigente de esta fórmula quedará inactiva." : " Los lotes anteriores conservarán su referencia."}`,
@@ -1182,6 +1183,24 @@ export default function Formulas({
                           >
                             Duplicar fórmula
                           </AppButton>
+                          {f.state !== "current" && (
+                            <AppButton
+                              className="secondary"
+                              disabled={state.busy}
+                              onClick={() => void changeState(f, "current")}
+                            >
+                              Marcar como vigente
+                            </AppButton>
+                          )}
+                          {f.state !== "inactive" && (
+                            <AppButton
+                              className="secondary"
+                              disabled={state.busy}
+                              onClick={() => void changeState(f, "inactive")}
+                            >
+                              Desactivar versión
+                            </AppButton>
+                          )}
                           </ProductionMenu>
                         </>
                       )}
