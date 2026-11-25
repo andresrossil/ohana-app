@@ -1,5 +1,7 @@
 import { productionStatus, productionStatusLabels, productionMatches, productionDate } from "./production-catalog";
 import ProductionMenu from "./ProductionMenu";
+import ProductionCapture, { parseProductionWeights, productionWeightTotal, usesProductionWeights } from "./ProductionCapture";
+import { weightMatches, type WeightVariant } from "./variant-weights";
 import FormSection from "./FormSection";
 import { scrollCompactFormToStart, useCompactFormViewport } from "./compact-form-viewport";
 import { plannedProductionUnits } from "./formula-model";
@@ -92,7 +94,23 @@ function ProductionBatches({
     if (mode === "start" && state.error) scrollCompactFormToStart(draftBody.current);
   }, [mode, state.error]);
   const [yieldTiming, setYieldTiming] = useState("");
-  const [weightCounts, setWeightCounts] = useState<Record<string, number>>({});
+  const [outputWeights, setOutputWeights] = useState<Record<string, string>>({});
+  const [scrap, setScrap] = useState("0");
+  const [basePrices, setBasePrices] = useState<Map<string, Row>>(new Map());
+  const [priceStatus, setPriceStatus] = useState<"loading" | "ready" | "unavailable">("loading");
+
+  useEffect(() => {
+    if (!selected?.product_id || (mode !== "finish" && mode !== "curing_complete")) return;
+    let current = true;
+    setBasePrices(new Map());
+    setPriceStatus("loading");
+    void operation(company, "variants", { product: selected.product_id }).then((rows: Row[]) => {
+      if (!current) return;
+      setBasePrices(new Map(rows.map(row => [row.id, row])));
+      setPriceStatus("ready");
+    }).catch(() => { if (current) setPriceStatus("unavailable"); });
+    return () => { current = false; };
+  }, [company, selected, mode, catalog]);
   const [calendarDate, setCalendarDate] = useState(today);
   useEffect(() => {
     const timer = window.setInterval(() => setCalendarDate(today()), 60_000);
@@ -146,8 +164,10 @@ function ProductionBatches({
   const curingDaysLeft = finishingCuring && selected?.available_on
     ? Math.max(0, (Date.parse(selected.available_on) - Date.parse(calendarDate)) / 86_400_000)
     : 0;
-  const assignedUnits = Object.values(outputUnits).reduce((sum, value) => sum + Number(value), 0)
-    + Object.values(weightCounts).reduce((sum, value) => sum + value, 0);
+  const openingWeights = mode === "finish" && !!selected?.opening_stock;
+  const outputVariants: (Row & WeightVariant)[] = catalog.variants.filter((variant: Row) => variant.product_id === selected?.product_id);
+  const assignedUnits = outputVariants.reduce((total, variant) => total + (usesProductionWeights(openingWeights, variant)
+    ? parseProductionWeights(outputWeights[variant.id]).length : Number(outputUnits[variant.id] || 0)), 0);
 
   function openYield(batch: Row, nextMode: "finish" | "curing_complete") {
     setSelected(batch);
@@ -156,7 +176,8 @@ function ProductionBatches({
       (batch.preliminary_outputs ?? batch.outputs ?? []).map((output: Row) =>
         [output.variant ?? output.variant_id, String(output.quantity)]),
     ));
-    setWeightCounts({});
+    setOutputWeights({});
+    setScrap("0");
     setYieldTiming("");
     setDirty(false);
     setMode(nextMode);
@@ -190,10 +211,7 @@ function ProductionBatches({
     mode === "start"
       ? Number(effectiveScale)
       : Number(selected?.formula_scale || 1);
-  const producedUnits = Object.values(outputUnits).reduce(
-    (sum, n) => sum + Number(n || 0),
-    0,
-  );
+  const producedUnits = assignedUnits;
   const neededUnits =
     mode === "start"
       ? Number(draftUnits)
@@ -329,6 +347,37 @@ function ProductionBatches({
                   };
                 } else if (mode === "finish" || mode === "curing_complete") {
                   action = mode === "curing_complete" ? "batch_curing_complete" : "batch_finish";
+                  const captureOutputs = !sendingToCuring || yieldTiming === "before";
+                  const outputs = [];
+                  if (captureOutputs) {
+                    const available = new Set(outputVariants.map(variant => variant.id));
+                    if (Object.entries(outputUnits).some(([id, count]) => !available.has(id) && Number(count) > 0) ||
+                        Object.entries(outputWeights).some(([id, value]) => !available.has(id) && value.trim())) {
+                      state.setError("Una variante capturada ya no está disponible. Reabre la confirmación para revisar el catálogo.");
+                      return;
+                    }
+                    for (const variant of outputVariants) {
+                      if (usesProductionWeights(openingWeights, variant)) {
+                        const weights = parseProductionWeights(outputWeights[variant.id]);
+                        if (weights.some(weight => weightMatches(outputVariants, variant.attributes ?? {}, weight)[0]?.id !== variant.id)) {
+                          state.setError("Revisa los pesos de " + variantLabel(variant) + ": deben ser pesos reales dentro de su rango.");
+                          return;
+                        }
+                        if (weights.length) outputs.push({ variant: variant.id, quantity: weights.length, unit_weights: weights, weight: productionWeightTotal(weights) });
+                      } else {
+                        const quantity = Number(outputUnits[variant.id] || 0);
+                        if (!Number.isInteger(quantity) || quantity < 0 || quantity > 10000) {
+                          state.setError("Indica una cantidad entera válida para " + variantLabel(variant) + ".");
+                          return;
+                        }
+                        if (quantity) outputs.push({ variant: variant.id, quantity });
+                      }
+                    }
+                    if (assignedUnits > 10000) {
+                      state.setError("El máximo es de 10,000 unidades por lote.");
+                      return;
+                    }
+                  }
                   payload = {
                     batch: selected!.id,
                     expected_revision: formula?.edit_revision,
@@ -343,20 +392,7 @@ function ProductionBatches({
                       unit: r.unit_id,
                       quantity: f.get("consume_" + r.material_id),
                     })),
-                    outputs: sendingToCuring && yieldTiming !== "before" ? [] : catalog.variants
-                      .filter(
-                        (v: Row) =>
-                          v.product_id === selected!.product_id &&
-                          (Number(f.get("output_" + v.id)) > 0 || String(f.get("weights_" + v.id) || "").trim()),
-                      )
-                      .map((v: Row) => {
-                        const weights = String(f.get("weights_" + v.id) || "")
-                          .trim().split(/\s+/).filter(Boolean).map((weight) => Number(weight.replace(",", ".")));
-                        return weights.length
-                          ? { variant: v.id, quantity: weights.length, unit_weights: weights,
-                              weight: weights.reduce((sum, weight) => sum + Math.round(weight * 10000), 0) / 10000 }
-                          : { variant: v.id, quantity: f.get("output_" + v.id) };
-                      }),
+                    outputs,
                   };
                   if (sendingToCuring) {
                     payload.yield_timing = yieldTiming;
@@ -717,79 +753,15 @@ function ProductionBatches({
                       {selected?.yield_timing === "before" ? "Contadas al enviar" : "Unidades estimadas"} {selected?.preliminary_quantity ?? selected?.planned_quantity}
                     </p>}
                   </div>}
-                  <h3>Variantes obtenidas</h3>
-                  <div className="actions">
-                    <AppButton
-                      type="button"
-                      className="secondary"
-                      disabled={state.busy}
-                      onClick={() =>
-                        state.run(async () =>
-                          setCatalog(
-                            await operation(company, "production_catalog"),
-                          ),
-                        )
-                      }
-                    >
-                      Actualizar variantes
-                    </AppButton>
-                  </div>
-                  <p>
-                    {sendingToCuring
-                      ? "Si ya conoces las variantes, captura todas las unidades por variante. Puedes dejar esta sección vacía y completarla al liberar el lote."
-                      : "Indica las unidades buenas obtenidas de cada variante. Si falta alguna, agrégala en Productos y actualiza esta lista antes de confirmar."}
-                  </p>
-                  <div className="table-wrap">
-                    <ResponsiveTable>
-                      <thead>
-                        <tr>
-                          <th>Variante</th>
-                          <th>{selected?.opening_stock && mode === "finish" ? "Pesos en gramos / unidades" : "Unidades obtenidas"}</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {catalog.variants
-                          .filter(
-                            (v: Row) => v.product_id === selected!.product_id,
-                          )
-                          .map((v: Row) => (
-                            <tr key={v.id}>
-                              <td>{variantLabel(v)}</td>
-                              <td>
-                                {selected?.opening_stock && mode === "finish" && v.weight_min != null ? (
-                                  <AutoTextarea
-                                    aria-label={"Pesos en gramos de " + variantLabel(v)}
-                                    name={"weights_" + v.id}
-                                    placeholder="Un peso en gramos por unidad"
-                                    onChange={(event) => setWeightCounts((previous) => ({
-                                      ...previous,
-                                      [v.id]: event.target.value.trim().split(/\s+/).filter(Boolean).length,
-                                    }))}
-                                  />
-                                ) : (
-                                <input
-                                  aria-label={"Unidades de " + variantLabel(v)}
-                                  name={"output_" + v.id}
-                                  type="number"
-                                  min="0"
-                                  max="10000"
-                                  step="1"
-                                  placeholder="0"
-                                  value={outputUnits[v.id] ?? ""}
-                                  onChange={(e) =>
-                                    setOutputUnits((old) => ({
-                                      ...old,
-                                      [v.id]: e.target.value,
-                                    }))
-                                  }
-                                />
-                                )}
-                              </td>
-                            </tr>
-                          ))}
-                      </tbody>
-                    </ResponsiveTable>
-                  </div>
+                  <ProductionCapture key={selected?.id} variants={outputVariants} prices={basePrices}
+                    priceStatus={priceStatus} openingWeights={openingWeights} units={outputUnits} weights={outputWeights}
+                    scrap={scrap} busy={state.busy}
+                    refresh={() => void state.run(async () => setCatalog(await operation(company, "production_catalog")))}
+                    setValue={(id, value, weighed) => {
+                      const setOutput = weighed ? setOutputWeights : setOutputUnits;
+                      setOutput(previous => ({ ...previous, [id]: value }));
+                      setDirty(true);
+                    }} />
                   </>}
                   {mode === "finish" && <div className="settings-grid">
                     <label>
@@ -799,7 +771,8 @@ function ProductionBatches({
                         type="number"
                         min="0"
                         step="1"
-                        defaultValue="0"
+                        value={scrap}
+                        onChange={event => setScrap(event.target.value)}
                       />
                     </label>
                   </div>}
