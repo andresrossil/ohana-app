@@ -124,6 +124,7 @@ export default function VariantManager({
       barcode_custom: data.custom === "on",
       published: data.published === "on",
       active: data.active === "on",
+      trial_failed: data.trial_failed === "on",
       allow_preorder: data.allow_preorder === "on",
     };
     if (!String(data.name || "").trim() && !String(data.commercial_code || "").trim()) {

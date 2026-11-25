@@ -40,6 +40,7 @@ export default function VariantCard({ variant, estimate, priceList, onEdit, onBa
         {attributes.length > 0 && <span className="variant-card-attributes">{attributes.map(([key, value]) => `${key}: ${value}`).join(" · ")}</span>}
         <span className="variant-card-price">
           <CatalogBadge active={variant.active} label={variant.active ? "Activa" : "Archivada"} />
+          {variant.trial_failed && <CatalogBadge active={false} label="No funcionó" />}
           <span><strong>{variant.price == null ? "Pendiente de precio" : money(variant.price, currency)}</strong>
             <small>{priceList || "Lista base"}</small></span>
         </span>
@@ -50,6 +51,7 @@ export default function VariantCard({ variant, estimate, priceList, onEdit, onBa
         </span>
       </summary>
       <dl className="variant-detail">
+        {variant.comments && <Value label="Comentarios"><span style={{ whiteSpace: "pre-wrap" }}>{variant.comments}</span></Value>}
         <Value label="Código de barras">{variant.barcode || "Sin código de barras"}</Value>
         {estimate?.midpoint != null && <Value label="Peso de referencia">{Number(estimate.midpoint).toLocaleString("es-GT", { maximumFractionDigits: 4 })} g</Value>}
         {estimate?.costPerGram != null && <Value label="Costo por gramo">{money(estimate.costPerGram, currency)}</Value>}

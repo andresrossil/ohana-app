@@ -93,9 +93,11 @@ export default function VariantForm({ productName, variant, attributeKeys, busy,
                 <label className="check-label"><input name="active" type="checkbox" defaultChecked={variant?.active ?? true} /> Activa</label>
                 <label className="check-label"><input name="published" type="checkbox" defaultChecked={variant?.published ?? false} /> Publicar en tienda</label>
                 <label className="check-label form-wide"><input name="allow_preorder" type="checkbox" defaultChecked={variant?.allow_preorder ?? false} /> Permitir pedidos anticipados</label>
+                <label className="check-label"><input name="trial_failed" type="checkbox" defaultChecked={variant?.trial_failed ?? false} /> No funcionó</label>
                 <small className="form-wide">Los precios de venta se administran desde Listas de precios.</small>
               </div>
             </FormSection>
+            <label>Comentarios<textarea name="comments" rows={4} maxLength={4000} defaultValue={variant?.comments ?? ""} /></label>
           </fieldset>
         </div>
         <div className="compact-form-actions">
