@@ -1,4 +1,7 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { Undo2 } from "lucide-react";
+import ProductionMenu from "./ProductionMenu";
+import { confirmAction } from "./ConfirmDialog";
 import { AppButton } from "./AppIcon";
 import AutoTextarea from "./AutoTextarea";
 import { money, type Row } from "./operations";
@@ -33,9 +36,19 @@ export default function ProductionCapture({
   const [quantity, setQuantity] = useState("1");
   const [showAll, setShowAll] = useState(false);
   const [message, setMessage] = useState("");
-  const [error, setError] = useState("");
+  const [edit, setEdit] = useState<{ id: string; kind: "quantity" | "weights" }>();
+  const [editQuantity, setEditQuantity] = useState("");
+  const [editWeights, setEditWeights] = useState("");
+  const [removed, setRemoved] = useState<number[]>([]);
+  const [unitIndex, setUnitIndex] = useState(0);
+  const [editError, setEditError] = useState("");
   const [last, setLast] = useState<{ id: string; before: string; after: string; weighed: boolean; label: string }>();
   const captureInput = useRef<HTMLInputElement>(null);
+  const editor = useRef<HTMLElement>(null);
+  useEffect(() => {
+    editor.current?.scrollIntoView({ block: "nearest" });
+    editor.current?.querySelector<HTMLElement>("input, select")?.focus({ preventScroll: true });
+  }, [edit]);
   const rows = variants.map(variant => {
     const weighed = usesProductionWeights(openingWeights, variant);
     const recorded = parseProductionWeights(weights[variant.id]);
@@ -50,45 +63,39 @@ export default function ProductionCapture({
   const pending = rows.reduce((sum, row) => sum + (row.variant.weight_min != null && !row.weighed ? row.count : 0), 0);
   const missingPrice = rows.some(row => row.count > 0 && row.price == null);
   const valueCents = rows.reduce((sum, row) => sum + row.count * Math.round(Number(row.price ?? 0) * 100), 0);
+  const formatPrice = (value: number) => currency === "GTQ" ? "Q" + value.toLocaleString("es-GT", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : money(value, currency);
   const grams = (value: number) => Number.isFinite(value) ? value.toLocaleString("es-GT", { maximumFractionDigits: 4 }) + " g" : "Revisar pesos";
 
+  const normalized = input.trim().replace(",", ".");
+  const number = Number(normalized);
+  const count = multiple ? Number(quantity) : 1;
+  const validWeight = (value: number, variant: WeightVariant) => {
+    const candidates = weightMatches(variants, variant.attributes ?? {}, value);
+    return candidates.length === 1 && candidates[0].id === variant.id;
+  };
+  const matches = normalized ? rows.filter(row => mode === "grams"
+    ? weightMatches([row.variant], row.variant.attributes ?? {}, number).length > 0
+    : priceStatus === "ready" && row.price != null && Number(row.price) === number) : [];
+  const preview = matches.length === 1 ? matches[0] : undefined;
+  const validInput = (mode === "grams" ? /^\d+(\.\d{1,4})?$/ : /^\d+(\.\d{1,2})?$/).test(normalized)
+    && Number.isFinite(number) && (mode === "price" || number > 0);
+  const captureWarning = !normalized ? "" :
+    !validInput ? (mode === "grams" ? "Ingresa un peso positivo con hasta cuatro decimales." : "Ingresa un precio con hasta dos decimales.") :
+    mode === "price" && priceStatus !== "ready" ? "Los precios BASE no están disponibles." :
+    !preview ? (matches.length ? "Hay más de una variante que coincide. Usa la edición manual."
+      : mode === "grams" ? "Ninguna variante coincide con ese peso." : "Ninguna variante coincide con ese precio BASE.") :
+    preview.weighed && mode === "price" ? "El saldo inicial requiere el peso real de esta variante. Usa Gramos." :
+    !Number.isInteger(count) || count < 1 || totalUnits + count > 10000 ? "Ingresa una cantidad válida. El máximo es de 10,000 unidades por lote." : "";
+
   function add() {
-    if (busy) return;
-    setError("");
-    const normalized = input.trim().replace(",", ".");
-    const number = Number(normalized);
-    const count = multiple ? Number(quantity) : 1;
-    if (!(mode === "grams" ? /^\d+(\.\d{1,4})?$/ : /^\d+(\.\d{1,2})?$/).test(normalized)
-      || !Number.isFinite(number) || (mode === "grams" && number <= 0)) {
-      setError(mode === "grams" ? "Ingresa un peso positivo con hasta cuatro decimales." : "Ingresa un precio con hasta dos decimales.");
-      return;
-    }
-    if (!Number.isInteger(count) || count < 1 || totalUnits + count > 10000) {
-      setError("Ingresa una cantidad entera positiva. El máximo es de 10,000 unidades por lote.");
-      return;
-    }
-    if (mode === "price" && priceStatus !== "ready") {
-      setError("Los precios BASE no están disponibles. Actualiza las variantes o usa la captura manual.");
-      return;
-    }
-    const matches = rows.filter(row => mode === "grams"
-      ? weightMatches([row.variant], row.variant.attributes ?? {}, number).length > 0
-      : row.price != null && Number(row.price) === number);
-    if (matches.length !== 1) {
-      setError(matches.length > 1 ? "Hay más de una variante que coincide. Registra la unidad manualmente."
-        : mode === "grams" ? "Ninguna variante coincide con ese peso." : "Ninguna variante coincide con ese precio BASE.");
-      return;
-    }
-    const { variant, weighed } = matches[0];
-    if (weighed && mode === "price") {
-      setError("El saldo inicial requiere el peso real de cada unidad de esta variante. Usa Gramos.");
-      return;
-    }
+    if (busy || !validInput || !preview || captureWarning) return;
+    const { variant, weighed } = preview;
     const before = (weighed ? weights : units)[variant.id] ?? "";
     const after = weighed ? [before.trim(), Array(count).fill(normalized).join("\n")].filter(Boolean).join("\n")
       : String(Number(before || 0) + count);
-    const label = `${count} × ${variantLabel(variant)} · ${mode === "grams" ? grams(number) : money(number, currency)} por unidad`;
+    const label = `${count} × ${variantLabel(variant)} · ${mode === "grams" ? grams(number) : formatPrice(number)} por unidad`;
     setValue(variant.id, after, weighed);
+    setEdit(undefined);
     setLast({ id: variant.id, before, after, weighed, label });
     setMessage("");
     setInput("");
@@ -96,55 +103,191 @@ export default function ProductionCapture({
     captureInput.current?.focus();
   }
 
+  const editing = edit && rows.find(row => row.variant.id === edit.id);
+  const difference = Number(editQuantity) - (editing?.count ?? 0);
+  const pickUnits = !!editing?.weighed && difference < 0 && new Set(editing.recorded).size > 1;
+  type CaptureRow = (typeof rows)[number];
+
+  function openEdit(row: CaptureRow, kind: "quantity" | "weights") {
+    setEdit({ id: row.variant.id, kind });
+    setEditQuantity(String(row.count));
+    setUnitIndex(0);
+    setEditWeights(kind === "weights" ? String(row.recorded[0] ?? "") : "");
+    setRemoved([]);
+    setEditError("");
+  }
+
+  function applyQuantity(row: CaptureRow) {
+    const next = Number(editQuantity);
+    if (!editQuantity.trim() || !Number.isInteger(next) || next < 0 || totalUnits + difference > 10000) {
+      setEditError("Ingresa una cantidad entera válida. El máximo es de 10,000 unidades por lote.");
+      return;
+    }
+    if (!row.weighed) setValue(row.variant.id, String(next), false);
+    else if (difference > 0) {
+      const entered = parseProductionWeights(editWeights);
+      if ((entered.length !== 1 && entered.length !== difference) || entered.some(weight => !validWeight(weight, row.variant))) {
+        setEditError("Ingresa un peso válido para repetir o un peso por cada unidad adicional, dentro del rango de esta variante.");
+        return;
+      }
+      const additions = entered.length === 1 ? Array(difference).fill(entered[0]) : entered;
+      setValue(row.variant.id, [...row.recorded, ...additions].join("\n"), true);
+    } else if (difference < 0) {
+      if (pickUnits && removed.length !== -difference) {
+        setEditError("Selecciona exactamente " + -difference + " unidades para retirar.");
+        return;
+      }
+      const result = pickUnits ? row.recorded.filter((_, index) => !removed.includes(index)) : row.recorded.slice(0, next);
+      setValue(row.variant.id, result.join("\n"), true);
+    }
+    setEdit(undefined);
+    setLast(undefined);
+    setMessage("Cantidad actualizada.");
+  }
+
+  function changeWeight(row: CaptureRow, remove = false) {
+    const updated = [...row.recorded];
+    if (remove) updated.splice(unitIndex, 1);
+    else {
+      const [value, ...extra] = parseProductionWeights(editWeights);
+      const matches = weightMatches(variants, row.variant.attributes ?? {}, value);
+      const destination = matches.length === 1 ? rows.find(candidate => candidate.variant.id === matches[0].id && candidate.weighed) : undefined;
+      if (!destination || extra.length) {
+        setEditError("El peso debe corresponder a una sola variante de las mismas características.");
+        return;
+      }
+      if (destination.variant.id === row.variant.id) updated[unitIndex] = value;
+      else {
+        updated.splice(unitIndex, 1);
+        setValue(destination.variant.id, [...destination.recorded, value].join("\n"), true);
+      }
+    }
+    setValue(row.variant.id, updated.join("\n"), true);
+    setEdit(undefined);
+    setLast(undefined);
+    setMessage(remove ? "Unidad eliminada." : "Peso actualizado.");
+  }
+
+  async function removeRow(row: CaptureRow) {
+    const code = row.variant.commercial_code || row.variant.sku || variantLabel(row.variant);
+    if (!await confirmAction(
+      `¿Deseas eliminar la variante ${code} de esta captura? Se retirarán ${row.count} unidades.\nPeso real retirado: ${row.recorded.length ? grams(productionWeightTotal(row.recorded)) : "Sin peso registrado"}.\nImporte descontado: ${row.price == null ? "Pendiente de precio BASE" : formatPrice(row.count * Number(row.price))}.`,
+      { title: "Eliminar fila", confirmText: "Eliminar", cancelText: "Cancelar", danger: true },
+    )) return;
+    setValue(row.variant.id, "", row.weighed);
+    setLast(undefined);
+    setMessage("Fila eliminada.");
+    if (edit?.id === row.variant.id) setEdit(undefined);
+  }
+
   return <section className="production-capture">
     <h3>Captura rápida</h3>
+    <div className="production-capture-feedback" role="group" aria-label="Modalidad de captura">
+      {(["grams", "price"] as const).map(option => <AppButton key={option} type="button"
+        className={mode === option ? "" : "secondary"} aria-pressed={mode === option}
+        disabled={busy || (option === "grams" && !openingWeights)}
+        onClick={() => { if (mode !== option) { setMode(option); setInput(""); } captureInput.current?.focus(); }}>
+        {option === "grams" ? "Gramos" : "Precio BASE"}
+      </AppButton>)}
+    </div>
     <div className="production-capture-fields">
-      <label>Modalidad<select value={mode} onChange={event => {
-        setMode(event.target.value as "grams" | "price"); setInput(""); setError(""); captureInput.current?.focus();
-      }}>
-        <option value="grams" disabled={!openingWeights}>Gramos</option>
-        <option value="price">Precio base (Q)</option>
-      </select></label>
-      <label>{mode === "grams" ? "Peso por unidad (g)" : "Precio por unidad"}
-        <input ref={captureInput} inputMode="decimal" value={input} onChange={event => { setInput(event.target.value); setError(""); }}
+      <label>{mode === "grams" ? "Peso por unidad (g)" : "Precio por unidad (Q)"}
+        <input ref={captureInput} inputMode="decimal" value={input} onChange={event => setInput(event.target.value)}
           onKeyDown={event => { if (event.key === "Enter") { event.preventDefault(); add(); } }} />
       </label>
-      {multiple && <label>Cantidad<input type="number" min="1" max="10000" step="1" value={quantity}
+      <AppButton type="button" disabled={busy || !preview || !validInput || !!captureWarning} onClick={add}>Agregar</AppButton>
+    </div>
+    {normalized && <div className="production-capture-preview" aria-live="polite">
+      {validInput && preview && <>
+        <span><strong>{preview.variant.commercial_code || preview.variant.sku || "Variante"}</strong>
+          {preview.variant.name && <> · {preview.variant.name}</>}<br />
+          <small>{weightRangeLabel(preview.variant)}</small></span>
+        <strong className={preview.price == null ? "" : "production-capture-price"}>
+          {preview.price == null ? "Precio BASE pendiente" : formatPrice(Number(preview.price))}
+        </strong>
+      </>}
+      {captureWarning && <small className="production-capture-warning">{captureWarning}</small>}
+    </div>}
+    <div className="production-capture-feedback">
+      <label className="check-label"><input type="checkbox" checked={multiple}
+        onChange={event => { setMultiple(event.target.checked); setQuantity("1"); }} /> Registrar varias unidades iguales</label>
+      {multiple && <label className="production-capture-quantity">Cantidad<input type="number" inputMode="numeric" min="1" max="10000" step="1" value={quantity}
         onChange={event => setQuantity(event.target.value)} onKeyDown={event => {
           if (event.key === "Enter") { event.preventDefault(); add(); }
         }} /></label>}
-      <AppButton type="button" disabled={busy} onClick={add}>Agregar</AppButton>
     </div>
-    <label className="check-label"><input type="checkbox" checked={multiple}
-      onChange={event => { setMultiple(event.target.checked); setQuantity("1"); }} /> Registrar varias unidades iguales</label>
-    {!openingWeights && <small>Esta confirmación guarda cantidades por variante. La captura por gramos está disponible para el saldo inicial.</small>}
+    {!openingWeights && <small>La captura por gramos está disponible para el saldo inicial.</small>}
     {priceStatus !== "ready" && <small>{priceStatus === "loading" ? "Consultando precios BASE…" : "Precios BASE no disponibles."}</small>}
-    {error && <p className="error" role="alert">{error}</p>}
     <div className="production-capture-feedback">
-      <span role="status">{last ? "Agregado: " + last.label : message}</span>
-      {last && <AppButton type="button" className="secondary" disabled={busy || (last.weighed ? weights : units)[last.id] !== last.after}
-        onClick={() => { setValue(last.id, last.before, last.weighed); setLast(undefined); setMessage("Última captura deshecha."); setError(""); captureInput.current?.focus(); }}>Deshacer última captura</AppButton>}
+      <small role="status">{last ? "Agregado: " + last.label : message}</small>
+      {last && <AppButton type="button" className="secondary production-capture-small" disabled={busy || (last.weighed ? weights : units)[last.id] !== last.after}
+        onClick={() => { setValue(last.id, last.before, last.weighed); setLast(undefined); setEdit(undefined); setMessage("Última captura deshecha."); captureInput.current?.focus(); }}>
+        <Undo2 size={14} aria-hidden="true" /> Deshacer
+      </AppButton>}
     </div>
 
     <div className="production-capture-feedback">
       <h3>Variantes obtenidas</h3>
-      <AppButton type="button" className="secondary" disabled={busy} onClick={refresh}>Actualizar variantes</AppButton>
+      <AppButton type="button" className="secondary production-capture-small" iconKey="action.refresh" disabled={busy} onClick={refresh}>Actualizar variantes</AppButton>
     </div>
     <label className="check-label"><input type="checkbox" checked={showAll} onChange={event => setShowAll(event.target.checked)} /> Mostrar todas las variantes</label>
+    {editing && edit && <section ref={editor} className="production-capture-editor" aria-label={edit.kind === "quantity" ? "Editar cantidad" : "Editar pesos individuales"}
+      onKeyDown={event => { if (event.key === "Enter" && event.target instanceof HTMLInputElement) {
+        event.preventDefault();
+        if (!busy && edit.kind === "quantity") applyQuantity(editing);
+      } }}>
+      <strong>{variantLabel(editing.variant)}</strong>
+      {edit.kind === "quantity" ? <>
+        <label>Nueva cantidad<input type="number" inputMode="numeric" min="0" max="10000" step="1" value={editQuantity}
+          onChange={event => { setEditQuantity(event.target.value); setRemoved([]); setEditError(""); }} /></label>
+        {editing.weighed && difference > 0 && <label>Pesos adicionales (g)
+          <AutoTextarea value={editWeights} onChange={event => setEditWeights(event.target.value)}
+            placeholder="Un peso por unidad o un solo peso para repetir" />
+        </label>}
+        {pickUnits && <div className="production-capture-pick">
+          <small>Selecciona { -difference } unidades para retirar.</small>
+          {editing.recorded.map((weight, index) => <label key={index} className="check-label">
+            <input type="checkbox" checked={removed.includes(index)} onChange={event =>
+              setRemoved(previous => event.target.checked ? [...previous, index] : previous.filter(value => value !== index))} />
+            Unidad {index + 1} · {grams(weight)}
+          </label>)}
+        </div>}
+      </> : <>
+        <label>Unidad<select value={unitIndex} onChange={event => {
+          const next = Number(event.target.value);
+          setUnitIndex(next); setEditWeights(String(editing.recorded[next] ?? "")); setEditError("");
+        }}>{editing.recorded.map((weight, index) => <option key={index} value={index}>Unidad {index + 1} · {grams(weight)}</option>)}</select></label>
+        <label>Peso real (g)<input inputMode="decimal" value={editWeights} onChange={event => setEditWeights(event.target.value)} /></label>
+      </>}
+      {editError && <small role="alert" className="production-capture-warning">{editError}</small>}
+      <div className="production-capture-feedback">
+        <AppButton type="button" className="secondary production-capture-small" onClick={() => setEdit(undefined)}>Cancelar</AppButton>
+        {edit.kind === "weights" && <AppButton type="button" className="danger production-capture-small" disabled={busy}
+          onClick={() => changeWeight(editing, true)}>Eliminar unidad</AppButton>}
+        <AppButton type="button" className="production-capture-small" disabled={busy}
+          onClick={() => edit.kind === "quantity" ? applyQuantity(editing) : changeWeight(editing)}>Guardar cambio</AppButton>
+      </div>
+    </section>}
     {rows.some(row => row.count > 0) || showAll ? <div className="table-wrap">
-      <ResponsiveTable showAllMobileFields>
-        <thead><tr><th>Variante</th><th>Unidades y pesos</th><th>Peso real</th><th>Precio BASE</th><th>Importe estimado</th></tr></thead>
-        <tbody>{rows.filter(row => showAll || row.count > 0).map(({ variant, count, weighed, recorded, price }) => <tr key={variant.id}>
-          <td data-sort-value={variant.weight_min ?? ""}>{variantLabel(variant)}<br /><small>{weightRangeLabel(variant)}</small></td>
-          <td data-sort-value={count}>{weighed ? <details><summary>{count} · Editar pesos</summary>
-            <AutoTextarea aria-label={"Pesos en gramos de " + variantLabel(variant)} placeholder="Un peso en gramos por unidad"
-              value={weights[variant.id] ?? ""} onChange={event => setValue(variant.id, event.target.value, true)} />
-          </details> : <input aria-label={"Unidades de " + variantLabel(variant)} type="number" min="0" max="10000" step="1"
-            placeholder="0" value={units[variant.id] ?? ""} onChange={event => setValue(variant.id, event.target.value, false)} />}</td>
-          <td data-sort-value={recorded.length ? productionWeightTotal(recorded) : ""}>{recorded.length ? grams(productionWeightTotal(recorded)) : "—"}</td>
-          <td className="production-capture-money" data-sort-value={price ?? ""}>{price == null ? "Pendiente" : money(price, currency)}</td>
-          <td className="production-capture-money" data-sort-value={price == null ? "" : count * Number(price)}>{price == null ? "Pendiente" : money(count * Number(price), currency)}</td>
-        </tr>)}</tbody>
+      <ResponsiveTable className="production-capture-table" showAllMobileFields compactRowActions>
+        <thead><tr><th>Variante y rango</th><th>Unidades</th><th>Peso real</th><th>Precio BASE</th><th>Importe total</th><th>Acciones</th></tr></thead>
+        <tbody>{rows.filter(row => showAll || row.count > 0).map(row => {
+          const { variant, count, recorded, price } = row;
+          const weight = recorded.length ? productionWeightTotal(recorded) : null;
+          return <tr key={variant.id}>
+            <td data-sort-value={variant.weight_min ?? ""}>{variantLabel(variant)}<br /><small>{weightRangeLabel(variant)}</small></td>
+            <td data-sort-value={count}>{count}</td>
+            <td data-sort-value={weight ?? ""}>{weight == null ? "—" : grams(weight)}</td>
+            <td className="production-capture-money" data-sort-value={price ?? ""}>{price == null ? "Pendiente" : formatPrice(Number(price))}</td>
+            <td className="production-capture-money" data-sort-value={price == null ? "" : count * Number(price)}>{price == null ? "Pendiente" : formatPrice(count * Number(price))}</td>
+            <td><ProductionMenu document={variant.commercial_code || variant.sku || variantLabel(variant)}>
+              <AppButton type="button" className="secondary" iconKey="action.edit" disabled={busy} onClick={() => openEdit(row, "quantity")}>Editar cantidad</AppButton>
+              <AppButton type="button" className="secondary" iconKey="action.edit" disabled={busy || !recorded.length}
+                onClick={() => openEdit(row, "weights")}>Editar pesos individuales</AppButton>
+              <AppButton type="button" className="danger" disabled={busy || !count} onClick={() => void removeRow(row)}>Eliminar fila completa</AppButton>
+            </ProductionMenu></td>
+          </tr>;
+        })}</tbody>
       </ResponsiveTable>
     </div> : <p>Agrega unidades o muestra todas las variantes para capturarlas manualmente.</p>}
     <dl className="production-capture-totals">
@@ -152,7 +295,7 @@ export default function ProductionCapture({
       <div><dt>Peso real registrado</dt><dd>{grams(totalWeight)}</dd></div>
       {pending > 0 && <div><dt>Unidades pendientes de pesaje</dt><dd>{pending}</dd></div>}
       <div><dt>Unidades dañadas</dt><dd>{scrap || "0"}</dd></div>
-      <div><dt>Valor comercial estimado</dt><dd>{missingPrice ? `Incompleto · ${money(valueCents / 100, currency)} con precio` : money(valueCents / 100, currency)}</dd></div>
+      <div className="production-capture-total-value"><dt>Valor comercial estimado</dt><dd>{missingPrice ? `Incompleto · ${formatPrice(valueCents / 100)} con precio` : formatPrice(valueCents / 100)}</dd><small>Importe potencial de venta</small></div>
     </dl>
   </section>;
 }

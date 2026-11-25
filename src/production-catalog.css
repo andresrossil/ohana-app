@@ -111,3 +111,28 @@
 }
 .production-capture-totals dt { color: var(--admin-muted); font-size: .85em; }
 .production-capture-totals dd { margin: 0; font-weight: 700; }
+.production-capture { gap: 5px; }
+.production-capture-fields { grid-template-columns: minmax(0, 1fr) auto; }
+.production-capture-preview {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 4px 10px;
+  padding: 5px 8px;
+  background: var(--admin-secondary);
+  border-radius: 6px;
+}
+.production-capture-warning { display: block; flex-basis: 100%; color: var(--admin-muted); }
+.production-capture-price { color: var(--functional-success, #166534); font-size: 1.35rem; }
+.production-capture-total-value dd { font-size: 1.2rem; }
+.shell .production-capture .production-capture-small { min-height: 32px; padding: 3px 6px; font-size: .85em; }
+.production-capture-quantity input { max-width: 90px; }
+.production-capture-editor { display: grid; gap: 5px; padding: 8px; background: var(--admin-secondary); border-radius: 6px; }
+.production-capture-editor :is(input:not([type="checkbox"]), select, textarea) { width: 100%; min-width: 0; }
+.production-capture-pick { max-height: 14rem; overflow-y: auto; }
+@media (max-width: 760px) {
+  .shell .production-capture-table > tbody > tr { gap: 3px 6px; padding: 5px; }
+  .shell .production-capture-table > tbody > tr > td { padding: 2px 4px; }
+  .shell .production-capture-table .mobile-cell-label { font-size: .75em; }
+}
