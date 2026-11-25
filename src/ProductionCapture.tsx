@@ -32,7 +32,6 @@ export default function ProductionCapture({
 }) {
   const [mode, setMode] = useState<"grams" | "price">(openingWeights ? "grams" : "price");
   const [input, setInput] = useState("");
-  const [multiple, setMultiple] = useState(false);
   const [quantity, setQuantity] = useState("1");
   const [showAll, setShowAll] = useState(false);
   const [message, setMessage] = useState("");
@@ -49,6 +48,7 @@ export default function ProductionCapture({
     editor.current?.scrollIntoView({ block: "nearest" });
     editor.current?.querySelector<HTMLElement>("input, select")?.focus({ preventScroll: true });
   }, [edit]);
+  const code = (variant: Row) => String(variant.commercial_code || variant.sku || variant.name || "Variante");
   const rows = variants.map(variant => {
     const weighed = usesProductionWeights(openingWeights, variant);
     const recorded = parseProductionWeights(weights[variant.id]);
@@ -56,7 +56,7 @@ export default function ProductionCapture({
     const price = prices.get(variant.id)?.price ?? null;
     return { variant, weighed, recorded, count, price };
   }).sort((a, b) => (a.variant.weight_min == null ? Infinity : Number(a.variant.weight_min)) -
-    (b.variant.weight_min == null ? Infinity : Number(b.variant.weight_min)) || variantLabel(a.variant).localeCompare(variantLabel(b.variant), "es"));
+    (b.variant.weight_min == null ? Infinity : Number(b.variant.weight_min)) || Number(a.variant.weight_max ?? 0) - Number(b.variant.weight_max ?? 0) || code(a.variant).localeCompare(code(b.variant), "es", { numeric: true }));
   const currency = prices.values().next().value?.currency ?? "GTQ";
   const totalUnits = rows.reduce((sum, row) => sum + row.count, 0);
   const totalWeight = productionWeightTotal(rows.flatMap(row => row.recorded));
@@ -68,7 +68,7 @@ export default function ProductionCapture({
 
   const normalized = input.trim().replace(",", ".");
   const number = Number(normalized);
-  const count = multiple ? Number(quantity) : 1;
+  const count = Number(quantity);
   const validWeight = (value: number, variant: WeightVariant) => {
     const candidates = weightMatches(variants, variant.attributes ?? {}, value);
     return candidates.length === 1 && candidates[0].id === variant.id;
@@ -85,7 +85,7 @@ export default function ProductionCapture({
     !preview ? (matches.length ? "Hay más de una variante que coincide. Usa la edición manual."
       : mode === "grams" ? "Ninguna variante coincide con ese peso." : "Ninguna variante coincide con ese precio BASE.") :
     preview.weighed && mode === "price" ? "El saldo inicial requiere el peso real de esta variante. Usa Gramos." :
-    !Number.isInteger(count) || count < 1 || totalUnits + count > 10000 ? "Ingresa una cantidad válida. El máximo es de 10,000 unidades por lote." : "";
+    !/^\d+$/.test(quantity) || !Number.isInteger(count) || count < 1 || totalUnits + count > 10000 ? "Ingresa una cantidad válida. El máximo es de 10,000 unidades por lote." : "";
 
   function add() {
     if (busy || !validInput || !preview || captureWarning) return;
@@ -93,7 +93,7 @@ export default function ProductionCapture({
     const before = (weighed ? weights : units)[variant.id] ?? "";
     const after = weighed ? [before.trim(), Array(count).fill(normalized).join("\n")].filter(Boolean).join("\n")
       : String(Number(before || 0) + count);
-    const label = `${count} × ${variantLabel(variant)} · ${mode === "grams" ? grams(number) : formatPrice(number)} por unidad`;
+    const label = [`${count} × ${code(variant)}`, mode === "grams" ? grams(number) : null, preview.price == null ? "Precio pendiente" : formatPrice(Number(preview.price))].filter(Boolean).join(" · ");
     setValue(variant.id, after, weighed);
     setEdit(undefined);
     setLast({ id: variant.id, before, after, weighed, label });
@@ -192,34 +192,30 @@ export default function ProductionCapture({
     </div>
     <div className="production-capture-fields">
       <label>{mode === "grams" ? "Peso por unidad (g)" : "Precio por unidad (Q)"}
-        <input ref={captureInput} inputMode="decimal" value={input} onChange={event => setInput(event.target.value)}
+        <input ref={captureInput} inputMode="decimal" enterKeyHint="done" value={input} onChange={event => setInput(event.target.value)}
           onKeyDown={event => { if (event.key === "Enter") { event.preventDefault(); add(); } }} />
       </label>
+      <label className="production-capture-quantity">Cantidad<input type="number" inputMode="numeric" min="1" max="10000" step="1" value={quantity}
+        onChange={event => setQuantity(event.target.value)} onKeyDown={event => {
+          if (event.key === "Enter") { event.preventDefault(); add(); }
+        }} /></label>
       <AppButton type="button" disabled={busy || !preview || !validInput || !!captureWarning} onClick={add}>Agregar</AppButton>
     </div>
     {normalized && <div className="production-capture-preview" aria-live="polite">
       {validInput && preview && <>
         <span><strong>{preview.variant.commercial_code || preview.variant.sku || "Variante"}</strong>
           {preview.variant.name && <> · {preview.variant.name}</>}<br />
-          <small>{weightRangeLabel(preview.variant)}</small></span>
+          <small>{weightRangeLabel(preview.variant)}{!!preview.variant.attributes?.aroma && <> · {String(preview.variant.attributes.aroma)}</>}</small></span>
         <strong className={preview.price == null ? "" : "production-capture-price"}>
-          {preview.price == null ? "Precio BASE pendiente" : formatPrice(Number(preview.price))}
+          {preview.price == null ? "Precio BASE pendiente" : "Precio BASE: " + formatPrice(Number(preview.price))}
         </strong>
       </>}
       {captureWarning && <small className="production-capture-warning">{captureWarning}</small>}
     </div>}
-    <div className="production-capture-feedback">
-      <label className="check-label"><input type="checkbox" checked={multiple}
-        onChange={event => { setMultiple(event.target.checked); setQuantity("1"); }} /> Registrar varias unidades iguales</label>
-      {multiple && <label className="production-capture-quantity">Cantidad<input type="number" inputMode="numeric" min="1" max="10000" step="1" value={quantity}
-        onChange={event => setQuantity(event.target.value)} onKeyDown={event => {
-          if (event.key === "Enter") { event.preventDefault(); add(); }
-        }} /></label>}
-    </div>
     {!openingWeights && <small>La captura por gramos está disponible para el saldo inicial.</small>}
     {priceStatus !== "ready" && <small>{priceStatus === "loading" ? "Consultando precios BASE…" : "Precios BASE no disponibles."}</small>}
     <div className="production-capture-feedback">
-      <small role="status">{last ? "Agregado: " + last.label : message}</small>
+      <small role="status">{last ? "Última captura: " + last.label : message}</small>
       {last && <AppButton type="button" className="secondary production-capture-small" disabled={busy || (last.weighed ? weights : units)[last.id] !== last.after}
         onClick={() => { setValue(last.id, last.before, last.weighed); setLast(undefined); setEdit(undefined); setMessage("Última captura deshecha."); captureInput.current?.focus(); }}>
         <Undo2 size={14} aria-hidden="true" /> Deshacer
@@ -228,7 +224,7 @@ export default function ProductionCapture({
 
     <div className="production-capture-feedback">
       <h3>Variantes obtenidas</h3>
-      <AppButton type="button" className="secondary production-capture-small" iconKey="action.refresh" disabled={busy} onClick={refresh}>Actualizar variantes</AppButton>
+      <AppButton type="button" className="secondary production-capture-small" iconKey="action.refresh" disabled={busy} onClick={refresh} aria-label="Actualizar variantes" title="Actualizar variantes" />
     </div>
     <label className="check-label"><input type="checkbox" checked={showAll} onChange={event => setShowAll(event.target.checked)} /> Mostrar todas las variantes</label>
     {editing && edit && <section ref={editor} className="production-capture-editor" aria-label={edit.kind === "quantity" ? "Editar cantidad" : "Editar pesos individuales"}
@@ -269,13 +265,13 @@ export default function ProductionCapture({
       </div>
     </section>}
     {rows.some(row => row.count > 0) || showAll ? <div className="table-wrap">
-      <ResponsiveTable className="production-capture-table" showAllMobileFields compactRowActions>
-        <thead><tr><th>Variante y rango</th><th>Unidades</th><th>Peso real</th><th>Precio BASE</th><th>Importe total</th><th>Acciones</th></tr></thead>
+      <ResponsiveTable className="production-capture-table" showAllMobileFields compactRowActions sortable={false}>
+        <thead><tr><th>Variante</th><th>Ud.</th><th>Peso real</th><th>P. BASE</th><th>Total</th><th>Acciones</th></tr></thead>
         <tbody>{rows.filter(row => showAll || row.count > 0).map(row => {
           const { variant, count, recorded, price } = row;
           const weight = recorded.length ? productionWeightTotal(recorded) : null;
           return <tr key={variant.id}>
-            <td data-sort-value={variant.weight_min ?? ""}>{variantLabel(variant)}<br /><small>{weightRangeLabel(variant)}</small></td>
+            <td data-sort-value={variant.weight_min ?? ""}><strong>{code(variant)}</strong><br /><small>{weightRangeLabel(variant)}</small></td>
             <td data-sort-value={count}>{count}</td>
             <td data-sort-value={weight ?? ""}>{weight == null ? "—" : grams(weight)}</td>
             <td className="production-capture-money" data-sort-value={price ?? ""}>{price == null ? "Pendiente" : formatPrice(Number(price))}</td>
