@@ -21,13 +21,17 @@
 .production-card-list {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 310px), 1fr));
-  align-items: start;
+  grid-auto-rows: 1fr;
+  align-items: stretch;
   gap: 8px;
 }
-.production-card {
+.shell .production-card {
+  display: flex;
+  flex-direction: column;
   min-width: 0;
+  min-height: 16rem;
   padding: 9px 10px;
-  border-color: var(--production-frame, var(--admin-border));
+  border: 2px solid var(--production-frame, var(--admin-border));
   overflow-wrap: anywhere;
 }
 .production-card-header, .production-card-meta, .production-card-actions {
@@ -53,7 +57,7 @@
 .production-card-metrics dd { margin: 0; font-size: 14px; font-weight: 600; }
 .production-card-outputs { display: flex; flex-wrap: wrap; gap: 3px 8px; }
 .production-card-outputs:empty { display: none; }
-.production-card-actions { margin-top: 7px; }
+.production-card-actions { margin-top: auto; padding-top: 7px; }
 .shell :is(.production-card-actions, .production-worklist-heading) button:not(.catalog-icon-button) {
   min-height: 44px;
   font-size: 13px;
