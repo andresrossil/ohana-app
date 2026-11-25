@@ -45,6 +45,7 @@ type Row = { id: string; [key: string]: any };
 const Reports = lazy(() => import("./Reports"));
 const Inventory = lazy(() => import("./Inventory"));
 const Notes = lazy(() => import("./Notes"));
+const NoteSettings = lazy(() => import("./NoteSettings"));
 const Formulas = lazy(() => import("./Formulas"));
 const Production = lazy(() => import("./Production"));
 const BusinessPartners = lazy(() => import("./BusinessPartners"));
@@ -809,6 +810,7 @@ function App() {
                       ["users", "Usuarios"],
                       ["margin", "Margen esperado"],
                       ["materials", "Materiales"],
+                      ["notes", "Configuración de notas"],
                       ["structure", "Corporaciones y accesos"],
                       ["store", "Tienda y ventas"],
                       ["origins", "Orígenes"],
@@ -870,6 +872,7 @@ function App() {
                         onDirty={setSettingsDirty}
                       />
                     )}
+                  {configView === "notes" && activeCompany?.manage && <NoteSettings key={company} company={company} onDirty={setSettingsDirty} />}
                   {configView === "materials" && activeCompany?.manage && <MaterialTypeSettings key={company} company={company} onDirty={setSettingsDirty} />}
                   {configView === "users" && activeCompany?.manage && <UserSettings key={company} company={company} onDirty={setSettingsDirty} />}
                   {configView === "margin" && activeCompany?.manage && <MarginSettings key={company} company={company} onDirty={setSettingsDirty} />}
@@ -1011,8 +1014,8 @@ function App() {
                   onDirty={setSettingsDirty}
                 />
               )}
-              {section === "notes" && activeCompany?.production_read && (
-                <Notes key={company + session?.user.id} company={company} onDirty={setSettingsDirty} />
+              {section === "notes" && session && activeCompany?.production_read && (
+                <Notes key={company + session.user.id} company={company} user={session.user.id} canManage={!!activeCompany.manage} onDirty={setSettingsDirty} />
               )}
               {section === "production" && (
                 <Production
