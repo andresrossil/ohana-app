@@ -54,24 +54,13 @@
 .production-card-outputs { display: flex; flex-wrap: wrap; gap: 3px 8px; }
 .production-card-outputs:empty { display: none; }
 .production-card-actions { margin-top: 7px; }
-.shell :is(.production-card-actions, .production-worklist-heading, .production-actions-menu) button:not(.catalog-icon-button) {
+.shell :is(.production-card-actions, .production-worklist-heading) button:not(.catalog-icon-button) {
   min-height: 44px;
   font-size: 13px;
   padding: 5px 8px;
   white-space: normal;
 }
 .production-card-actions > button[popovertarget] { margin-inline-start: auto; }
-.production-actions-menu {
-  position: fixed;
-  inset: auto;
-  margin: 0;
-  width: min(220px, calc(100vw - 16px));
-  max-height: calc(100dvh - 8px);
-  overflow: auto;
-  padding: 6px;
-}
-.production-actions-menu:popover-open { display: grid; gap: 4px; }
-.shell .production-actions-menu button { justify-content: start; text-align: start; }
 .shell .production-planned-output > input { background: var(--admin-secondary); }
 .shell .production-draft-dialog :is(input[type="date"], .search-select) { min-width: 0; }
 .shell .production-draft-dialog .search-select-display {

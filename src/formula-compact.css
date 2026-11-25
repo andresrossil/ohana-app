@@ -1,0 +1,89 @@
+.shell .intro.formula-intro { padding: 8px 0; gap: 8px; }
+.shell .formula-intro h1 { margin: 0 0 3px; font-size: clamp(22px, 4vw, 28px); }
+.shell .formula-intro p { font-size: 13px; }
+.shell .formula-intro .form-actions > button:not(.catalog-icon-button) { min-height: 44px; padding: 5px 8px; font-size: 13px; }
+.shell .formula-catalog .toolbar { padding: 6px 9px; margin: 0; }
+.shell .formula-catalog .toolbar .pool-search-field { max-width: 480px; min-width: 0; }
+.shell .formula-catalog .formula-gallery { max-height: none; }
+.shell .formula-catalog-table :is(th, td) { padding: 6px; overflow-wrap: anywhere; }
+.shell .formula-catalog .formula-product { gap: 6px; }
+.shell .formula-catalog .formula-product-image { flex-basis: 38px; width: 38px; }
+.shell .formula-catalog .formula-product-image .product-photo { width: 38px; height: 38px; }
+.shell .formula-catalog .formula-state { min-width: 120px; grid-template-columns: 18px minmax(0, 1fr); gap: 4px; }
+.shell .formula-catalog .formula-product-text small { margin: 0; }
+.formula-mobile-code { display: none; }
+.shell .formula-catalog .formula-actions { min-width: 165px; max-width: none; }
+.shell .formula-catalog .formula-actions > button:not(.catalog-icon-button) {
+  min-height: 44px; padding: 4px 7px; font-size: 12px; white-space: normal;
+}
+.formula-estimate-details { margin-top: 4px; font-size: 12px; }
+.shell .formula-estimate-details summary { min-height: 40px; }
+.formula-estimate-details small { display: block; white-space: normal; }
+.formula-line-mobile-detail, .formula-overhead-mobile-basis { display: none; }
+
+.shell .overlay > .formula-compact-dialog {
+  width: min(1180px, 100%);
+  max-width: 100%;
+  max-height: 100% !important;
+  padding: 0;
+  overflow-y: auto;
+}
+.shell .formula-compact-dialog form { gap: 0; }
+.shell .formula-compact-dialog .compact-form-body { overflow: visible; }
+.shell .formula-compact-dialog .compact-form-body > :is(details, section) { margin-block: 6px; }
+.shell .formula-compact-dialog .compact-form-grid + .compact-form-grid { margin-top: 7px; }
+.shell .formula-compact-dialog :is(.compact-form-grid, .settings-grid) { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.shell .formula-compact-dialog .formula-disclosure { padding: 6px 8px; }
+.shell .formula-compact-dialog .formula-disclosure > summary { min-height: 44px; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; }
+.shell .formula-compact-dialog .formula-disclosure[open] > summary { margin-bottom: 4px; }
+.shell .formula-compact-dialog .formula-line-frame { border: 0; padding: 0; }
+.shell .formula-compact-dialog .formula-edit-lines { min-width: 780px; }
+.shell .formula-compact-dialog .formula-edit-lines :is(th, td) { padding: 4px 5px; }
+.shell .formula-compact-dialog .formula-edit-lines td:first-child { min-width: 172px; }
+.shell .formula-compact-dialog .formula-edit-lines td:nth-child(2) { min-width: 100px; }
+.shell .formula-compact-dialog .formula-edit-lines td:nth-child(4) { min-width: 68px; width: auto; }
+.shell .formula-compact-dialog .formula-line-notes summary { font-size: 11px; min-height: 40px; }
+.shell .formula-compact-dialog .formula-footer { flex-wrap: wrap; gap: 4px; }
+.shell .formula-compact-dialog textarea { resize: vertical; }
+.shell .formula-compact-dialog .additional-costs-content { padding: 4px; gap: 5px; }
+.shell .formula-compact-dialog .formula-overheads :is(th, td) { padding: 5px; }
+.shell .formula-compact-dialog .formula-overheads .form-actions { margin-block: 4px; }
+.formula-intermediate-cost { font-size: 12px; font-weight: 600; }
+.shell .formula-compact-dialog .formula-disclosure > .settings-grid { margin: 4px 0; padding: 5px; border-bottom: 1px solid var(--admin-border); }
+.shell .formula-compact-dialog .cost-summary-compact { margin: 0; border-radius: 8px; }
+.shell .cost-summary-compact .cost-summary-heading { position: static; height: auto; min-height: 0; padding: 6px 8px; }
+.shell .cost-summary-compact > p { padding: 5px 8px; }
+.shell .cost-summary-compact :is(th, td) { padding: 5px; white-space: normal; overflow-wrap: anywhere; }
+.shell .cost-summary-compact th:first-child { width: 45%; }
+@media (max-width: 760px) {
+  .shell .formula-catalog-table > tbody > tr { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 7px; gap: 4px 6px; }
+  .shell .formula-catalog-table > tbody > tr > :is(.formula-catalog-code, .formula-catalog-version) { display: none !important; }
+  .shell .formula-catalog-table > tbody > tr > :is(.formula-catalog-product, .formula-catalog-state, .formula-actions) { grid-column: 1 / -1; }
+  .shell .formula-catalog-table .formula-catalog-state { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; }
+  .shell .formula-catalog-table .formula-mobile-code { display: inline; }
+  .shell .formula-catalog-table :is(.formula-catalog-product, .formula-catalog-state) > .mobile-cell-label { display: none; }
+  .shell .formula-catalog-table .formula-state :is(select, input[data-search-select]) { min-height: 42px; }
+  .shell .formula-catalog-table .formula-estimate-details { width: 100%; }
+  .shell .formula-compact-dialog .formula-edit-lines > tbody > tr { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 6px; padding: 7px; }
+  .shell .formula-compact-dialog .formula-edit-lines .formula-line-material { grid-column: 1 / -1; }
+  .shell .formula-compact-dialog .formula-edit-lines .formula-line-material > .mobile-cell-label,
+  .shell .formula-compact-dialog .formula-edit-lines > tbody > tr > .formula-line-desktop-detail,
+  .shell .formula-compact-dialog .formula-overheads-compact > .table-wrap > table > tbody > tr > .formula-overhead-basis { display: none; }
+  .shell .formula-compact-dialog :is(.formula-line-mobile-detail, .formula-overhead-mobile-basis) { display: block; }
+  .shell .formula-compact-dialog .formula-edit-lines > tbody > tr > .formula-line-remove { justify-self: end; }
+  .shell .formula-compact-dialog .formula-line-remove > .mobile-cell-label { display: none; }
+  .shell .cost-summary-compact .responsive-table { display: table !important; table-layout: fixed !important; }
+  .shell .cost-summary-compact .responsive-table > thead { display: table-header-group !important; }
+  .shell .cost-summary-compact .responsive-table > tbody { display: table-row-group; }
+  .shell .cost-summary-compact .responsive-table :is(thead, tbody) > tr { display: table-row; }
+  .shell .cost-summary-compact .responsive-table :is(thead, tbody) > tr > :is(td, th) {
+    display: table-cell;
+    padding: 5px !important;
+    border-bottom: 1px solid var(--admin-border) !important;
+    font-size: 12px;
+  }
+  .shell .cost-summary-compact .responsive-table > thead:has(button) th { min-width: 0; }
+  .shell .cost-summary-compact .mobile-cell-label { display: none; }
+}
+
+.shell .cost-summary-compact th button { padding: 3px; gap: 4px; font-size: inherit; white-space: normal; text-align: start; }

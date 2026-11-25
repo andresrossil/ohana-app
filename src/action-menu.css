@@ -1,0 +1,11 @@
+.production-actions-menu {
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  width: min(220px, calc(100vw - 16px));
+  max-height: calc(100dvh - 8px);
+  overflow: auto;
+  padding: 6px;
+}
+.production-actions-menu:popover-open { display: grid; gap: 4px; }
+.shell .production-actions-menu button { justify-content: start; text-align: start; min-height: 44px; padding: 5px 8px; font-size: 13px; white-space: normal; }

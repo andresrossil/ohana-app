@@ -1,6 +1,7 @@
 import SearchSelect from "./SearchSelect";
 import { AppButton } from "./AppIcon";
 import ResponsiveTable from "./ResponsiveTable";
+import { IconDetails } from "./PoolControls";
 import DecimalInput from "./DecimalInput";
 import { money, type Row } from "./operations";
 import {
@@ -14,12 +15,14 @@ export default function FormulaOverheads({
   quote,
   onChange,
   historical = false,
+  compact = false,
 }: {
   items: Row[];
   lines: Row[];
   quote: Row;
   onChange?: (lines: Row[]) => void;
   historical?: boolean;
+  compact?: boolean;
 }) {
   const legacy = [
     ...(quote.overhead_lines || []),
@@ -44,7 +47,7 @@ export default function FormulaOverheads({
   const amount = (v: unknown) =>
     v == null ? "Pendiente" : money(v, quote.currency);
   return (
-    <section className="formula-overheads">
+    <section className={compact ? "formula-overheads formula-overheads-compact" : "formula-overheads"}>
       <div className="form-actions">
         {onChange && (
           <AppButton
@@ -70,7 +73,7 @@ export default function FormulaOverheads({
         </p>
       )}
       <div className="table-wrap">
-        <ResponsiveTable>
+        <ResponsiveTable showAllMobileFields={compact}>
           <thead>
             <tr>
               <th>Concepto</th>
@@ -89,6 +92,9 @@ export default function FormulaOverheads({
                     )
                   : line,
                 fixed = (item?.kind || row?.kind || "overhead") === "overhead";
+              const basis = fixed
+                ? amount(row?.unit_price)
+                : quote.sale_price == null ? "Pendiente de precio" : amount(quote.sale_price);
               return (
                 <tr
                   key={line.cost_id || i}
@@ -151,6 +157,10 @@ export default function FormulaOverheads({
                     ) : (
                       <>{row?.name}</>
                     )}
+                    {compact && <IconDetails className="formula-overhead-mobile-basis" open={false}>
+                      <summary>Base de cálculo</summary>
+                      <small>{basis}</small>
+                    </IconDetails>}
                   </td>
                   <td>
                     {fixed ? (
@@ -207,13 +217,7 @@ export default function FormulaOverheads({
                       `${row?.percent ?? "—"} %`
                     )}
                   </td>
-                  <td>
-                    {fixed
-                      ? amount(row?.unit_price)
-                      : quote.sale_price == null
-                        ? "Pendiente de precio"
-                        : amount(quote.sale_price)}
-                  </td>
+                  <td className="formula-overhead-basis">{basis}</td>
                   <td>
                     {!fixed && quote.sale_price == null
                       ? "Pendiente de precio"

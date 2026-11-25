@@ -1,6 +1,9 @@
 import { centralVariant } from "./central-variant";
 import { variantLabel } from "./variant-label";
 import { MarginBadge } from "./MarginBadge";
+import FormSection from "./FormSection";
+import ProductionMenu from "./ProductionMenu";
+import { scrollCompactFormToStart, useCompactFormViewport } from "./compact-form-viewport";
 import SearchSelect, { SortedDatalist } from "./SearchSelect";
 import ProductImage from "./ProductImage";
 import AutoTextarea from "./AutoTextarea";
@@ -20,6 +23,7 @@ import { estimateIntermediateCost, formulaCost } from "./price-cost";
 import { keyedRequest, money, useOperation, type Row } from "./operations";
 import { recipeMath, roundQuantity, type RecipeLine } from "./formula-model";
 import "./formulas.css";
+import "./formula-compact.css";
 import { productLabel, resolveProduct } from "./product-view";
 import BatchTrace, { lotCode } from "./BatchTrace";
 
@@ -151,6 +155,11 @@ export default function Formulas({
   useEffect(() => {
     if (mode) heading.current?.focus();
   }, [mode]);
+  const formulaBody = useRef<HTMLDivElement>(null);
+  useCompactFormViewport(formulaBody);
+  useEffect(() => {
+    if (mode && state.error) scrollCompactFormToStart(formulaBody.current);
+  }, [mode, state.error]);
   const readOnly = mode === "view" || mode === "notes",
     math = recipeMath(
       lines,
@@ -531,16 +540,9 @@ export default function Formulas({
   function rowsTable(kind: RecipeLine["line_kind"]) {
     return (
       <section className="formula-lines">
-        <h3>
-          {kind === "ingredient"
-            ? "Materias primas"
-            : kind === "packaging"
-              ? "Materiales de empaque"
-              : "Insumos adicionales"}
-        </h3>
         <div className="formula-line-frame">
           <div className="formula-table-scroll">
-            <ResponsiveTable>
+            <ResponsiveTable className="formula-edit-lines" showAllMobileFields>
               <thead>
                 <tr>
                   <th>
@@ -582,9 +584,35 @@ export default function Formulas({
                             ? m.classification === "Material de empaque"
                             : m.classification !== "Material de empaque"),
                     );
+                  const priceDetail = (
+                    <>
+{material?.presentation_price != null ? (
+                          <>
+                            <strong>
+                              {money(
+                                material.presentation_price,
+                                catalog.currency,
+                              )}
+                            </strong>
+                            <small>
+                              {number(Number(material.presentation_quantity))}{" "}
+                              {material.presentation_unit} ·{" "}
+                              {material.presentation_name}
+                            </small>
+                            <small>
+                              {material.price_basis === "undated"
+                                ? "Referencia sin fecha"
+                                : material.effective_on}
+                            </small>
+                          </>
+                        ) : (
+                          <span className="muted">Sin precio utilizable</span>
+                        )}
+                    </>
+                  );
                   return (
                     <tr key={line.key}>
-                      <td>
+                      <td className="formula-line-material">
                         {readOnly ? (
                           <span>
                             {material?.name || "Material no disponible"}
@@ -614,6 +642,7 @@ export default function Formulas({
                         )}
                         <IconDetails
                           className="formula-line-notes"
+                          open={false}
                           onToggle={(e) => {
                             if (e.currentTarget.open) {
                               const area =
@@ -626,7 +655,7 @@ export default function Formulas({
                           }}
                         >
                           <summary>
-                            Referencia / Observaciones
+                            Referencia y detalles
                             {line.reference_notes ? " · con nota" : ""}
                           </summary>
                           {readOnly ? (
@@ -645,9 +674,14 @@ export default function Formulas({
                               }
                             />
                           )}
+                          <div className="formula-line-mobile-detail">
+                            <strong>Precio por presentación</strong>
+                            {priceDetail}
+                            <small>% costo MP: {computed.costPercentage == null ? "—" : number(computed.costPercentage) + " %"}</small>
+                          </div>
                         </IconDetails>
                       </td>
-                      <td>
+                      <td className="formula-line-quantity">
                         {kind === "auxiliary" &&
                           (readOnly ? (
                             <small>
@@ -708,7 +742,7 @@ export default function Formulas({
                           </small>
                         )}
                       </td>
-                      <td>
+                      <td className="formula-line-unit">
                         {readOnly ? (
                           computed.unit?.symbol
                         ) : (
@@ -773,7 +807,7 @@ export default function Formulas({
                             </label>
                           )}
                       </td>
-                      <td>
+                      <td className="formula-line-desktop-detail">
                         {computed.costPercentage == null
                           ? "—"
                           : new Intl.NumberFormat("es-GT", {
@@ -783,8 +817,7 @@ export default function Formulas({
                       {!readOnly &&
                         kind === "ingredient" &&
                         draft.capture_mode === "percentage" && (
-                          <td>
-                            {" "}
+                          <td className="formula-line-percentage">
                             <DecimalInput
                               disabled={state.busy}
                               aria-label={`Porcentaje fila ${index + 1}`}
@@ -802,31 +835,8 @@ export default function Formulas({
                             />
                           </td>
                         )}
-                      <td>
-                        {material?.presentation_price != null ? (
-                          <>
-                            <strong>
-                              {money(
-                                material.presentation_price,
-                                catalog.currency,
-                              )}
-                            </strong>
-                            <small>
-                              {number(Number(material.presentation_quantity))}{" "}
-                              {material.presentation_unit} ·{" "}
-                              {material.presentation_name}
-                            </small>
-                            <small>
-                              {material.price_basis === "undated"
-                                ? "Referencia sin fecha"
-                                : material.effective_on}
-                            </small>
-                          </>
-                        ) : (
-                          <span className="muted">Sin precio utilizable</span>
-                        )}
-                      </td>
-                      <td>
+                      <td className="formula-line-desktop-detail">{priceDetail}</td>
+                      <td className="formula-line-cost">
                         {computed.cost == null ? (
                           <span className="muted">Sin precio utilizable</span>
                         ) : (
@@ -834,10 +844,11 @@ export default function Formulas({
                         )}
                       </td>
                       {!readOnly && (
-                        <td>
+                        <td className="formula-line-remove">
                           <AppButton
                             type="button"
-                            className="secondary"
+                            className="secondary catalog-icon-button"
+                            title="Quitar de la fórmula"
                             disabled={state.busy}
                             iconKey="action.delete"
                             aria-label={`Eliminar material fila ${index + 1}`}
@@ -847,9 +858,7 @@ export default function Formulas({
                               );
                               changed();
                             }}
-                          >
-                            Eliminar
-                          </AppButton>
+                          />
                         </td>
                       )}
                     </tr>
@@ -940,19 +949,23 @@ export default function Formulas({
       .toLowerCase()
       .includes(query.toLowerCase()),
   );
+  const draftWarnings = mode ? [
+    !draft.product && "Producto sin seleccionar.",
+    !(Number(draft.estimated_units) > 0) && "Unidades estimadas sin definir.",
+    draft.production_mode === "variable_weight" && !(Number(draft.estimated_final_weight_g) > 0) && "Rendimiento final pendiente.",
+    draft.product && !referenceVariant && "Variante central pendiente.",
+  ].filter(Boolean) : [];
   const compared = formulas.find((f) => f.id === comparison);
   return (
     <>
       <section className="intro formula-intro">
         <div>
-          <p className="eyebrow">DE LA RECETA AL PRODUCTO</p>
           <h1 className="module-title">
             <AppIcon name="module.formulas" />
             Fórmulas
           </h1>
           <p>
-            Composición, versiones y costos estimados, sin modificar
-            existencias.
+            Composición, versiones y costos estimados.
           </p>
         </div>
         <div className="form-actions">
@@ -962,12 +975,11 @@ export default function Formulas({
             </AppButton>
           )}
           <AppButton
-            className="secondary"
+            type="button" className="secondary catalog-icon-button" iconKey="action.refresh"
+            aria-label="Actualizar fórmulas" title="Actualizar"
             disabled={state.busy}
             onClick={() => state.run(load)}
-          >
-            Actualizar
-          </AppButton>
+          />
         </div>
       </section>
       {!mode && state.error && (
@@ -979,7 +991,6 @@ export default function Formulas({
       {state.notice && <p role="status">{state.notice}</p>}
       <section className="catalog formula-catalog">
         <div className="toolbar">
-          <h2>Fórmulas y versiones</h2>
           <SearchField
             aria-label="Buscar fórmula"
             placeholder="Código, producto, fórmula o estado…"
@@ -988,7 +999,7 @@ export default function Formulas({
           />
         </div>
         <div className="formula-table-scroll formula-gallery">
-          <ResponsiveTable>
+          <ResponsiveTable className="formula-catalog-table" showAllMobileFields compactRowActions>
             <thead>
               <tr>
                 <th>Código</th>
@@ -1035,8 +1046,8 @@ export default function Formulas({
                     : null;
                 return (
                   <tr key={f.id}>
-                    <td>{f.code}</td>
-                    <td>
+                    <td className="formula-catalog-code">{f.code}</td>
+                    <td className="formula-catalog-product">
                       <div className="formula-product">
                         <div className="formula-product-image">
                           <ProductImage
@@ -1050,12 +1061,13 @@ export default function Formulas({
                         </div>
                         <div className="formula-product-text">
                           <strong>{f.product_name}</strong>
-                          <small>{f.name}</small>
+                          {f.name && f.name.trim().toLocaleLowerCase() !== f.product_name?.trim().toLocaleLowerCase() && <small>{f.name}</small>}
                         </div>
                       </div>
                     </td>
-                    <td>v{f.version}</td>
-                    <td>
+                    <td className="formula-catalog-version">v{f.version}</td>
+                    <td className="formula-catalog-state">
+                      <small className="formula-mobile-code">{f.code} · v{f.version}</small>
                       <div className={"formula-state formula-state-" + f.state}>
                         <span className="formula-state-icon">
                           <AppIcon
@@ -1095,20 +1107,6 @@ export default function Formulas({
                       {price == null
                         ? "Pendiente"
                         : money(price, catalog.currency)}
-                      {presentation && (
-                        <small>
-                          Variante central: {variantLabel(presentation)}
-                        </small>
-                      )}
-                      {price == null && (
-                        <small>
-                          {presentation
-                            ? "Sin precio base vigente"
-                            : f.production_mode === "variable_weight"
-                              ? "Completa los rangos de peso de las variantes"
-                              : "No hay una variante central válida; revisa sus rangos"}
-                        </small>
-                      )}
                     </td>
                     <td
                       className="formula-amount"
@@ -1123,7 +1121,6 @@ export default function Formulas({
                           fabricación
                         </small>
                       )}
-                      {f.intermediates?.length && shownCost != null ? <small>Costo de fabricación</small> : estimate.reason && <small>{estimate.reason}</small>}
                     </td>
                     <td
                       data-sort-value={margin ?? ""}
@@ -1163,6 +1160,7 @@ export default function Formulas({
                           >
                             Editar fórmula
                           </AppButton>
+                          <ProductionMenu document={`la fórmula ${f.code} v${f.version}`}>
                           <AppButton
                             className="secondary"
                             disabled={state.busy}
@@ -1184,8 +1182,27 @@ export default function Formulas({
                           >
                             Duplicar fórmula
                           </AppButton>
+                          </ProductionMenu>
                         </>
                       )}
+                      <IconDetails className="formula-estimate-details" open={false}>
+                        <summary>Detalles de costos</summary>
+                      {presentation && (
+                        <small>
+                          Variante central: {variantLabel(presentation)}
+                        </small>
+                      )}
+                      {price == null && (
+                        <small>
+                          {presentation
+                            ? "Sin precio base vigente"
+                            : f.production_mode === "variable_weight"
+                              ? "Completa los rangos de peso de las variantes"
+                              : "No hay una variante central válida; revisa sus rangos"}
+                        </small>
+                      )}
+                      {f.intermediates?.length && shownCost != null ? <small>Costo de fabricación</small> : estimate.reason && <small>{estimate.reason}</small>}
+                      </IconDetails>
                     </td>
                   </tr>
                 );
@@ -1207,9 +1224,9 @@ export default function Formulas({
         )}
       </section>
       {mode && (
-        <div className="overlay">
+        <div className="overlay compact-form-overlay">
           <section
-            className="modal formula-dialog"
+            className="modal formula-dialog compact-form-dialog formula-compact-dialog"
             role="dialog"
             aria-modal="true"
             aria-labelledby="formula-title"
@@ -1217,32 +1234,40 @@ export default function Formulas({
               if (e.key === "Escape") close();
             }}
           >
-            <div className="hierarchy-toolbar">
+            <div className="compact-form-header">
               <h2 tabIndex={-1} ref={heading} id="formula-title">
                 {actionNames[mode]}
                 {readOnly ? ` · ${draft.code} · v${draft.version}` : ""}
               </h2>
-              <AppButton
-                className="secondary"
-                disabled={state.busy}
-                onClick={close}
-              >
-                Cerrar
-              </AppButton>
+              <AppButton type="button" className="secondary catalog-icon-button" iconKey="action.cancel"
+                aria-label="Cerrar fórmula" title="Cerrar" disabled={state.busy} onClick={close} />
             </div>
+            <form key={mode} className="compact-form" aria-busy={state.busy}
+              data-dirty-managed
+              onInvalidCapture={event => {
+                const field = event.target;
+                if (!(field instanceof HTMLElement)) return;
+                for (let group = field.closest("details"); group; group = group.parentElement?.closest("details") ?? null) {
+                  group.open = true;
+                }
+                if (compactIngredients && field.closest(".formula-lines")?.closest("[hidden]")) {
+                  event.preventDefault();
+                  setCompactIngredients(false);
+                  requestAnimationFrame(() => field.focus());
+                }
+              }}
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (!readOnly || mode === "notes") save(false);
+              }}
+            >
+              <div className="compact-form-body" ref={formulaBody}>
             {state.error && (
               <p role="alert" className="error">
                 <AppIcon name="status.error" />
                 {state.error}
               </p>
             )}
-            <form
-              data-dirty-managed
-              onSubmit={(e) => {
-                e.preventDefault();
-                if (!readOnly || mode === "notes") save(false);
-              }}
-            >
               {draft.locked && (
                 <p className="sheet-warning">
                   Esta versión ya tiene producción confirmada. Puedes editar
@@ -1257,8 +1282,8 @@ export default function Formulas({
                   fórmula.
                 </p>
               )}
-              <fieldset disabled={state.busy}>
-                <legend>Identidad</legend>
+              <FormSection title="Identidad y datos generales" icon="status.info">
+              <fieldset className="compact-form-grid" disabled={state.busy}>
                 <label>
                   Código automático
                   <input
@@ -1282,8 +1307,7 @@ export default function Formulas({
                   />
                 </label>
               </fieldset>
-              <fieldset disabled={readOnly || state.busy}>
-                <legend>Datos generales</legend>
+              <fieldset className="compact-form-grid" disabled={readOnly || state.busy}>
                 <label>
                   Producto
                   <input
@@ -1427,8 +1451,9 @@ export default function Formulas({
                   </>
                 )}
               </fieldset>
-              <fieldset disabled={readOnly || state.busy}>
-                <legend>Producción estimada · opcional</legend>
+              </FormSection>
+              <FormSection title="Producción estimada" icon="module.production" initiallyOpen={false}>
+              <fieldset className="compact-form-grid" disabled={readOnly || state.busy}>
                 <label>
                   Modalidad de producción
                   <SearchSelect
@@ -1653,6 +1678,7 @@ export default function Formulas({
                   </small>
                 </label>
               </fieldset>
+              </FormSection>
               <IconDetails className="formula-disclosure" hidden>
                 <summary>
                   Merma informativa
@@ -1731,8 +1757,8 @@ export default function Formulas({
                   )}
                 </label>
               )}
-              <IconDetails className="formula-disclosure" open>
-                <summary>Materias primas</summary>
+              <IconDetails className="formula-disclosure" open={false}>
+                <summary>Materias primas · {lines.filter(line => line.line_kind === "ingredient").length}</summary>
                 <div className="formula-ingredient-view">
                   <AppButton type="button" className="secondary"
                     onClick={() => setCompactIngredients((active) => !active)}>
@@ -1770,8 +1796,8 @@ export default function Formulas({
                   </section>
                 )}
               </IconDetails>
-              <IconDetails className="formula-disclosure">
-                <summary>Productos intermedios</summary>
+              <IconDetails className="formula-disclosure" open={false}>
+                <summary>Productos intermedios · {(draft.intermediates || []).length}</summary>
                 {(draft.intermediates || []).map((line: Row, index: number) => {
                   const options = (catalog.intermediate_options || []) as Row[];
                   const selected = options.find((option) => option.id === line.variant_id);
@@ -1802,8 +1828,13 @@ export default function Formulas({
                           .map((unit: Row) => <option key={unit.id} value={unit.id}>{unit.name} ({unit.symbol})</option>)}
                       </SearchSelect>
                     </label>
-                    {!readOnly && <AppButton type="button" className="secondary" onClick={() =>
-                      field("intermediates", draft.intermediates.filter((_: Row, i: number) => i !== index))}>Quitar</AppButton>}
+                    <span className="formula-intermediate-cost">Costo: {(() => {
+                      const amount = estimateIntermediateCost([line], catalog, readOnly ? Number(scale) : 1, formulas);
+                      return amount == null ? "Pendiente" : money(amount, catalog.currency);
+                    })()}</span>
+                    {!readOnly && <AppButton type="button" className="secondary catalog-icon-button"
+                      aria-label="Quitar producto intermedio" title="Quitar producto intermedio" iconKey="action.delete"
+                      onClick={() => field("intermediates", draft.intermediates.filter((_: Row, i: number) => i !== index))} />}
                   </div>;
                 })}
                 {!readOnly && <AppButton type="button" className="secondary" onClick={() => field("intermediates",
@@ -1811,14 +1842,14 @@ export default function Formulas({
                   Agregar producto intermedio
                 </AppButton>}
               </IconDetails>
-              <IconDetails className="formula-disclosure">
+              <IconDetails className="formula-disclosure" open={false}>
                 <summary>
                   Materiales de empaque ·{" "}
                   {lines.filter((l) => l.line_kind === "packaging").length}
                 </summary>
                 {rowsTable("packaging")}
               </IconDetails>
-              <IconDetails className="formula-disclosure">
+              <IconDetails className="formula-disclosure" open={false}>
                 <summary>
                   Insumos adicionales ·{" "}
                   {lines.filter((l) => l.line_kind === "auxiliary").length}
@@ -1837,6 +1868,7 @@ export default function Formulas({
                 un precio, el total y los porcentajes quedan pendientes.
               </p>
               <AdditionalCostsPanel
+                compact
                 quote={{
                   ...extraQuote,
                   variable_weight: draft.production_mode === "variable_weight",
@@ -1851,7 +1883,9 @@ export default function Formulas({
                 baseCost={math.totalCost}
                 hideTotals
               />
+              <FormSection title="Resumen de costos y utilidad" icon="action.calculate" initiallyOpen={false}>
               <CostSummary
+                compact
                 product={
                   catalog.products.find((p: Row) => p.id === draft.product)
                     ?.name ||
@@ -1896,11 +1930,19 @@ export default function Formulas({
                 quote={extraQuote}
                 variable={draft.production_mode === "variable_weight"}
               />
-              {math.missingCosts > 0 && (
-                <p className="muted">
-                  Hay {math.missingCosts} fila(s) sin precio utilizable. Los
-                  costos faltantes permanecen pendientes.
-                </p>
+              </FormSection>
+              {(math.missingCosts > 0 || draftWarnings.length > 0) && (
+                <FormSection title={`Advertencias · ${draftWarnings.length + math.missingCosts}`} icon="status.warning" initiallyOpen={false}>
+                  {!!draftWarnings.length && <ul>{draftWarnings.map(warning => <li key={String(warning)}>{warning}</li>)}</ul>}
+                  {math.missingCosts > 0 && <>
+                  <p className="muted">Los materiales sin precio utilizable y los costos incompletos permanecen pendientes.</p>
+                  <ul>{lines.map((line, index) => {
+                    if (math.rows[index]?.cost != null) return null;
+                    const material = catalog.materials.find((m: Row) => m.id === line.material);
+                    return <li key={line.key}>{material?.name || line.search || `Fila ${index + 1}`}</li>;
+                  })}</ul>
+                  </>}
+                </FormSection>
               )}
               {duplicates.length > 0 && (
                 <section className="formula-duplicates" role="status">
@@ -1945,11 +1987,11 @@ export default function Formulas({
               )}
               <IconDetails
                 className="formula-disclosure"
+                open={mode === "notes"}
               >
-                <summary>Notas administrativas</summary>
+                <summary>Notas administrativas{draft.admin_notes?.trim() ? " · con notas" : ""}</summary>
                 <label className="form-wide">
-                  Notas administrativas
-                  <textarea
+                  <textarea aria-label="Notas administrativas" rows={3}
                     maxLength={4000}
                     value={draft.admin_notes || ""}
                     disabled={mode === "view" || state.busy}
@@ -1981,7 +2023,8 @@ export default function Formulas({
                   ))}
                 </section>
               )}
-              <div className="form-actions">
+              </div>
+              <div className="compact-form-actions formula-footer">
                 {(mode === "view" || mode === "notes" || mode === "edit") &&
                   state.canWrite && (
                     <>
@@ -2036,7 +2079,7 @@ export default function Formulas({
                     </>
                   )}
                 {(!readOnly || mode === "notes") && (
-                  <AppButton disabled={state.busy}>
+                  <AppButton type="submit" iconKey="action.save" disabled={state.busy}>
                     {mode === "edit" || mode === "notes"
                       ? "Guardar cambios"
                       : "Guardar"}

@@ -64,11 +64,12 @@ export default forwardRef<
   TableHTMLAttributes<HTMLTableElement> & {
     showAllMobileFields?: boolean;
     compactRowActions?: boolean;
+    mobileTable?: boolean;
     sortable?: boolean;
     onSortRows?: (indexes: number[]) => void;
   }
 >(function ResponsiveTable(
-  { children, className, onInvalidCapture, onSortRows, showAllMobileFields, compactRowActions, sortable = true, ...props },
+  { children, className, onInvalidCapture, onSortRows, showAllMobileFields, compactRowActions, mobileTable, sortable = true, ...props },
   ref,
 ) {
   const [overrides, setOverrides] = useState<Set<string>>(new Set()),
@@ -103,7 +104,7 @@ export default forwardRef<
   const mobileColumn = descriptionColumn >= 0 ? descriptionColumn : headers.findIndex((heading) =>
     /^(nombre|producto|materia prima|material|ingrediente|art[ií]culo|cliente|proveedor|concepto|fondo|variante)\b/i.test(heading),
   );
-  const selection = mobile && sortable && mobileColumn >= 0 ? descriptionSort : sort;
+  const selection = mobile && !mobileTable && sortable && mobileColumn >= 0 ? descriptionSort : sort;
   function capture(column: number) {
     const values: Record<string, string> = {};
     for (const body of Array.from(table.current?.tBodies || []))
@@ -167,7 +168,7 @@ export default forwardRef<
     }
   }
   useLayoutEffect(() => {
-    if (!mobile || !sortable || mobileColumn < 0 ||
+    if (!mobile || mobileTable || !sortable || mobileColumn < 0 ||
       (table.current?.contains(document.activeElement) &&
         /^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement?.tagName || ""))) return;
     const values = capture(mobileColumn);
@@ -185,7 +186,7 @@ export default forwardRef<
   });
   useLayoutEffect(() => {
     if (
-      mobile || !sort ||
+      (mobile && !mobileTable) || !sort ||
       (table.current?.contains(document.activeElement) &&
         /^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement?.tagName || ""))
     )

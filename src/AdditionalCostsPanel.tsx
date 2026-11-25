@@ -11,6 +11,7 @@ export default function AdditionalCostsPanel({
   overheadLines = [],
   onOverheadChange,
   hideTotals = false,
+  compact = false,
 }: {
   quote: Row;
   items?: Row[];
@@ -19,6 +20,7 @@ export default function AdditionalCostsPanel({
   overheadLines?: Row[];
   onOverheadChange?: (lines: Row[]) => void;
   hideTotals?: boolean;
+  compact?: boolean;
 }) {
   const total =
     baseCost != null && quote.additional_total != null
@@ -27,8 +29,14 @@ export default function AdditionalCostsPanel({
   const amount = (v: unknown) =>
     v == null ? "Pendiente" : money(v, quote.currency);
   const n = Number(quote.unit_basis_count ?? quote.estimated_units);
+  const costMethod = <p className="muted">
+    {historical
+      ? "Se conservan las cantidades e importes registrados al confirmar. "
+      : "Otros gastos: cantidad = unidades del lote; importe = cantidad × precio unitario. "}
+    Mano de obra y Publicidad se estiman sobre el precio de venta base. No generan consumos de inventario.
+  </p>;
   return (
-    <IconDetails className="formula-disclosure additional-costs">
+    <IconDetails className="formula-disclosure additional-costs" open={compact ? false : undefined}>
       <summary>
         <AppIcon name="action.calculate" /> Costos adicionales
         {historical ? " · histórico confirmado" : ""}
@@ -52,14 +60,12 @@ export default function AdditionalCostsPanel({
           quote={quote}
           onChange={onOverheadChange}
           historical={historical}
+          compact={compact}
         />
-        <p className="muted">
-          {historical
-            ? "Se conservan las cantidades e importes registrados al confirmar. "
-            : "Otros gastos: cantidad = unidades del lote; importe = cantidad × precio unitario. "}
-          Mano de obra y Publicidad se estiman sobre el precio de venta base. No
-          generan consumos de inventario.
-        </p>
+        {compact ? <IconDetails className="cost-method-help" open={false}>
+          <summary>Criterios de cálculo</summary>
+          {costMethod}
+        </IconDetails> : costMethod}
         {!hideTotals && (
           <div className="formula-summary">
             <div>

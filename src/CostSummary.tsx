@@ -10,6 +10,7 @@ export default function CostSummary({
   historical = false,
   unitReference,
   referenceLabel,
+  compact = false,
 }: {
   product: string;
   materials: Row;
@@ -18,6 +19,7 @@ export default function CostSummary({
   historical?: boolean;
   unitReference?: { materials: Row; quote: Row };
   referenceLabel?: string;
+  compact?: boolean;
 }) {
   const s = financialSummary(materials, quote),
     currency = quote.currency || "GTQ";
@@ -72,10 +74,20 @@ export default function CostSummary({
       unitReference ? unitReference.materials.intermediates ?? null : s.unit(materials.intermediates),
       materials.intermediates]);
   }
+  const financialOrder = [
+    "Materias primas", "Productos intermedios", "Empaque", "Insumos adicionales",
+    "Total de materiales", "Mano de obra", "Publicidad", "Otros gastos",
+    "Costo total estimado", "Precio de venta · Lista base", "Resultado antes de gastos",
+    "Utilidad estimada antes de impuestos", "Margen estimado sobre venta",
+  ];
+  const rank = new Map(financialOrder.map((label, index) => [label, index]));
+  const displayed = compact
+    ? [...rows].sort(([a], [b]) => (rank.get(a) ?? financialOrder.length) - (rank.get(b) ?? financialOrder.length))
+    : rows;
   return (
-    <section className="cost-summary" aria-label="Resumen de costos y utilidad">
-      <header className="cost-summary-heading">
-        <h3>Resumen de costos y utilidad{historical ? " · histórico" : ""}</h3>
+    <section className={compact ? "cost-summary cost-summary-compact" : "cost-summary"} aria-label="Resumen de costos y utilidad">
+      <div className="cost-summary-heading">
+        {!compact && <h3>Resumen de costos y utilidad{historical ? " · histórico" : ""}</h3>}
         <div>
           <strong>{product}</strong>
           <span>
@@ -85,25 +97,25 @@ export default function CostSummary({
               : s.n.toLocaleString("es-GT", { maximumFractionDigits: 2 })}
           </span>
         </div>
-      </header>
+      </div>
       {referenceLabel && <p className="cost-basis-panel">{referenceLabel}</p>}
       <div className="table-wrap">
-        <ResponsiveTable>
+        <ResponsiveTable showAllMobileFields={compact} mobileTable={compact}>
           <thead>
             <tr>
               <th>Concepto</th>
               <th>
-                {unitReference
+                {compact ? "Unidad" : unitReference
                   ? "Unidad · variante central"
                   : variable
                     ? "Unidad · promedio"
                     : "Unidad"}
               </th>
-              <th>{unitReference ? "Lote · receta completa" : "Lote"}</th>
+              <th>{unitReference && !compact ? "Lote · receta completa" : "Lote"}</th>
             </tr>
           </thead>
           <tbody>
-            {rows.map(([label, unit, batch, kind]) => (
+            {displayed.map(([label, unit, batch, kind]) => (
               <tr key={label} className={"summary-row-" + (kind || "normal")}>
                 <td>{label}</td>
                 <td data-sort-value={unit ?? ""}>
