@@ -662,8 +662,9 @@ function App() {
               ? ["purchases", "inventory"]
               : []),
             ...(activeCompany?.production_read
-              ? ["formulas", "production", "notes"]
+              ? ["formulas", "production"]
               : []),
+            ...(activeCompany && activeCompany.active !== false ? ["notes"] : []),
             ...(activeCompany?.sales_read ? ["sales", "order-preparation"] : []),
             ...(activeCompany?.manage || activeCompany?.sales_read
               ? ["customers"]
@@ -1014,7 +1015,7 @@ function App() {
                   onDirty={setSettingsDirty}
                 />
               )}
-              {section === "notes" && session && activeCompany?.production_read && (
+              {section === "notes" && session && activeCompany && activeCompany.active !== false && (
                 <Notes key={company + session.user.id} company={company} user={session.user.id} canManage={!!activeCompany.manage} onDirty={setSettingsDirty} />
               )}
               {section === "production" && (

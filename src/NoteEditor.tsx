@@ -11,9 +11,10 @@ const tools = [
   ["Deshacer","↶","undo"],["Rehacer","↷","redo"],
 ];
 
-export default function NoteEditor({ note, prefix, onChange, onUploading }: {
-  note: Note; prefix: string; onChange: (body: string, html: string) => void; onUploading: (uploading: boolean) => void;
+export default function NoteEditor({ note, company, user, onChange, onUploading }: {
+  note: Note; company: string; user: string; onChange: (body: string, html: string) => void; onUploading: (uploading: boolean) => void;
 }) {
+  const companyPrefix = company + "/";
   const region = useRef<HTMLDivElement>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const selection = useRef<Range | null>(null);
@@ -41,15 +42,15 @@ export default function NoteEditor({ note, prefix, onChange, onUploading }: {
     if (!area) return;
     mounted.current = true;
     if (original.current.rich_body === null) area.textContent = original.current.body;
-    else area.innerHTML = sanitizeNote(original.current.rich_body, prefix);
+    else area.innerHTML = sanitizeNote(original.current.rich_body, companyPrefix);
     void showImages(area);
     return () => { mounted.current = false; };
-  }, [prefix]);
+  }, [companyPrefix]);
 
   function report() {
     if (!region.current) return;
     const body = region.current.innerText;
-    const html = sanitizeNote(region.current.innerHTML, prefix);
+    const html = sanitizeNote(region.current.innerHTML, companyPrefix);
     onChange(body, html);
   }
   function remember() {
@@ -78,7 +79,7 @@ export default function NoteEditor({ note, prefix, onChange, onUploading }: {
     try {
       for (const file of files) {
         if (!imageTypes.has(file.type) || file.size > 3145728) throw new Error("Selecciona una imagen PNG, JPG, WebP o GIF de hasta 3 MB.");
-        const path = prefix + crypto.randomUUID() + "." + file.type.split("/")[1];
+        const path = companyPrefix + user + "/" + crypto.randomUUID() + "." + file.type.split("/")[1];
         const { error } = await supabase.storage.from("note-images").upload(path, file, { contentType: file.type });
         if (error) throw new Error("No se pudo subir la imagen. Inténtalo de nuevo.");
         if (!mounted.current) return;

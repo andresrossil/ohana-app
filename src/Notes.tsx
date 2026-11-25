@@ -148,7 +148,7 @@ export default function Notes({ company, user, canManage, onDirty }: {
   async function newNote(destination = group) {
     if (!await abandon()) return;
     open({
-      id: crypto.randomUUID(), title: "", body: "", rich_body: null, group_id: destination === ALL || destination === UNASSIGNED ? null : destination,
+      id: crypto.randomUUID(), author_id: user, title: "", body: "", rich_body: null, group_id: destination === ALL || destination === UNASSIGNED ? null : destination,
       status_id: null, pinned: false, position: nextPosition, revision: null, created_at: null, updated_at: null, note_markers: [],
     });
   }
@@ -314,7 +314,7 @@ export default function Notes({ company, user, canManage, onDirty }: {
           setMenu(""); if (target) void reorder(note, target);
         }}>{direction < 0 ? "Subir en orden personalizado" : "Bajar en orden personalizado"}</AppButton>;
       })}
-      <AppButton className="secondary danger" iconKey="action.delete" disabled={pending} onClick={() => { setMenu(""); void removeNote(note); }}>Eliminar</AppButton>
+      {note.author_id === user && <AppButton className="secondary danger" iconKey="action.delete" disabled={pending} onClick={() => { setMenu(""); void removeNote(note); }}>Eliminar</AppButton>}
     </div>;
   }
 
@@ -536,7 +536,7 @@ export default function Notes({ company, user, canManage, onDirty }: {
             <AppButton className="secondary" onClick={() => { setAction({ type: "tags", note: draft }); setMenu(""); }}>Marcadores</AppButton>
           </div>
           {noteLabels(draft)}
-          <NoteEditor key={editorKey} note={draft} prefix={company + "/" + user + "/"} onUploading={setUploading}
+          <NoteEditor key={editorKey} note={draft} company={company} user={user} onUploading={setUploading}
             onChange={(body, rich_body) => setDraft(current => current ? { ...current, body, rich_body } : current)} />
           {base && base.revision !== null && <div className="note-dates"><small>Creación · {noteDate(base.created_at)}</small><small>Modificación · {noteDate(base.updated_at)}</small></div>}
         </> : <p>Selecciona una nota o crea una nueva.</p>}
