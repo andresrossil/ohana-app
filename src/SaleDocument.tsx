@@ -52,6 +52,29 @@ function ShippingLabelContent({ data, logo }: { data: Row; logo: React.ReactNode
   </>;
 }
 
+async function invoiceCustomer(order: Row, delivery?: Row) {
+  if (!order.customer_id) return null;
+  const { data: customer, error } = await supabase.from("business_partners")
+    .select("name,phone,address")
+    .eq("company_id", order.company_id)
+    .eq("id", order.customer_id)
+    .maybeSingle();
+  if (error || !customer) throw new Error("Ficha del cliente no disponible");
+
+  let address = null;
+  if (delivery?.address_id && delivery.kind !== "pickup") {
+    const result = await supabase.from("partner_addresses")
+      .select("address,zone,department")
+      .eq("company_id", order.company_id)
+      .eq("partner_id", order.customer_id)
+      .eq("id", delivery.address_id)
+      .maybeSingle();
+    if (result.error) throw result.error;
+    address = result.data;
+  }
+  return { customer, address };
+}
+
 export function openSaleDocument(source: Row | (() => Promise<Row | Row[]>), format: "invoice" | "label" | "labels" = "invoice") {
   const preview = window.open("", "_blank");
   if (!preview) return false;
@@ -78,6 +101,18 @@ export function openSaleDocument(source: Row | (() => Promise<Row | Row[]>), for
     }
     if (format === "labels") return;
     const delivery = data.delivery;
+    let current: Awaited<ReturnType<typeof invoiceCustomer>> = null;
+    let customerWarning = "";
+    if (format === "invoice") {
+      try {
+        current = await invoiceCustomer(data.order, delivery);
+        if (current && delivery?.address_id && delivery.kind !== "pickup" && !current.address) {
+          customerWarning = "La dirección vinculada ya no está en la ficha. Se muestra la dirección guardada en el pedido.";
+        }
+      } catch {
+        customerWarning = "No se pudo actualizar la ficha del cliente. Se muestran los datos guardados en el pedido.";
+      }
+    }
     let schedule = delivery?.tariff_snapshot?.delivery_schedule?.trim() || "";
     if (format === "invoice" && delivery?.kind === "courier" && !schedule && data.order.company_id) {
       try {
@@ -91,22 +126,32 @@ export function openSaleDocument(source: Row | (() => Promise<Row | Row[]>), for
     }
     if (preview.closed) return;
     doc.title = `${title} · #${data.order.invoice_number || data.order.number}`;
-    root.render(<SaleDocument data={data} schedule={schedule} format={format} onPrint={() => preview.print()} />);
+    root.render(<SaleDocument data={data} schedule={schedule} format={format} current={current} customerWarning={customerWarning} onPrint={() => preview.print()} />);
   };
   if (typeof source === "function") {
     root.render(<p className="print-controls" role="status">Cargando documento…</p>);
     void source().then(show).catch(() => {
       if (!preview.closed) root.render(<p className="print-controls" role="alert">No se pudo cargar el documento. Cierra esta ventana y vuelve a intentarlo.</p>);
     });
-  } else void show(source);
+  } else {
+    root.render(<p className="print-controls" role="status">Cargando documento…</p>);
+    void show(source);
+  }
   preview.addEventListener("pagehide", () => root.unmount(), { once: true });
   return true;
 }
 
-function SaleDocument({ data, format, onPrint, schedule }: { data: Row; schedule: string; format: "invoice" | "label"; onPrint: () => void }) {
+function SaleDocument({ data, format, onPrint, schedule, current, customerWarning }: {
+  data: Row;
+  schedule: string;
+  format: "invoice" | "label";
+  onPrint: () => void;
+  current: Awaited<ReturnType<typeof invoiceCustomer>>;
+  customerWarning: string;
+}) {
   const { order, document_brand: brand } = data;
   const delivery = data.delivery ?? {};
-  const customer = order.customer_snapshot ?? {};
+  const customer = current?.customer ?? order.customer_snapshot ?? {};
   const lines: Row[] = data.lines ?? [];
   const documentLines = lines
     .map((line) => ({ line, product: saleDocumentLine(line).product }))
@@ -136,7 +181,8 @@ function SaleDocument({ data, format, onPrint, schedule }: { data: Row; schedule
   const discount = saleDiscountAmount({ ...order, lines });
   const deliveryKind = delivery.kind ?? (order.delivery === "pickup" ? "pickup" : "own");
   const deliveryLabel = deliveryKind === "courier" ? "Mensajería" : deliveryKind === "own" ? "Entrega propia" : "Recoger pedido";
-  const address = [delivery.address || customer.address, deliveryZoneLabel(delivery.zone), delivery.department]
+  const destination = current?.address ?? delivery;
+  const address = [destination.address || customer.address, deliveryZoneLabel(destination.zone), destination.department]
     .filter(Boolean).join(" · ");
   const isLabel = format === "label";
   const documentLogo = logo ? (
@@ -192,6 +238,7 @@ function SaleDocument({ data, format, onPrint, schedule }: { data: Row; schedule
         <button type="button" disabled={loadingLogo || exporting} onClick={downloadImage}>
           <Download size={16} aria-hidden="true" /> {exporting ? "Preparando imagen…" : "Guardar imagen PNG"}
         </button>
+        {customerWarning && <p role="status">{customerWarning}</p>}
         {exportError && <p role="alert">{exportError}</p>}
       </div>
       <article ref={article} className={isLabel ? "document shipping-label" : "document"}>
