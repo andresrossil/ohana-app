@@ -17,7 +17,8 @@ export default function ProductionMenu({ children, document }: { children: React
         panel.style.top = `${anchor.bottom + needed + 5 <= viewportHeight
           ? anchor.bottom + 5
           : Math.max(4, anchor.top - needed)}px`;
-        panel.style.right = `${Math.max(8, window.innerWidth - anchor.right)}px`;
+        const menuWidth = Math.min(220, window.innerWidth - 16);
+        panel.style.right = `${Math.max(8, Math.min(window.innerWidth - menuWidth - 8, window.innerWidth - anchor.right))}px`;
       }}>
       <EllipsisVertical size={18} aria-hidden="true" />
     </button>

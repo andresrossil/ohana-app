@@ -66,3 +66,74 @@
     padding: 12px 16px;
   }
 }
+
+.shell .sales-worklist-header,
+.shell .sales-worklist-title,
+.shell .sales-row-buttons {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.shell .sales-worklist-header { justify-content: space-between; margin-bottom: 8px; }
+.shell .sales-worklist-title h1 { margin: 0; font-size: clamp(22px, 3vw, 30px); }
+.shell .sales-worklist-header .actions { margin: 0; gap: 6px; }
+.shell .sales-worklist :is(.sales-worklist-header, .sales-row-buttons) button {
+  min-height: 40px;
+  padding: 5px 8px;
+  font-size: 13px;
+  line-height: 1.2;
+  white-space: normal;
+}
+.shell .sales-worklist :is(.sales-worklist-title, .sales-row-buttons) .catalog-icon-button { min-width: 40px; width: 40px; }
+.sales-worklist-filters { border-bottom: 1px solid var(--admin-border); }
+.sales-worklist-filters summary { cursor: pointer; padding: 8px 12px; overflow-wrap: anywhere; }
+.sales-worklist-filters summary small { margin-inline-start: 8px; color: var(--admin-muted); }
+.shell .sales-worklist .worklist-filters { padding: 8px 12px; gap: 8px; }
+.shell .sales-worklist .worklist-filters :is(input, button) { min-height: 40px; }
+.shell .sales-worklist-table :is(td, th) { padding: 6px; overflow-wrap: anywhere; }
+.shell .sales-row-buttons { flex-wrap: nowrap; }
+:is(.sales-row-total, .sales-row-paid, .sales-row-balance) { font-variant-numeric: tabular-nums; }
+.sales-amount-na { color: var(--admin-muted); }
+.sales-amount-ok { color: var(--functional-success, #166534); }
+.sales-amount-due { color: var(--functional-danger, #b91c1c); }
+.sales-status {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 6px;
+  font-size: .8em;
+  line-height: 1.3;
+  font-weight: 650;
+  background: var(--sale-status-bg, #eef0f3);
+  color: var(--sale-status-fg, #475569);
+}
+.sales-status[data-status="invoiced"] { --sale-status-bg: #e0efff; --sale-status-fg: #17467d; }
+.sales-status[data-status="preparing"] { --sale-status-bg: #fef3c7; --sale-status-fg: #854d0e; }
+.sales-status[data-status="finished"] { --sale-status-bg: #f2e7dc; --sale-status-fg: #704523; }
+.sales-status[data-status="courier"] { --sale-status-bg: #f0e7ff; --sale-status-fg: #653596; }
+.sales-status:is([data-status="delivered"], [data-status="settled"]) { --sale-status-bg: #dcfce7; --sale-status-fg: #166534; }
+.sales-status[data-status="cancelled"] { --sale-status-bg: #fee2e2; --sale-status-fg: #991b1b; }
+
+@media (max-width: 760px) {
+  .shell .sales-worklist .table-wrap { padding: 6px; overflow: visible; }
+  .shell .sales-worklist-table > tbody > tr {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    align-items: start;
+    gap: 3px 6px;
+    padding: 7px;
+    margin-bottom: 6px;
+  }
+  .shell .sales-worklist-table > tbody > tr > td { padding: 0; min-width: 0; grid-column: span 2; }
+  .shell .sales-worklist-table td.sales-row-client.mobile-record-title { grid-area: 1 / 1 / 2 / 5; font-size: 1rem; }
+  .shell .sales-worklist-table td.sales-row-status { grid-area: 1 / 5 / 2 / 7; justify-self: end; text-align: end; }
+  .shell .sales-worklist-table td.sales-row-number { grid-column: 1 / 3; }
+  .shell .sales-worklist-table td.sales-row-date { grid-column: 3 / 7; }
+  .shell .sales-worklist-table :is(.sales-row-number, .sales-row-date) { font-size: .8rem; color: var(--admin-muted); }
+  .shell .sales-worklist-table :is(.sales-row-delivery, .sales-row-method) { grid-column: span 3; }
+  .shell .sales-worklist-table td.sales-row-action.mobile-actions-cell { grid-column: 1 / -1; justify-self: stretch; }
+  .shell .sales-worklist-table :is(.sales-row-client, .sales-row-number, .sales-row-date, .sales-row-status, .sales-row-action) .mobile-cell-label { display: none; }
+  .shell .sales-worklist-table .mobile-cell-label { margin: 0; font-size: .72rem; }
+  .shell .sales-row-buttons { flex-wrap: wrap; }
+  .shell .sales-row-buttons > .catalog-icon-button { margin-inline-start: auto; flex: 0 0 40px; }
+}

@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import ProductionMenu from "./ProductionMenu";
+import { roundMoney } from "./sale-form-model";
 import { AppButton } from "./AppIcon";
 import { confirmAction } from "./ConfirmDialog";
 import { salesTodayRange, salesWorklist } from "./commerce";
@@ -17,6 +19,8 @@ const statusLabels: Record<string, string> = {
   ...fulfillmentLabels, settled: "Ruta liquidada", cancelled: "Cancelado", expired: "Vencido",
 };
 const pageSize = 50;
+const beginning = "0001-01-01";
+const salesDay = new Intl.DateTimeFormat("es-GT", { dateStyle: "short", timeZone: "UTC" });
 const orderDate = new Intl.DateTimeFormat("es-GT", {
   timeZone: "America/Guatemala", dateStyle: "short", timeStyle: "short",
 });
@@ -31,7 +35,7 @@ export default function Sales({ company, currency = "GTQ", initialDrafts = false
   const [page, setPage] = useState(0);
   const [cancelOrder, setCancelOrder] = useState<Row | null>(null);
   const [editor, setEditor] = useState<Row | null | undefined>();
-  const [viewOrder, setViewOrder] = useState<string | null>(null);
+  const [viewOrder, setViewOrder] = useState<{ id: string; finishOnly?: boolean } | null>(null);
   const [labelDate, setLabelDate] = useState("");
   const [managedOrder, setManagedOrder] = useState<string | null>(null);
 
@@ -87,13 +91,22 @@ export default function Sales({ company, currency = "GTQ", initialDrafts = false
     setLabelDate("");
   }
 
-  return <>
-    <section className="intro">
-      <div><h1>Ventas y pedidos</h1></div>
+  const filterSummary = [
+    applied.from === beginning ? "Desde el inicio" : salesDay.format(new Date(applied.from)),
+    salesDay.format(new Date(applied.to)),
+    customers.find(client => client.id === applied.customer)?.name || "Todos los clientes",
+    statusLabels[applied.status] || "Todos los estados",
+  ].join(" · ");
+
+  return <div className="sales-worklist">
+    <section className="sales-worklist-header">
+      <div className="sales-worklist-title"><h1>Ventas y pedidos</h1>
+        <AppButton className="secondary catalog-icon-button" iconKey="action.refresh" aria-label="Actualizar" title="Actualizar"
+          disabled={state.busy} onClick={() => state.run(reload)} />
+      </div>
       <div className="actions">
-        {state.canWrite && <AppButton onClick={() => setEditor(null)}>Ingresar factura</AppButton>}
+        {state.canWrite && <AppButton onClick={() => setEditor(null)}>Nueva factura</AppButton>}
         <AppButton className="secondary" iconKey="action.print" onClick={() => setLabelDate(salesTodayRange().from)}>Imprimir etiquetas del día</AppButton>
-        <AppButton className="secondary" disabled={state.busy} onClick={() => state.run(reload)}>Actualizar</AppButton>
       </div>
     </section>
     {labelDate && <div className="overlay"><section className="modal operations-dialog" role="dialog" aria-modal="true" aria-labelledby="bulk-label-title"
@@ -109,15 +122,17 @@ export default function Sales({ company, currency = "GTQ", initialDrafts = false
       </form>
     </section></div>}
     {state.error && !cancelOrder && <p className="error" role="alert" style={{ whiteSpace: "pre-line", overflowWrap: "anywhere" }}>{state.error}</p>}
-    <section className="catalog">
-      <div className="toolbar"><h2>Facturas</h2></div>
+    <section className="catalog sales-worklist-list">
+      <details className="sales-worklist-filters">
+        <summary><strong>Filtros</strong><small>{filterSummary}</small></summary>
       <form className="settings-grid worklist-filters" onSubmit={(event) => {
         event.preventDefault();
         void state.run(() => load(filters, 0));
       }}>
-        <label>Desde<input required type="date" value={filters.from} max={filters.to}
-          onChange={(e) => setFilters({ ...filters, from: e.target.value })} /></label>
-        <label>Hasta<input required type="date" value={filters.to} min={filters.from}
+        <label>Fecha desde<input type="date" value={filters.from === beginning ? "" : filters.from} max={filters.to}
+          onChange={(e) => setFilters({ ...filters, from: e.target.value || beginning })} />
+          {filters.from === beginning && <small>Desde el inicio</small>}</label>
+        <label>Fecha hasta<input required type="date" value={filters.to} min={filters.from}
           onChange={(e) => setFilters({ ...filters, to: e.target.value })} /></label>
         <label>Cliente<SearchSelect value={filters.customer} onChange={(e) => setFilters({ ...filters, customer: e.target.value })}>
           <option value="">Todos los clientes</option>
@@ -136,51 +151,66 @@ export default function Sales({ company, currency = "GTQ", initialDrafts = false
           }}>Hoy</AppButton>
         </div>
       </form>
+      </details>
       <div className="table-wrap" aria-busy={state.busy}>
-        <ResponsiveTable>
-          <thead><tr><th>Pedido</th><th>Fecha</th><th>Cliente</th><th>Total</th><th>Saldo</th><th>Entrega / pago</th><th>Estado</th><th>Acciones</th></tr></thead>
+        <ResponsiveTable className="sales-worklist-table" showAllMobileFields compactRowActions>
+          <thead><tr><th>Cliente</th><th>Pedido</th><th>Fecha</th><th>Total</th><th>Pagado</th><th>Pendiente</th><th>Entrega</th><th>Forma de pago</th><th>Estado</th><th>Acciones</th></tr></thead>
           <tbody>{orders.map((order) => {
+            const draft = order.fulfillment_stage === "draft";
+            const closed = ["cancelled", "expired"].includes(order.status);
             const editable = state.canWrite && order.status === "pending" && !order.settled &&
               ["draft", "invoiced"].includes(order.fulfillment_stage);
             const active = state.canWrite && ["pending", "dispatched"].includes(order.status) && !order.settled;
+            const balance = draft || closed || order.balance == null ? null : Number(order.balance);
+            // The existing customer balance is total minus covered payments, floored at zero.
+            const paid = balance == null ? null : roundMoney(Number(order.total) - balance);
+            const pay = state.canWrite && balance != null && balance > 0;
+            const manage = () => setManagedOrder(order.id);
+            const view = (finishOnly = false) => setViewOrder({ id: order.id, finishOnly });
+            const confirmDraft = () => state.run(async () => {
+                if (!await confirmAction("¿El cliente confirmó el pedido? Se comprobarán las existencias y, si alcanzan, se reservarán las unidades del pedido.",
+                  { title: "Confirmación del cliente", confirmText: "Confirmar pedido" })) return;
+                try {
+                  await keyedRequest(company, "sales_fulfillment", { order: order.id, expected_stage: "draft", expected_revision: order.revision }, "confirm_customer");
+                } catch (error) {
+                  const message = (error as { message?: string }).message;
+                  const stockWarning = "El pedido sigue en borrador. Revisa estas existencias:";
+                  if (!message?.startsWith(stockWarning)) throw error;
+                  await confirmAction("El pedido sigue en borrador.\n\n" + message.slice(stockWarning.length).trim(),
+                    { title: "Inventario insuficiente", confirmText: "Cerrar", cancelText: null });
+                  return;
+                }
+                await reload();
+              });
+            let primary: { label: string; run: () => void } | undefined;
+            if (active && order.status === "pending" && draft) primary = { label: "Confirmar", run: confirmDraft };
+            else if (active && order.display_status === "invoiced") primary = { label: "Preparar", run: () => view() };
+            else if (active && order.display_status === "preparing") primary = { label: "Terminar preparación", run: () => view(true) };
+            else if (active && order.display_status === "finished") primary = { label: order.courier_name ? "Enviar" : "Confirmar entrega", run: () => view() };
+            else if (pay) primary = { label: "Registrar pago", run: manage };
+            const document = "#" + (order.invoice_number || order.number);
             return <tr key={order.id}>
-              <td data-sort-value={order.invoice_number || order.number}>#{order.invoice_number || order.number}</td>
-              <td data-sort-value={order.created_at}>{orderDate.format(new Date(order.created_at))}</td>
-              <td>{order.customer_snapshot.name}</td>
-              <td data-sort-value={order.total}>{money(order.total, order.currency)}</td>
-              <td data-sort-value={order.balance}>
-                {order.fulfillment_stage === "draft" ? "—" : <strong className={Number(order.balance) > 0 ? "balance-debt" : "balance-zero"}>{money(order.balance, order.currency)}</strong>}
-              </td>
-              <td>{order.courier_name || (order.delivery === "delivery" ? "Domicilio" : "Retiro")}
-                <small>{paymentMethods.find((method) => method.value === order.payment)?.label}</small>
-              </td>
-              <td>{statusLabels[order.display_status] ?? order.display_status}</td>
-              <td className="actions">
-                <AppButton className="secondary" iconKey="action.expand" onClick={() => setViewOrder(order.id)}>Ver factura</AppButton>
-                <AppButton className="secondary" iconKey="action.print" onClick={() => printOrder(order.id, "invoice")}>Imprimir</AppButton>
-                <AppButton className="secondary" iconKey="action.print" onClick={() => printOrder(order.id, "label")}>Imprimir etiqueta</AppButton>
-                {editable && <AppButton className="secondary" onClick={() => setEditor(order)}>Editar factura</AppButton>}
-                {order.fulfillment_stage !== "draft" && <AppButton className="secondary" onClick={() => setManagedOrder(order.id)}>
-                  {Number(order.balance) > 0 ? "Pagar factura" : "Ver pagos"}
-                </AppButton>}
-                {active && order.status === "pending" && order.fulfillment_stage === "draft" && <AppButton iconKey="action.confirm" disabled={state.busy}
-                  onClick={() => state.run(async () => {
-                    if (!await confirmAction("¿El cliente confirmó el pedido? Se comprobarán las existencias y, si alcanzan, se reservarán las unidades del pedido.",
-                      { title: "Confirmación del cliente", confirmText: "Confirmar pedido" })) return;
-                    try {
-                      await keyedRequest(company, "sales_fulfillment", { order: order.id, expected_stage: "draft", expected_revision: order.revision }, "confirm_customer");
-                    } catch (error) {
-                      const message = (error as { message?: string }).message;
-                      const stockWarning = "El pedido sigue en borrador. Revisa estas existencias:";
-                      if (!message?.startsWith(stockWarning)) throw error;
-                      await confirmAction("El pedido sigue en borrador.\n\n" + message.slice(stockWarning.length).trim(),
-                        { title: "Inventario insuficiente", confirmText: "Cerrar", cancelText: null });
-                      return;
-                    }
-                    await reload();
-                  })}>Confirmación del cliente</AppButton>}
-                {active && <AppButton className="secondary" onClick={() => setCancelOrder(order)}>Cancelar pedido</AppButton>}
-              </td>
+              <td className="sales-row-client"><strong>{order.customer_snapshot.name}</strong></td>
+              <td className="sales-row-number" data-sort-value={order.invoice_number || order.number}>{document}</td>
+              <td className="sales-row-date" data-sort-value={order.created_at}>{orderDate.format(new Date(order.created_at))}</td>
+              <td className="sales-row-total" data-sort-value={order.total}><strong>{money(order.total, order.currency)}</strong></td>
+              <td className="sales-row-paid" data-sort-value={paid ?? ""}><strong className={paid == null ? "sales-amount-na" : "sales-amount-ok"}>{paid == null ? "—" : money(paid, order.currency)}</strong></td>
+              <td className="sales-row-balance" data-sort-value={balance ?? ""}><strong className={balance == null ? "sales-amount-na" : balance > 0 ? "sales-amount-due" : "sales-amount-ok"}>{balance == null ? "—" : money(balance, order.currency)}</strong></td>
+              <td className="sales-row-delivery">{order.courier_name || (order.delivery === "delivery" ? "Domicilio" : "Retiro")}</td>
+              <td className="sales-row-method">{paymentMethods.find(method => method.value === order.payment)?.label || "—"}</td>
+              <td className="sales-row-status"><span className="sales-status" data-status={order.display_status}>{statusLabels[order.display_status] ?? order.display_status}</span></td>
+              <td className="sales-row-action"><div className="sales-row-buttons">
+                <AppButton className="secondary" onClick={() => view()}>Ver factura</AppButton>
+                {primary && <AppButton disabled={state.busy} onClick={primary.run}>{primary.label}</AppButton>}
+                <ProductionMenu document={document}>
+                  {editable && <AppButton className="secondary" onClick={() => setEditor(order)}>Editar factura</AppButton>}
+                  <AppButton className="secondary" iconKey="action.print" onClick={() => printOrder(order.id, "invoice")}>Imprimir factura</AppButton>
+                  <AppButton className="secondary" iconKey="action.print" onClick={() => printOrder(order.id, "label")}>Imprimir etiqueta</AppButton>
+                  {pay && primary?.label !== "Registrar pago" && <AppButton className="secondary" onClick={manage}>Registrar pago</AppButton>}
+                  {!draft && <AppButton className="secondary" onClick={manage}>Consultar pagos</AppButton>}
+                  {active && <AppButton className="danger" onClick={() => setCancelOrder(order)}>Cancelar pedido</AppButton>}
+                </ProductionMenu>
+              </div></td>
             </tr>;
           })}</tbody>
         </ResponsiveTable>
@@ -193,7 +223,7 @@ export default function Sales({ company, currency = "GTQ", initialDrafts = false
       </div>}
     </section>
     {editor !== undefined && <SaleEditor company={company} orderId={editor?.id} currency={editor?.currency || currency} onClose={() => setEditor(undefined)} onSaved={reload} />}
-    {viewOrder && <OrderPreparationDialog company={company} orderId={viewOrder} onClose={() => setViewOrder(null)} onSaved={reload} />}
+    {viewOrder && <OrderPreparationDialog company={company} orderId={viewOrder.id} finishOnly={viewOrder.finishOnly} onClose={() => setViewOrder(null)} onSaved={reload} />}
     {managedOrder && <OrderDeliveryDialog company={company} orderId={managedOrder} onClose={() => setManagedOrder(null)} onSaved={reload} />}
     {cancelOrder && <div className="overlay">
       <section className="modal operations-dialog" role="dialog" aria-modal="true" aria-label="Cancelar pedido">
@@ -219,5 +249,5 @@ export default function Sales({ company, currency = "GTQ", initialDrafts = false
         </form>
       </section>
     </div>}
-  </>;
+  </div>;
 }
