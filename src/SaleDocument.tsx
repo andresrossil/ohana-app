@@ -45,7 +45,7 @@ function ShippingLabelContent({ data, logo }: { data: Row; logo: React.ReactNode
           </header>
           <dl className="shipping-label-fields">
             <div className="shipping-label-client"><dt className="label-visually-hidden">Cliente</dt><dd>{customer.name || "—"}</dd></div>
-            <div className="shipping-label-phone"><dt className="label-visually-hidden">Teléfono</dt><dd>{customer.phone || "—"}</dd></div>
+            <div className="shipping-label-phone"><dt className="label-visually-hidden">Teléfono</dt><dd>{data.labelPhone || customer.phone?.trim() || "—"}</dd></div>
             <div className="shipping-label-address"><dt className="label-visually-hidden">Dirección</dt><dd>{deliveryKind === "pickup" ? "Recoger pedido" : address || "—"}</dd></div>
             <div className="shipping-label-amount"><dt>Monto a cobrar</dt><dd>{amountToCollect}</dd></div>
           </dl>
@@ -75,6 +75,33 @@ async function invoiceCustomer(order: Row, delivery?: Row) {
   return { customer, address };
 }
 
+async function withCurrentLabelPhones(orders: Row[]) {
+  const phonesByCustomer = new Map<string, Promise<string>>();
+  return Promise.all(orders.map(async (data) => {
+    const { order } = data;
+    if (!order.company_id || !order.customer_id) return data;
+
+    const key = `${order.company_id}/${order.customer_id}`;
+    let lookup = phonesByCustomer.get(key);
+    if (!lookup) {
+      lookup = (async () => {
+        const { data: customer, error } = await supabase.from("business_partners")
+          .select("phone,phone_secondary,whatsapp")
+          .eq("company_id", order.company_id)
+          .eq("id", order.customer_id)
+          .maybeSingle();
+        if (error || !customer) return "";
+        return [customer.phone, customer.phone_secondary, customer.whatsapp]
+          .map((phone) => phone?.trim()).find(Boolean) || "";
+      })().catch(() => "");
+      phonesByCustomer.set(key, lookup);
+    }
+
+    const phone = await lookup;
+    return phone ? { ...data, labelPhone: phone } : data;
+  }));
+}
+
 export function openSaleDocument(source: Row | (() => Promise<Row | Row[]>), format: "invoice" | "label" | "labels" = "invoice") {
   const preview = window.open("", "_blank");
   if (!preview) return false;
@@ -96,10 +123,12 @@ export function openSaleDocument(source: Row | (() => Promise<Row | Row[]>), for
   const show = async (data: Row | Row[]) => {
     if (preview.closed) return;
     if (Array.isArray(data)) {
-      root.render(<ShippingLabelBatch orders={data} onPrint={() => preview.print()} />);
+      const orders = await withCurrentLabelPhones(data);
+      if (!preview.closed) root.render(<ShippingLabelBatch orders={orders} onPrint={() => preview.print()} />);
       return;
     }
     if (format === "labels") return;
+    if (format === "label") [data] = await withCurrentLabelPhones([data]);
     const delivery = data.delivery;
     let current: Awaited<ReturnType<typeof invoiceCustomer>> = null;
     let customerWarning = "";
