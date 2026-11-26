@@ -102,8 +102,9 @@ export default function SaleEditor({company,orderId,currency,onClose,onSaved}:{c
    const payload={...(original?{order:original.id,expected_revision:original.revision}:{}),draft:!original,customer_id:customer||undefined,customer:contact,payment,delivery:delivery.kind==="pickup"?"pickup":"delivery",delivery_info:delivery,
     items:lines.map(l=>({variant:l.variant,quantity:Number(l.quantity),unit_price:l.is_gift?"0":l.unit_price,is_gift:!!l.is_gift,discount:{mode:l.line_discount_mode||"amount",value:l.line_discount_input||"0"}})),discount:{mode:"amount",value:"0"},expected_total:totals.total.toFixed(2),credit_amount:isDraft?"0":credit||"0",};
    await keyedRequest(company,original?"edit_sale":"sales",payload,original?undefined:"create");setDirty(false);await onSaved();onClose();
-  });}}><fieldset className="sale-main-fields" disabled={state.busy||!state.canWrite}>
+  });}}>
    <div className="sale-editor-scroll">
+   <fieldset className="sale-main-fields" disabled={state.busy||!state.canWrite}>
    <details className="sale-section" open={!orderId}><summary><strong>Cliente</strong><small>{clientName || "Cliente pendiente"} · {paymentName} · {listName}</small></summary><div className="sale-section-content"><div className="settings-grid"><label>Cliente<SearchSelect required={!!original} disabled={!!original?.invoice_number} value={customer} onChange={e=>changeCustomer(e.target.value)}><option value="">Nuevo contacto</option>{original&&!catalog.customers.some((c:Row)=>c.id===customer)&&<option value={customer}>{original.customer_snapshot.name}</option>}{catalog.customers.filter((c:Row)=>c.active||c.id===customer).map((c:Row)=><option key={c.id} value={c.id}>{c.code} · {c.name}</option>)}</SearchSelect></label>
     <label>Forma de pago habitual<SearchSelect required value={payment} onChange={e=>setPayment(e.target.value)}><option value="">Seleccionar</option>{paymentMethods.map(p=><option key={p.value} value={p.value}>{p.label}</option>)}</SearchSelect><small>Elegir transferencia no confirma un pago.</small></label>
     {!customer&&<><label>Nombre<input required minLength={2} maxLength={120} value={contact.name} onChange={e=>setContact({...contact,name:e.target.value})}/></label><label>Teléfono<input required type="tel" maxLength={25} value={contact.phone} onChange={e=>setContact({...contact,phone:e.target.value})}/></label><label>Correo · opcional<input type="email" maxLength={254} value={contact.email} onChange={e=>setContact({...contact,email:e.target.value})}/></label></>}
@@ -148,16 +149,16 @@ export default function SaleEditor({company,orderId,currency,onClose,onSaved}:{c
    {isDraft&&<p className="muted">Borrador pendiente de confirmación del cliente. El inventario se reserva al confirmar.</p>}
    {payment==="cash"&&!isDraft&&<p className="muted">Efectivo pendiente de liquidación de ruta. Guardar la factura no registra dinero recibido ni reduce su saldo.</p>}
    {customer&&!isDraft&&<div className="sale-credit"><strong>Saldo a favor disponible: {displayMoney(available)}</strong><label>Aplicar saldo a esta factura<MoneyInput currency={currency} min="0" max={Math.min(available,due)} disabled={available<=0||due<=0} value={credit} onChange={e=>setCredit(e.target.value)}/></label></div>}
-   </details></div>
+   </details></fieldset></div>
    <footer className="sale-redesign-footer">
     <div className="sale-totals-strip"><small>{unitCount} {unitCount===1?"unidad":"unidades"} · {lines.length} {lines.length===1?"línea":"líneas"} · Envío {displayMoney(totals.shipping)}</small><strong>Total a pagar: {displayMoney(totals.total)}</strong></div>
     <div className="sale-footer-buttons">
-      <AppButton type="button" iconKey="action.add" disabled={lines.length>=30} onClick={()=>openLine()}>Agregar producto</AppButton>
-      <AppButton type="submit" disabled={!lines.length}>{isDraft?"Guardar borrador":"Guardar cambios"}</AppButton>
-      <AppButton type="button" className="secondary" onClick={close}>Volver</AppButton>
+      <AppButton type="button" iconKey="action.add" disabled={state.busy||!state.canWrite||lines.length>=30} onClick={()=>openLine()}>Agregar producto</AppButton>
+      <AppButton type="submit" disabled={state.busy||!state.canWrite||!lines.length}>{isDraft?"Guardar borrador":"Guardar cambios"}</AppButton>
+      <AppButton type="button" className="secondary" disabled={state.busy||!state.canWrite} onClick={close}>Volver</AppButton>
     </div>
    </footer>
-  </fieldset></form>}
+  </form>}
  </section></div>
  {lineEdit&&l&&<div className="overlay sale-capture-overlay"><section className="modal operations-dialog sale-line-dialog" role="dialog" aria-modal="true"
    aria-label={lineEdit.existing?"Editar producto":"Agregar producto"} data-navigation-dirty={!!l.variant || l.quantity!=="1"} onKeyDown={event=>{if(event.key==="Escape")closeLine();}}>
