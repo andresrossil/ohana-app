@@ -181,7 +181,7 @@ function SaleDocument({ data, format, onPrint, schedule, current, customerWarnin
   const { order, document_brand: brand } = data;
   const delivery = data.delivery ?? {};
   const customer = current?.customer ?? order.customer_snapshot ?? {};
-  const lines: Row[] = data.lines ?? [];
+  const lines: Row[] = (data.lines ?? []).filter((line: Row) => !line.price_reference?.preparation_gift);
   const documentLines = lines
     .map((line) => ({ line, product: saleDocumentLine(line).product }))
     .sort((a, b) => productOrder.compare(a.product, b.product) ||

@@ -14,10 +14,11 @@ export default function OrderPreparationDialog({company,orderId,onClose,onSaved,
  const state=useOperation(company,"sales"),[data,setData]=useState<Row|null>(null),[reverting,setReverting]=useState(false),[reason,setReason]=useState("");
  const [finishing,setFinishing]=useState(finishOnly);
  const [packaging,setPackaging]=useState<Record<string,string>>({});
- const hasPackaging=Object.values(packaging).some(Boolean);
+ const [gifts,setGifts]=useState<Record<string,string>>({});
+ const hasExtras=Object.keys(packaging).length>0||Object.keys(gifts).length>0;
  const load=async()=>setData(await request("sales_fulfillment",{p_company:company,p_action:"detail",p_data:{order:orderId}}));
  useEffect(()=>{void state.run(load);},[company,orderId]);
- const close=async()=>{if(state.busy)return;if(((reverting&&reason!=="")||(finishing&&hasPackaging))&&!(await confirmAction("Hay cambios sin guardar. ¿Salir sin guardar?")))return;onClose();};
+ const close=async()=>{if(state.busy)return;if(((reverting&&reason!=="")||(finishing&&hasExtras))&&!(await confirmAction("Hay cambios sin guardar. ¿Salir sin guardar?")))return;onClose();};
  const stage=data?.order.fulfillment_stage||"invoiced";
  const action=stage==="invoiced"?"prepare":stage==="preparing"?"finish":stage==="finished"?"handoff":null;
  const actionLabel=action==="prepare"?"Iniciar preparación":action==="finish"?"Pedido terminado":data?.delivery?.kind==="courier"?"Entregado a mensajería":"Entregar al cliente";
@@ -27,7 +28,7 @@ export default function OrderPreparationDialog({company,orderId,onClose,onSaved,
   if(!(await confirmAction(action==="handoff"?"¿Confirmas la entrega del pedido? El inventario ya se descontó al terminarlo.":"¿Confirmas iniciar la preparación? No se descontará inventario todavía.")))return;
   await keyedRequest(company,"sales_fulfillment",{order:orderId,expected_stage:stage},action);await load();await onSaved();
  });
- return <div className="overlay"><section className="modal operations-dialog order-preparation" role="dialog" aria-modal="true" aria-label={finishOnly?"Pedido terminado":"Ver factura"} data-navigation-dirty={(reverting&&reason!=="")||(finishing&&hasPackaging)}><header className="hierarchy-toolbar"><h2>{finishOnly?"Pedido terminado":"Factura"} · #{data?.order.invoice_number||data?.order.number||"…"}</h2><div className="actions">
+ return <div className="overlay"><section className="modal operations-dialog order-preparation" role="dialog" aria-modal="true" aria-label={finishOnly?"Pedido terminado":"Ver factura"} data-navigation-dirty={(reverting&&reason!=="")||(finishing&&hasExtras)}><header className="hierarchy-toolbar"><h2>{finishOnly?"Pedido terminado":"Factura"} · #{data?.order.invoice_number||data?.order.number||"…"}</h2><div className="actions">
  {data&&!finishOnly&&<AppButton iconKey="action.print" disabled={state.busy} onClick={()=>{
   if(!openSaleDocument(data))state.setError("Permite las ventanas emergentes para abrir la vista de impresión.");
  }}>Imprimir</AppButton>}
@@ -45,11 +46,11 @@ export default function OrderPreparationDialog({company,orderId,onClose,onSaved,
  {finishing&&stage==="preparing"&&state.canWrite&&!data.settled&&<form data-dirty-managed onSubmit={e=>{e.preventDefault();void state.run(async()=>{
   const supplies=Object.entries(packaging).filter(([,quantity])=>quantity!==""&&Number(quantity)>0)
     .map(([material,quantity])=>({material,quantity}));
-  await keyedRequest(company,"sales_fulfillment",{order:orderId,expected_stage:"preparing",packaging:supplies},"finish");
-  setFinishing(false);setPackaging({});await load();await onSaved();
+  await keyedRequest(company,"sales_fulfillment",{order:orderId,expected_stage:"preparing",packaging:supplies,gifts:Object.entries(gifts).map(([variant,quantity])=>({variant,quantity}))},"finish");
+  setFinishing(false);setPackaging({});setGifts({});await load();await onSaved();
  });}}>
-  <h3>¿Qué empaque adicional usaste?</h3>
-  <p className="muted">Indica las cantidades utilizadas o continúa sin agregar insumos. Al terminar se descontarán los productos y el empaque registrado.</p>
+  <h3>Empaque y productos de regalo</h3>
+  <p className="muted">Al confirmar se descuentan del inventario los insumos y regalos registrados. Los regalos se registran al costo, sin cargo para el cliente.</p>
   <label>Agregar insumo<SearchSelect value="" disabled={state.busy} onChange={e=>{const id=e.target.value;if(id)setPackaging(previous=>({...previous,[id]:"1"}));}}>
     <option value="">Seleccionar</option>
     {(data.packaging_options||[]).filter((item:Row)=>!(item.id in packaging)).map((item:Row)=><option key={item.id} value={item.id}>{item.sku ? item.sku+" · " : ""}{item.name} · {item.available} {item.unit} disponibles</option>)}
@@ -64,8 +65,22 @@ export default function OrderPreparationDialog({company,orderId,onClose,onSaved,
     </label>
     <AppButton type="button" className="secondary" disabled={state.busy} onClick={()=>setPackaging(previous=>Object.fromEntries(Object.entries(previous).filter(([id])=>id!==item.id)))}>Quitar</AppButton>
   </div>)}</div>
+  {Array.isArray(data.gift_options)&&<>
+    <label>Agregar producto de regalo<SearchSelect value="" disabled={state.busy||Object.keys(gifts).length>=30}
+      onChange={e=>{const id=e.target.value;if(id)setGifts(previous=>({...previous,[id]:"1"}));}}>
+      <option value="">Seleccionar producto o variante</option>
+      {data.gift_options.filter((item:Row)=>!(item.id in gifts)).map((item:Row)=><option key={item.id} value={item.id}>
+        {[item.name,item.sku,item.barcode,`${item.available} disponibles`].filter(Boolean).join(" · ")}
+      </option>)}
+    </SearchSelect></label>
+    <div className="form-grid">{data.gift_options.filter((item:Row)=>item.id in gifts).map((item:Row)=><div key={item.id} className="form-actions">
+      <label>{item.name} · Unidades<input type="number" inputMode="numeric" required min={1} max={Math.min(1000,item.available)} step={1}
+        disabled={state.busy} value={gifts[item.id]} onChange={e=>setGifts({...gifts,[item.id]:e.target.value})}/></label>
+      <AppButton type="button" className="secondary" disabled={state.busy} onClick={()=>setGifts(previous=>Object.fromEntries(Object.entries(previous).filter(([id])=>id!==item.id)))}>Quitar regalo</AppButton>
+    </div>)}</div>
+  </>}
   <div className="form-actions"><AppButton type="submit" iconKey="action.confirm" disabled={state.busy}>Confirmar pedido terminado</AppButton>
-    <AppButton type="button" className="secondary" disabled={state.busy} onClick={()=>{if(finishOnly){void close();return;}setFinishing(false);setPackaging({});}}>Cancelar</AppButton></div>
+    <AppButton type="button" className="secondary" disabled={state.busy} onClick={()=>{if(finishOnly){void close();return;}setFinishing(false);setPackaging({});setGifts({});}}>Cancelar</AppButton></div>
  </form>}
  {data.settled&&<p>Ruta liquidada. Revierte primero la liquidación para reabrir esta factura.</p>}
  {reverting&&<form onSubmit={e=>{e.preventDefault();void state.run(async()=>{
