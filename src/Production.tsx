@@ -28,6 +28,8 @@ import {
   type Row,
 } from "./operations";
 const ignoreDirty = () => {};
+const yieldPercent = new Intl.NumberFormat("es-GT", { style: "percent", maximumFractionDigits: 1 });
+
 export default function Production(props: {
   company: string;
   formulasOnly?: boolean;
@@ -840,6 +842,11 @@ function ProductionBatches({
           const status = productionStatus(b, calendarDate);
           const document = lotCode(b.batch_number);
           const activeCuring = b.state === "curing";
+          const confirmed = b.actual_quantity != null && (b.confirmed || b.state === "released" || b.finalized_at);
+          const planned = Number(b.planned_quantity);
+          const actual = Number(b.actual_quantity);
+          const yieldRatio = confirmed && b.state !== "cancelled" && planned > 0 &&
+            Number.isFinite(planned) && Number.isFinite(actual) && actual >= 0 ? actual / planned : null;
           const days = activeCuring && b.available_on
             ? Math.max(0, (Date.parse(b.available_on) - Date.parse(calendarDate)) / 86_400_000)
             : NaN;
@@ -860,9 +867,10 @@ function ProductionBatches({
               {productionDate(b.production_date)} · {b.formula_code ? `${b.formula_code} · v${b.formula_version}` : "Sin versión seleccionada"}
             </p>
             <dl className="production-card-metrics">
-              <div><dt>Previstas</dt><dd>{b.planned_quantity ?? "—"}</dd></div>
-              <div><dt>{b.actual_quantity != null && (b.confirmed || b.state === "released" || b.finalized_at) ? "Confirmadas" : "Producidas"}</dt><dd>{b.actual_quantity ?? (b.yield_timing ? "Pendiente" : "—")}</dd></div>
+              <div><dt>Previstas</dt><dd>{b.planned_quantity ?? (b.opening_stock ? "No aplica" : "—")}</dd></div>
+              <div><dt>{confirmed ? "Confirmadas" : "Producidas"}</dt><dd>{b.actual_quantity ?? (b.yield_timing ? "Pendiente" : "—")}</dd></div>
               <div><dt>Merma</dt><dd>{b.scrap_quantity ?? "—"}</dd></div>
+              <div><dt>Rendimiento</dt><dd>{yieldRatio === null ? (b.opening_stock && b.planned_quantity == null ? "No aplica" : "—") : yieldPercent.format(yieldRatio)}</dd></div>
             </dl>
             <div className="production-card-meta">
               {b.preliminary_quantity != null && <span>{b.yield_timing === "after" ? "Estimadas al enviar" : "Contadas antes del curado"}: {b.preliminary_quantity}</span>}

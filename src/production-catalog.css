@@ -46,7 +46,7 @@
 .shell .production-card-meta { font-size: 12px; color: var(--admin-muted); margin: 3px 0; }
 .production-card-metrics {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 6px;
   margin: 6px 0;
   padding: 5px 7px;
