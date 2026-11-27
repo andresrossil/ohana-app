@@ -1,3 +1,4 @@
+import { flushSync } from "react-dom";
 import ProductionMenu from "./ProductionMenu";
 import SearchSelect from "./SearchSelect";
 import ResponsiveTable from "./ResponsiveTable";
@@ -147,6 +148,17 @@ export default function BusinessPartners({
     setError("");
     suggestion.current++;
   }
+  const [tab, setTab] = useState("general");
+  const tabbed = partnerType !== "courier";
+  const tabs = [
+    ["general", "General"], ["contacts", "Contactos"], ["addresses", "Direcciones"],
+    ["commercial", "Información comercial"], ...(draft.id ? [["history", "Historial"]] : []),
+  ];
+  const panel = (id: string) => tabbed ? {
+    id: `partner-panel-${id}`, role: "tabpanel", "aria-labelledby": `partner-tab-${id}`,
+    hidden: tab !== id, "data-partner-panel": id,
+  } : {};
+
   async function open(row?: Row, edit = false, addRole = false) {
     setBusy(true);
     setError("");
@@ -175,6 +187,7 @@ export default function BusinessPartners({
         setAccounts([]);
         setCourierBalance(0);
       }
+      setTab("general");
       setDirty(addRole);
       setMode(row && !edit ? "view" : "edit");
     } catch (e: any) {
@@ -183,8 +196,22 @@ export default function BusinessPartners({
       setBusy(false);
     }
   }
-  async function save(e: React.FormEvent) {
+  async function save(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (tabbed) {
+      const invalid = Array.from(e.currentTarget.elements).find(
+        (element): element is HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement =>
+          (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement || element instanceof HTMLSelectElement)
+          && element.willValidate && !element.validity.valid,
+      );
+      if (invalid) {
+        const section = invalid.closest<HTMLElement>("[data-partner-panel]")?.dataset.partnerPanel;
+        if (section) flushSync(() => setTab(section));
+        invalid.reportValidity();
+        invalid.focus();
+        return;
+      }
+    }
     setBusy(true);
     setError("");
     try {
@@ -279,6 +306,23 @@ export default function BusinessPartners({
       </label>
     );
   }
+  const contactFields = <>
+                {partnerType === "customer" && <>
+                  {field("instagram", "Instagram · usuario", { max: 200 })}
+                  {field("facebook", "Facebook · usuario o perfil", { max: 200 })}
+                </>}
+                {field("phone", "Teléfono principal", { max: 40, inputType: "tel" })}
+                {partnerType === "courier" && field("phone_secondary", "Teléfono secundario · opcional", {max:40,inputType:"tel"})}
+                {partnerType === "customer" && <>
+                  {field("phone_secondary", "Teléfono secundario · opcional", { max: 40, inputType: "tel" })}
+                  <label><input type="checkbox" checked={!!draft.whatsapp_same} onChange={(e) => change("whatsapp_same", e.target.checked)} /> Mismo número que WhatsApp</label>
+                </>}
+                {field("whatsapp", "WhatsApp", { max: 40, inputType: "tel" })}
+                {field("email", "Correo electrónico", {
+                  max: 254,
+                  inputType: "email",
+                })}
+  </>;
   const readOnly = mode === "view";
   return (
     <>
@@ -463,9 +507,9 @@ export default function BusinessPartners({
         )}
       </section>
       {mode && (
-        <div className="overlay">
+        <div className={tabbed ? "overlay partner-tab-overlay" : "overlay"}>
           <section
-            className="modal partner-dialog"
+            className={tabbed ? "modal partner-dialog partner-tab-dialog" : "modal partner-dialog"}
             role="dialog"
             aria-modal="true"
             aria-labelledby="partner-title"
@@ -473,7 +517,7 @@ export default function BusinessPartners({
               if (e.key === "Escape") close();
             }}
           >
-            <div className="hierarchy-toolbar">
+            <div className={tabbed ? "partner-tab-header" : "hierarchy-toolbar"}>
               <h2 ref={heading} tabIndex={-1} id="partner-title">
                 {readOnly
                   ? `Ver ${typeName(partnerType).toLowerCase()}`
@@ -481,24 +525,28 @@ export default function BusinessPartners({
                     ? `Editar ${typeName(partnerType).toLowerCase()}`
                     : `Nuevo ${typeName(partnerType).toLowerCase()}`}
               </h2>
-              {partnerType === "customer" && <CustomerBalance accounts={accounts} currency={data.currency||"GTQ"}/>}
+              {partnerType === "customer" && draft.id && <CustomerBalance accounts={accounts} currency={data.currency||"GTQ"}/>}
               {partnerType === "courier" && <aside className="customer-balance" aria-label="Saldo de mensajería, solo lectura"><strong>Saldo acumulado</strong><output className={courierBalanceClass(courierBalance)}>{courierBalanceText(courierBalance,draft.name||"El mensajero")}</output></aside>}
-              <AppButton className="secondary" disabled={busy} onClick={close}>
-                Cerrar
+              <AppButton className="secondary partner-close" aria-label="Cerrar" title="Cerrar" disabled={busy} onClick={close}>
+                {tabbed ? "×" : "Cerrar"}
               </AppButton>
             </div>
-            {error && (
-              <p role="alert" className="error">
-                <AppIcon name="status.error" />
-                {error}
-              </p>
-            )}
-            {partnerType!=="courier"&&<nav className="partner-section-nav" aria-label="Secciones de la ficha">
-              {[["general","Información general"],["contacts","Contactos"],["addresses","Direcciones"],
-                ["commercial","Información comercial"],...(draft.id?[["history","Historial"]]:[])].map(([id,label])=>
-                  <button type="button" className="secondary" key={id} onClick={()=>document.getElementById("partner-"+id)?.scrollIntoView({block:"nearest"})}>{label}</button>)}
-            </nav>}
-            <form onSubmit={save}>
+            {tabbed&&<div className="partner-tabs" role="tablist" aria-label="Secciones de la ficha" onKeyDown={event=>{
+              const index = tabs.findIndex(([id])=>id===tab);
+              const offsets: Record<string, number> = {ArrowLeft: -1, ArrowRight: 1};
+              if (!(event.key in offsets) && event.key!=="Home" && event.key!=="End") return;
+              event.preventDefault();
+              const next = tabs[event.key==="Home" ? 0 : event.key==="End" ? tabs.length-1 : (index+offsets[event.key]+tabs.length)%tabs.length][0];
+              setTab(next);
+              event.currentTarget.querySelector<HTMLElement>(`#partner-tab-${next}`)?.focus();
+            }}>
+              {tabs.map(([id,label])=><button type="button" key={id} id={`partner-tab-${id}`} role="tab"
+                aria-controls={`partner-panel-${id}`} aria-selected={tab===id} tabIndex={tab===id?0:-1}
+                onClick={()=>setTab(id)}>{label}</button>)}
+            </div>}
+            <div className={tabbed ? "partner-tab-body" : "partner-legacy-body"}>
+            {error && <p role="alert" className="error"><AppIcon name="status.error" />{error}</p>}
+            <form id="partner-edit-form" noValidate={tabbed} onSubmit={save}>
               {mode === "edit" && matches.length > 0 && <aside className="sheet-warning partner-matches" role="status">
                 <strong>Posibles coincidencias · puedes continuar guardando</strong>
                 <p>Revisa si ya existe este socio antes de crear otro. Las coincidencias de contacto no bloquean el registro.</p>
@@ -510,35 +558,21 @@ export default function BusinessPartners({
                   }}>Usar socio existente</AppButton>}
                 </div>)}
               </aside>}
-              <fieldset disabled={readOnly || busy}>
-                <legend id="partner-general">Datos generales</legend>
-                {field("code", `Código de ${typeName(partnerType).toLowerCase()} · automático`, { max: 40 })}
-                {field("alternate_code", "Código alterno · opcional", { max: 40 })}
-                <p className="form-wide muted">El código definitivo se asigna al guardar.</p>
-                {field("name", "Nombre comercial o nombre completo", {
-                  max: 160,
-                  required: true,
-                })}
+              <fieldset disabled={readOnly || busy} {...panel("general")}>
+                <legend>Datos generales</legend>
+                {!tabbed&&<>
+                  {field("code", "Código de mensajería · automático", { max: 40 })}
+                  {field("alternate_code", "Código alterno · opcional", { max: 40 })}
+                  <p className="form-wide muted">El código definitivo se asigna al guardar.</p>
+                </>}
+                {tabbed&&<p className="form-wide partner-code">Código automático · {draft.code || "Se asigna al guardar"}</p>}
+                {field("name", "Nombre comercial o nombre completo", { max: 160, required: true, wide: tabbed })}
+                {tabbed&&field("alternate_code", "Código alterno · opcional", { max: 40 })}
                 {partnerType === "supplier" && <>
                   {field("legal_name", "Razón social")}
                   {field("tax_id", "NIT / identificación fiscal", { max: 80 })}
                 </>}
-                {partnerType === "customer" && <>
-                  {field("instagram", "Instagram · usuario", { max: 200 })}
-                  {field("facebook", "Facebook · usuario o perfil", { max: 200 })}
-                </>}
-                {partnerType!=="courier"&&<h3 id="partner-contacts" className="form-wide partner-contact-heading">Contactos</h3>}
-                {field("phone", "Teléfono principal", { max: 40, inputType: "tel" })}
-                {partnerType === "courier" && field("phone_secondary", "Teléfono secundario · opcional", {max:40,inputType:"tel"})}
-                {partnerType === "customer" && <>
-                  {field("phone_secondary", "Teléfono secundario · opcional", { max: 40, inputType: "tel" })}
-                  <label><input type="checkbox" checked={!!draft.whatsapp_same} onChange={(e) => change("whatsapp_same", e.target.checked)} /> Mismo número que WhatsApp</label>
-                </>}
-                {field("whatsapp", "WhatsApp", { max: 40, inputType: "tel" })}
-                {field("email", "Correo electrónico", {
-                  max: 254,
-                  inputType: "email",
-                })}
+                {!tabbed && contactFields}
                 <label>
                   Estado
                   <SearchSelect
@@ -566,8 +600,9 @@ export default function BusinessPartners({
                   max: 4000,
                 })}
               </fieldset>
-              {partnerType !== "courier" && <fieldset disabled={readOnly || busy}>
-                <legend id="partner-addresses">Direcciones</legend>
+              {tabbed&&<fieldset disabled={readOnly || busy} {...panel("contacts")}><legend>Contactos</legend>{contactFields}</fieldset>}
+              {partnerType !== "courier" && <fieldset disabled={readOnly || busy} {...panel("addresses")}>
+                <legend>Direcciones</legend>
                 <p className="form-wide muted">
                   Hasta 20 direcciones por socio. Marca una como principal.
                 </p>
@@ -705,8 +740,8 @@ export default function BusinessPartners({
                   </div>
                 )}
               </fieldset>}
-              {partnerType !== "courier" && <fieldset disabled={readOnly || busy}>
-                <legend id="partner-commercial">Información comercial · {typeName(partnerType)}</legend>
+              {partnerType !== "courier" && <fieldset disabled={readOnly || busy} {...panel("commercial")}>
+                <legend>Información comercial · {typeName(partnerType)}</legend>
                 {partnerType === "customer" && <label>Lista de precios
                   <SearchSelect value={draft.price_list_id || data.default_price_list || ""} onChange={e => change("price_list_id", e.target.value)}>
                     <option value="">Sin lista disponible</option>
@@ -737,7 +772,7 @@ export default function BusinessPartners({
                       { multiline: true, max: 2000 },
                     )}
               </fieldset>}
-              <div className="form-actions">
+              {!tabbed&&<div className="form-actions">
                 {!readOnly && <AppButton disabled={busy}>Guardar</AppButton>}
                 <AppButton
                   type="button"
@@ -747,10 +782,10 @@ export default function BusinessPartners({
                 >
                   {readOnly ? "Volver" : "Cancelar"}
                 </AppButton>
-              </div>
+              </div>}
             </form>
             {draft.id && (
-              <section className="partner-history" id="partner-history">
+              <section className="partner-history" {...panel("history")}>
                 <h3>Relaciones e historial</h3>
                 <p className="muted">
                   Hasta 100 registros recientes por sección, según tus permisos.
@@ -784,6 +819,11 @@ export default function BusinessPartners({
                 ))}
               </section>
             )}
+            </div>
+            {tabbed&&<footer className="partner-tab-footer">
+              <AppButton className="secondary" disabled={busy} onClick={close}>{readOnly?"Volver":"Cancelar"}</AppButton>
+              {!readOnly&&<AppButton type="submit" form="partner-edit-form" disabled={busy}>Guardar</AppButton>}
+            </footer>}
           </section>
         </div>
       )}
