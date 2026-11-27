@@ -93,10 +93,10 @@ export default function SaleEditor({company,orderId,currency,onClose,onSaved}:{c
   if(continueAdding&&next.length<30)setLineEdit({line:emptyLine(),existing:false});
   else closeLine();
  }
- const changeCustomer=(id:string)=>{const list=catalog.customers.find((c:Row)=>c.id===id)?.price_list_id||catalog.default_price_list;setLines(old=>old.map(l=>({...l,regular_price:String(suggestedPrice(l.variant,list)??""),unit_price:l.is_gift?"0":String(suggestedPrice(l.variant,list)??"")})));setCustomer(id);setCredit("");setPayment(catalog.customers.find((x:Row)=>x.id===id)?.payment_preference||"");const a=options.addresses?.find((x:Row)=>x.partner_id===id&&x.is_primary);setDelivery(old=>applyDeliveryAddress(old,a||{address:catalog.customers.find((x:Row)=>x.id===id)?.address||""},options));setDirty(true);};
+ const changeCustomer=(id:string)=>{const list=catalog.customers.find((c:Row)=>c.id===id)?.price_list_id||catalog.default_price_list;setLines(old=>old.map(l=>({...l,regular_price:String(suggestedPrice(l.variant,list)??""),unit_price:l.is_gift?"0":String(suggestedPrice(l.variant,list)??"")})));setCustomer(id);setCredit("");const preferred=catalog.customers.find((x:Row)=>x.id===id)?.payment_preference;setPayment(preferred==="cod"?"cash":preferred||"");const a=options.addresses?.find((x:Row)=>x.partner_id===id&&x.is_primary);setDelivery(old=>applyDeliveryAddress(old,a||{address:catalog.customers.find((x:Row)=>x.id===id)?.address||""},options));setDirty(true);};
  const l=lineEdit?.line;
- return <><div className="overlay sale-editor-overlay" inert={!!lineEdit}><section className="modal operations-dialog sale-editor sale-editor-redesign" role="dialog" aria-modal="true" aria-label={orderId?"Editar factura":"Nueva factura"} data-navigation-dirty={dirty}>
-  <header className="hierarchy-toolbar"><h2>{original?`Editar factura #${original.invoice_number || original.number}`:"Nueva factura"}</h2><AppButton type="button" className="secondary catalog-icon-button" iconKey="action.cancel" aria-label="Cerrar factura" title="Cerrar factura" disabled={state.busy} onClick={close} /></header>
+ return <><div className="overlay sale-editor-overlay" inert={!!lineEdit}><section className="modal operations-dialog sale-editor sale-editor-redesign" role="dialog" aria-modal="true" aria-label={orderId?"Editar factura":"Nuevo pedido"} data-navigation-dirty={dirty}>
+  <header className="hierarchy-toolbar"><h2>{original?`Editar documento #${original.invoice_number || original.number}`:"Nuevo pedido"}</h2><AppButton type="button" className="secondary catalog-icon-button" iconKey="action.cancel" aria-label="Cerrar factura" title="Cerrar factura" disabled={state.busy} onClick={close} /></header>
   {state.error&&<p className="error" role="alert"><AppIcon name="status.error"/>{state.error}</p>}
   {ready&&<form className="sale-main-form" data-dirty-managed onInvalidCapture={revealInvalid} aria-busy={state.busy} onChange={()=>setDirty(true)} onSubmit={e=>{e.preventDefault();if(!lines.length||lineEdit||!state.canWrite||state.busy)return;if(lines.some(l=>!saleLineTotals(l).valid)){state.setError("Revisa los descuentos por línea. No pueden superar el importe de la línea ni el 100 %.");return;}if(totals.discount<0||totals.discount>totals.subtotal){state.setError("Revisa el descuento; no puede superar el subtotal.");return;}void state.run(async()=>{
    const payload={...(original?{order:original.id,expected_revision:original.revision}:{}),draft:!original,customer_id:customer||undefined,customer:contact,payment,delivery:delivery.kind==="pickup"?"pickup":"delivery",delivery_info:delivery,
@@ -106,7 +106,7 @@ export default function SaleEditor({company,orderId,currency,onClose,onSaved}:{c
    <div className="sale-editor-scroll">
    <fieldset className="sale-main-fields" disabled={state.busy||!state.canWrite}>
    <details className="sale-section" open={!orderId}><summary><strong>Cliente</strong><small>{clientName || "Cliente pendiente"} · {paymentName} · {listName}</small></summary><div className="sale-section-content"><div className="settings-grid"><label>Cliente<SearchSelect required={!!original} disabled={!!original?.invoice_number} value={customer} onChange={e=>changeCustomer(e.target.value)}><option value="">Nuevo contacto</option>{original&&!catalog.customers.some((c:Row)=>c.id===customer)&&<option value={customer}>{original.customer_snapshot.name}</option>}{catalog.customers.filter((c:Row)=>c.active||c.id===customer).map((c:Row)=><option key={c.id} value={c.id}>{c.code} · {c.name}</option>)}</SearchSelect></label>
-    <label>Forma de pago habitual<SearchSelect required value={payment} onChange={e=>setPayment(e.target.value)}><option value="">Seleccionar</option>{paymentMethods.map(p=><option key={p.value} value={p.value}>{p.label}</option>)}</SearchSelect><small>Elegir transferencia no confirma un pago.</small></label>
+    <label>Forma de pago habitual<SearchSelect required value={payment} onChange={e=>setPayment(e.target.value)}><option value="">Seleccionar</option>{paymentMethods.filter(p=>p.value!=="cod"||payment==="cod").map(p=><option key={p.value} value={p.value}>{p.label}</option>)}</SearchSelect><small>{delivery.kind==="courier"&&payment==="cash"?"Cobro al entregar si el cliente aún tiene saldo.":"La forma de pago se registra como preferencia."}</small></label>
     {!customer&&<><label>Nombre<input required minLength={2} maxLength={120} value={contact.name} onChange={e=>setContact({...contact,name:e.target.value})}/></label><label>Teléfono<input required type="tel" maxLength={25} value={contact.phone} onChange={e=>setContact({...contact,phone:e.target.value})}/></label><label>Correo · opcional<input type="email" maxLength={254} value={contact.email} onChange={e=>setContact({...contact,email:e.target.value})}/></label></>}
    </div>
    <CustomerCommercialInfo info={catalog.customers.find((c:Row)=>c.id===customer) ?? (customer===original?.customer_id?commercialInfo:null)} />
@@ -146,7 +146,7 @@ export default function SaleEditor({company,orderId,currency,onClose,onSaved}:{c
     <label>Descuento · %<input type="number" min="0" max="100" step="0.01" value={headerEdit?.mode==="percent"?headerEdit.value:String(totals.percent)} onBlur={()=>setHeaderEdit(null)} onChange={e=>changeHeaderDiscount("percent",e.target.value)}/></label>
    </div>
 
-   {isDraft&&<p className="muted">Borrador pendiente de confirmación del cliente. El inventario se reserva al confirmar.</p>}
+   {isDraft&&<p className="muted">Pedido pendiente de confirmación del cliente. El inventario se reserva al confirmar.</p>}
    {payment==="cash"&&!isDraft&&<p className="muted">Efectivo pendiente de liquidación de ruta. Guardar la factura no registra dinero recibido ni reduce su saldo.</p>}
    {customer&&!isDraft&&<div className="sale-credit"><strong>Saldo a favor disponible: {displayMoney(available)}</strong><label>Aplicar saldo a esta factura<MoneyInput currency={currency} min="0" max={Math.min(available,due)} disabled={available<=0||due<=0} value={credit} onChange={e=>setCredit(e.target.value)}/></label></div>}
    </details></fieldset></div>
@@ -154,7 +154,7 @@ export default function SaleEditor({company,orderId,currency,onClose,onSaved}:{c
     <div className="sale-totals-strip"><small>{unitCount} {unitCount===1?"unidad":"unidades"} · {lines.length} {lines.length===1?"línea":"líneas"} · Envío {displayMoney(totals.shipping)}</small><strong>Total a pagar: {displayMoney(totals.total)}</strong></div>
     <div className="sale-footer-buttons">
       <AppButton type="button" iconKey="action.add" disabled={state.busy||!state.canWrite||lines.length>=30} onClick={()=>openLine()}>Agregar producto</AppButton>
-      <AppButton type="submit" disabled={state.busy||!state.canWrite||!lines.length}>{isDraft?"Guardar borrador":"Guardar cambios"}</AppButton>
+      <AppButton type="submit" disabled={state.busy||!state.canWrite||!lines.length}>{isDraft?"Guardar pedido":"Guardar cambios"}</AppButton>
       <AppButton type="button" className="secondary" disabled={state.busy||!state.canWrite} onClick={close}>Volver</AppButton>
     </div>
    </footer>

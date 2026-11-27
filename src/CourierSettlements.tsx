@@ -7,14 +7,16 @@ import { confirmAction } from "./ConfirmDialog";
 import { courierRead } from "./delivery-model";
 import { keyedRequest, money, today, useOperation, type Row } from "./operations";
 import { courierBalanceClass, courierBalanceText, settlementNumber } from "./courier-account";
+import OrderPreparationDialog from "./OrderPreparationDialog";
 import CourierAccountDialog from "./CourierAccountDialog";
 import "./couriers.css";
 
-const states:Row={draft:"Borrador",pending:"Pendiente",partial:"Parcial",settled:"Saldada",cancelled:"Anulada"};
+const states:Row={draft:"Borrador",pending:"Pendiente",partial:"Parcial",settled:"Liquidada",cancelled:"Cancelada"};
 type Choice={selected:boolean;mark_collected:boolean;extra_cash:string};
 const emptyChoice=():Choice=>({selected:false,mark_collected:false,extra_cash:""});
 const blankExchange=()=>({actual_amount:"0",direction:"received",method:"cash",exchange_date:today(),exchange_notes:""});
 export default function CourierSettlements({company,onDirty,initialId,onInitialOpen}:{company:string;onDirty:(dirty:boolean)=>void;initialId?:string;onInitialOpen?:()=>void}){
+ const [preparing,setPreparing]=useState<string|null>(null);
  const state=useOperation(company,"sales");
  const [history,setHistory]=useState<Row[]>([]),[couriers,setCouriers]=useState<Row[]>([]),[filters,setFilters]=useState({courier:"",state:"",from:"",to:""});
  const [document,setDocument]=useState<Row|null>(null),[items,setItems]=useState<Row[]>([]),[payments,setPayments]=useState<Row[]>([]),[paying,setPaying]=useState(false),[pending,setPending]=useState<Row[]>([]),[choices,setChoices]=useState<Record<string,Choice>>({});
@@ -47,28 +49,25 @@ export default function CourierSettlements({company,onDirty,initialId,onInitialO
  const eligible=pending.filter(p=>!p.reserved_id||p.reserved_id===document?.id);
  const chosen=eligible.filter(p=>choices[p.order_id]?.selected);
  const draft=document?.state==="draft";
- const awaitingHandoff=draft&&chosen.some(p=>p.pending_handoff);
+ const awaitingPreparation=draft&&chosen.some(p=>p.needs_preparation);
+ const unresolvedCash=draft&&chosen.some(p=>p.payment_method!=="transfer"&&Number(p.expected_cash)>0&&
+   (!choices[p.order_id]?.mark_collected||Math.round(Number(choices[p.order_id]?.extra_cash)*100)!==Math.round(Number(p.expected_cash)*100)));
  const preview=draft&&(!document?.id||dirty);
  const collected=preview?chosen.reduce((sum,p)=>sum+(p.payment_method==="transfer"?0:Number(p.collected)+(choices[p.order_id]?.mark_collected?Number(choices[p.order_id].extra_cash||0):0)),0):Number(document?.collected||0);
  const cost=preview?chosen.reduce((sum,p)=>sum+Number(p.shipping_cost),0):Number(document?.shipping_cost||0),net=collected-cost;
- // Cash due at delivery can cover the shipping charged on the invoice.
- const dueAtHandoff=chosen.filter(p=>p.pending_handoff).reduce((sum,p)=>{
-  const shipping=Number(p.shipping_cost);
-  const expectedShippingCash=Math.min(Number(p.shipping_charged??0),Number(p.expected_cash));
-  return sum+Math.max(0,shipping-Number(p.collected)-expectedShippingCash);
- },0);
  const remaining=draft?net:Number(document?.remaining||0),paidTotal=draft?0:Number(document?.paid_total||0);
 
 
  const courierName=couriers.find(c=>c.id===document?.courier_id)?.name||"el mensajero";
  const choose=(id:string,patch:Partial<Choice>)=>{setChoices(old=>({...old,[id]:{...(old[id]||emptyChoice()),...patch}}));setDirty(true);};
  const editExchange=(key:string,value:string)=>{setExchange(old=>({...old,[key]:value}));setExchangeDirty(true);};
- const save=()=>state.run(async()=>{if(!document)return;const differences=chosen.filter(p=>p.payment_method!=="transfer"&&choices[p.order_id].mark_collected&&Math.round(Number(choices[p.order_id].extra_cash||0)*100)!==Math.round(Number(p.expected_cash)*100));if(differences.length&&!(await confirmAction(differences.map(p=>`Pedido #${p.number} · ${p.customer}\nTotal de factura: ${money(p.invoice_total)} · Pendiente: ${money(p.expected_cash)}\nEfectivo adicional cobrado: ${money(choices[p.order_id].extra_cash)}\nDiferencia: ${money(Math.abs(Number(choices[p.order_id].extra_cash||0)-Number(p.expected_cash)))} (${Number(choices[p.order_id].extra_cash||0)>Number(p.expected_cash)?"excedente a favor":"faltante por pagar"})`).join("\n\n")+"\n¿Son correctos estos cobros?",{title:"Revisar efectivo cobrado",confirmText:"Sí, guardar cobros"})))return;const saved=await keyedRequest(company,"courier_operations",{id:document.id,courier:document.courier_id,date:document.settled_on,notes:document.notes,expected_revision:document.revision,cash_discrepancies_confirmed:differences.length>0,orders:chosen.map(p=>({order:p.order_id,mark_collected:p.payment_method!=="transfer"&&choices[p.order_id].mark_collected,extra_cash:p.payment_method==="transfer"?"0":choices[p.order_id].extra_cash||"0"}))},"settlement_save");setDetail(await courierRead(company,"settlement",{id:saved.id}));await load();});
+ const save=()=>state.run(async()=>{if(!document)return;const differences=chosen.filter(p=>p.payment_method!=="transfer"&&choices[p.order_id].mark_collected&&Math.round(Number(choices[p.order_id].extra_cash||0)*100)!==Math.round(Number(p.expected_cash)*100));if(differences.length&&!(await confirmAction(differences.map(p=>`Pedido #${p.number} · ${p.customer}\nTotal de factura: ${money(p.invoice_total)} · Pendiente: ${money(p.expected_cash)}\nEfectivo adicional cobrado: ${money(choices[p.order_id].extra_cash)}\nDiferencia: ${money(Math.abs(Number(choices[p.order_id].extra_cash||0)-Number(p.expected_cash)))} (${Number(choices[p.order_id].extra_cash||0)>Number(p.expected_cash)?"excedente a favor":"faltante por pagar"})`).join("\n\n")+"\n¿Son correctos estos cobros?",{title:"Revisar efectivo cobrado",confirmText:"Sí, guardar cobros"})))return;const saved=await keyedRequest(company,"courier_operations",{id:document.id,courier:document.courier_id,date:document.settled_on,notes:document.notes,expected_revision:document.revision,admin_draft:true,cash_discrepancies_confirmed:differences.length>0,orders:chosen.map(p=>({order:p.order_id,mark_collected:p.payment_method!=="transfer"&&choices[p.order_id].mark_collected,extra_cash:p.payment_method==="transfer"?"0":choices[p.order_id].extra_cash||"0"}))},"settlement_save");setDetail(await courierRead(company,"settlement",{id:saved.id}));await load();});
  const beginPayment=()=>{setExchange({...blankExchange(),actual_amount:String(Math.abs(remaining)),direction:remaining>=0?"received":"paid"});setExchangeDirty(false);setPaying(true);};
  const confirm=()=>state.run(async()=>{if(!document)return;const amount=Number(exchange.actual_amount||0),left=Math.abs(remaining)-amount;
+  if(draft&&Math.round(left*100)!==0)throw Error("Guarda el borrador hasta resolver la diferencia del intercambio.");
   if(amount<0||left<0||(!draft&&amount===0))throw Error("El pago no puede superar el saldo pendiente.");
   if(!(await confirmAction(`${courierBalanceText(remaining,courierName)}.\nImporte pagado: ${money(amount)}.\nSaldo pendiente después del pago: ${money(left)}.\n¿${draft?"Liquidar el documento":"Registrar este pago"}?`)))return;
-  await keyedRequest(company,"courier_operations",draft?{id:document.id,...exchange,expected_revision:document.revision}:{id:document.id,amount:exchange.actual_amount,method:exchange.method,date:exchange.exchange_date,notes:exchange.exchange_notes,expected_revision:document.revision,expected_remaining:remaining},draft?"settlement_confirm":"settlement_payment");
+  await keyedRequest(company,"courier_operations",draft?{id:document.id,admin_complete:true,...exchange,expected_revision:document.revision}:{id:document.id,amount:exchange.actual_amount,method:exchange.method,date:exchange.exchange_date,notes:exchange.exchange_notes,expected_revision:document.revision,expected_remaining:remaining},draft?"settlement_confirm":"settlement_payment");
   setDetail(await courierRead(company,"settlement",{id:document.id}));setPaying(false);setExchangeDirty(false);setExchange(blankExchange());await load();
  });
  return <>
@@ -91,11 +90,11 @@ export default function CourierSettlements({company,onDirty,initialId,onInitialO
    {draft?<>
     <div className="hierarchy-toolbar"><h3>Pedidos disponibles para liquidación</h3><label className="settlement-check"><input type="checkbox" disabled={!state.canWrite||state.busy||!eligible.length} checked={eligible.length>0&&chosen.length===eligible.length} onChange={e=>{const checked=e.target.checked;setChoices(old=>Object.fromEntries(eligible.map(p=>[p.order_id,{...(old[p.order_id]||emptyChoice()),selected:checked}])));setDirty(true);}}/> Seleccionar todos</label></div>
     <p>Marca el efectivo que realmente cobró el mensajero. El saldo pendiente de una factura no se considera cobrado automáticamente.</p>
-    <div className="table-wrap"><ResponsiveTable><thead><tr><th>Seleccionar</th><th>Pedido</th><th>Fecha de entrega</th><th>Cliente</th><th>Efectivo cobrado</th><th>Costo real del envío</th></tr></thead><tbody>{pending.map(p=>{const choice=choices[p.order_id]||emptyChoice(),reserved=!!p.reserved_id&&p.reserved_id!==document.id;return <tr key={p.order_id}>
-     <td data-sort-value={choice.selected?1:0}><input aria-label={`Incluir pedido ${p.number}`} type="checkbox" disabled={reserved||!state.canWrite||state.busy} checked={choice.selected} onChange={e=>choose(p.order_id,{selected:e.target.checked})}/></td><td data-sort-value={p.number}>#{p.number}{reserved&&<small>Reservada en {settlementNumber(p.reserved_number)}</small>}</td><td data-sort-value={p.delivered_at}>{p.pending_handoff?"Pendiente de entregar":p.delivered_at?new Date(p.delivered_at).toLocaleDateString("es-GT"):"—"}</td><td>{p.customer}</td>
+    <div className="table-wrap"><ResponsiveTable><thead><tr><th>Seleccionar</th><th>Pedido</th><th>Preparación</th><th>Cliente y dirección</th><th>Total / Pagado a OHANA</th><th>Efectivo cobrado</th><th>Costo real del envío</th></tr></thead><tbody>{pending.map(p=>{const choice=choices[p.order_id]||emptyChoice(),reserved=!!p.reserved_id&&p.reserved_id!==document.id;return <tr key={p.order_id}>
+     <td data-sort-value={choice.selected?1:0}><input aria-label={`Incluir pedido ${p.number}`} type="checkbox" disabled={reserved||!state.canWrite||state.busy} checked={choice.selected} onChange={e=>choose(p.order_id,{selected:e.target.checked})}/></td><td data-sort-value={p.number}>#{p.invoice_number||p.number}{reserved&&<small>Reservada en {settlementNumber(p.reserved_number)}</small>}</td><td data-sort-value={p.needs_preparation?0:1}>{p.needs_preparation?<AppButton type="button" className="secondary" disabled={!state.canWrite||state.busy||reserved} onClick={()=>setPreparing(p.order_id)}>Confirmar preparación</AppButton>:"Preparada"}</td><td>{p.customer}<small>{p.address}</small></td><td data-sort-value={p.invoice_total}>{money(p.invoice_total)}<small>Pagado a OHANA {money(p.direct_paid??0)}</small></td>
      <td data-sort-value={p.payment_method==="transfer"?0:Number(p.collected)+(choice.mark_collected?Number(choice.extra_cash||0):0)}>{p.payment_method==="transfer"?<small>Transferencia · solo envío</small>:<><strong>{money(Number(p.collected)+(choice.mark_collected?Number(choice.extra_cash||0):0))}</strong>{Number(p.collected)>0&&<small>Ya registrado en Ventas: {money(p.collected)}</small>}
-      {p.pending_handoff&&Number(p.expected_cash)>0&&<p className="settlement-invoice-balance">Efectivo por cobrar: {money(p.expected_cash)}</p>}
-      {!p.pending_handoff&&Number(p.expected_cash)>0&&<><label className="settlement-check"><input type="checkbox" checked={choice.mark_collected} disabled={!choice.selected||!state.canWrite||state.busy} onChange={e=>choose(p.order_id,{mark_collected:e.target.checked,extra_cash:e.target.checked?String(p.expected_cash):""})}/> Confirmar efectivo recibido</label><MoneyInput aria-label={`Efectivo adicional cobrado del pedido ${p.number}`} required={choice.mark_collected&&choice.selected} min="0.01" disabled={!choice.mark_collected||!choice.selected||!state.canWrite||state.busy} value={choice.extra_cash} onChange={e=>choose(p.order_id,{extra_cash:e.target.value})}/><p className="settlement-invoice-balance">Pendiente de la factura: {money(p.expected_cash)}</p></>}
+      {p.needs_preparation&&Number(p.expected_cash)>0&&<p className="settlement-invoice-balance">Efectivo por cobrar: {money(p.expected_cash)}</p>}
+      {!p.needs_preparation&&Number(p.expected_cash)>0&&<><label className="settlement-check"><input type="checkbox" checked={choice.mark_collected} disabled={!choice.selected||!state.canWrite||state.busy} onChange={e=>choose(p.order_id,{mark_collected:e.target.checked,extra_cash:e.target.checked?String(p.expected_cash):""})}/> Confirmar efectivo recibido</label><MoneyInput aria-label={`Efectivo adicional cobrado del pedido ${p.number}`} required={choice.mark_collected&&choice.selected} min="0.01" disabled={!choice.mark_collected||!choice.selected||!state.canWrite||state.busy} value={choice.extra_cash} onChange={e=>choose(p.order_id,{extra_cash:e.target.value})}/><p className="settlement-invoice-balance">Pendiente de la factura: {money(p.expected_cash)}</p></>}
      </>}</td><td data-sort-value={p.shipping_cost}>{money(p.shipping_cost)}</td>
     </tr>;})}</tbody></ResponsiveTable></div>
     {!pending.length&&<p>No hay pedidos disponibles para este mensajero.</p>}
@@ -104,11 +103,11 @@ export default function CourierSettlements({company,onDirty,initialId,onInitialO
    </form>
    <section className="settlement-summary"><h3>Resumen</h3><dl>
     <div><dt>Efectivo cobrado por el mensajero</dt><dd>{money(collected)}</dd></div><div><dt>Costo de envíos</dt><dd>{money(cost)}</dd></div>
-    <div className="settlement-final"><dt>{awaitingHandoff?"A pagar al entregar a mensajería":draft?"Resultado del borrador":"Importe original"}</dt><dd>{awaitingHandoff?money(dueAtHandoff):courierBalanceText(net,courierName)}</dd></div>
+    <div className="settlement-final"><dt>{draft?"Resultado del borrador":"Importe original"}</dt><dd>{courierBalanceText(net,courierName)}</dd></div>
     {!draft&&document.state!=="cancelled"&&<><div><dt>Importe pagado</dt><dd>{money(paidTotal)}</dd></div><div className="settlement-final"><dt>Saldo pendiente</dt><dd className={courierBalanceClass(remaining)}>{courierBalanceText(remaining,courierName)}</dd></div></>}
    </dl></section>
    <p className="muted">Saldo acumulado de {courierName}: {courierBalanceText(balance,courierName)}</p>
-   {state.canWrite&&document.id&&!paying&&document.state!=="cancelled"&&(draft||Math.abs(remaining)>0)&&<div className="form-actions"><AppButton disabled={state.busy||dirty||awaitingHandoff} onClick={beginPayment}>{draft?"Liquidar":"Registrar pago"}</AppButton>{dirty&&<span>Guarda primero el borrador.</span>}{awaitingHandoff&&<span>Registra la entrega a mensajería para liquidar.</span>}</div>}
+   {state.canWrite&&document.id&&!paying&&document.state!=="cancelled"&&(draft||Math.abs(remaining)>0)&&<div className="form-actions"><AppButton disabled={state.busy||dirty||awaitingPreparation||unresolvedCash} onClick={beginPayment}>{draft?"Liquidar":"Registrar pago"}</AppButton>{dirty&&<span>Guarda primero el borrador.</span>}{awaitingPreparation&&<span>Confirma la preparación de las facturas seleccionadas.</span>}{!awaitingPreparation&&unresolvedCash&&<span>Confirma el efectivo pendiente y resuelve cualquier diferencia antes de liquidar.</span>}</div>}
    {paying&&state.canWrite&&<form onSubmit={e=>{e.preventDefault();void confirm();}}><fieldset className="settings-grid" disabled={state.busy}>
     <legend>{draft?"Liquidar":"Registrar pago"}</legend><p className="form-wide settlement-balance">{courierBalanceText(remaining,courierName)}</p>
     <label>Importe realmente pagado<MoneyInput required min={draft?"0":"0.01"} max={Math.abs(remaining)} value={exchange.actual_amount} onChange={e=>editExchange("actual_amount",e.target.value)}/></label>
@@ -123,5 +122,8 @@ export default function CourierSettlements({company,onDirty,initialId,onInitialO
    {document.cancel_reason&&<p>Motivo: {document.cancel_reason}</p>}
   </section></div>}
   {account&&<CourierAccountDialog company={company} courier={account} onClose={()=>setAccount(null)} onSaved={load}/>}
+ {preparing&&<OrderPreparationDialog finishOnly company={company} orderId={preparing} onClose={()=>setPreparing(null)} onSaved={async()=>{
+   if(document?.courier_id)setPending(await courierRead(company,"pending",{courier:document.courier_id}));
+ }}/>}
  </>;
 }

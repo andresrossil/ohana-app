@@ -84,3 +84,12 @@
     padding: 16px;
   }
 }
+
+.shell .admin-partner-list :is(th, td) { padding-block: 8px; }
+.shell .partner-contact-heading { margin: 2px 0 0; font-size: 1rem; }
+@media (max-width: 760px) {
+  .shell .admin-partner-list > tbody > tr { padding: 8px; gap: 4px 8px; }
+  .shell .admin-partner-list td { padding: 2px; overflow-wrap: anywhere; }
+}
+.shell .partner-section-nav { display: flex; flex-wrap: wrap; gap: 6px; margin-block: 8px; }
+.shell .partner-section-nav button { min-height: 40px; padding: 5px 8px; font-size: .875rem; }

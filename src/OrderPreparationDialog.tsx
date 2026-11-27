@@ -9,7 +9,7 @@ import OrderDeliverySummary from "./OrderDeliverySummary";
 import CustomerCommercialInfo from "./CustomerCommercialInfo";
 import { openSaleDocument, saleDocumentLine } from "./SaleDocument";
 import { saleLineTotals } from "./sale-form-model";
-export const fulfillmentLabels:Row={draft:"Borrador",invoiced:"Facturado",preparing:"En preparación",finished:"Terminado",courier:"Mensajería",delivered:"Entregado"};
+export const fulfillmentLabels:Row={draft:"Pedido",invoiced:"Facturado",preparing:"En preparación",finished:"Terminado",courier:"Mensajería",delivered:"Entregado"};
 export default function OrderPreparationDialog({company,orderId,onClose,onSaved,finishOnly=false}:{company:string;orderId:string;onClose:()=>void;onSaved:()=>Promise<void>;finishOnly?:boolean}){
  const state=useOperation(company,"sales"),[data,setData]=useState<Row|null>(null),[reverting,setReverting]=useState(false),[reason,setReason]=useState("");
  const [finishing,setFinishing]=useState(finishOnly);
@@ -20,15 +20,8 @@ export default function OrderPreparationDialog({company,orderId,onClose,onSaved,
  useEffect(()=>{void state.run(load);},[company,orderId]);
  const close=async()=>{if(state.busy)return;if(((reverting&&reason!=="")||(finishing&&hasExtras))&&!(await confirmAction("Hay cambios sin guardar. ¿Salir sin guardar?")))return;onClose();};
  const stage=data?.order.fulfillment_stage||"invoiced";
- const action=stage==="invoiced"?"prepare":stage==="preparing"?"finish":stage==="finished"?"handoff":null;
- const actionLabel=action==="prepare"?"Iniciar preparación":action==="finish"?"Pedido terminado":data?.delivery?.kind==="courier"?"Entregado a mensajería":"Entregar al cliente";
- const advance=()=>state.run(async()=>{
-  if(!action||!data)return;
-  if(action==="finish"){setFinishing(true);return;}
-  if(!(await confirmAction(action==="handoff"?"¿Confirmas la entrega del pedido? El inventario ya se descontó al terminarlo.":"¿Confirmas iniciar la preparación? No se descontará inventario todavía.")))return;
-  await keyedRequest(company,"sales_fulfillment",{order:orderId,expected_stage:stage},action);await load();await onSaved();
- });
- return <div className="overlay"><section className="modal operations-dialog order-preparation" role="dialog" aria-modal="true" aria-label={finishOnly?"Pedido terminado":"Ver factura"} data-navigation-dirty={(reverting&&reason!=="")||(finishing&&hasExtras)}><header className="hierarchy-toolbar"><h2>{finishOnly?"Pedido terminado":"Factura"} · #{data?.order.invoice_number||data?.order.number||"…"}</h2><div className="actions">
+ const canPrepare=data?.order.status==="pending"&&["invoiced","preparing"].includes(stage);
+ return <div className="overlay"><section className="modal operations-dialog order-preparation" role="dialog" aria-modal="true" aria-label={finishOnly?"Confirmar preparación":"Ver documento"} data-navigation-dirty={(reverting&&reason!=="")||(finishing&&hasExtras)}><header className="hierarchy-toolbar"><h2>{finishOnly?"Confirmar preparación":stage==="draft"?"Pedido":"Factura"} · #{data?.order.invoice_number||data?.order.number||"…"}</h2><div className="actions">
  {data&&!finishOnly&&<AppButton iconKey="action.print" disabled={state.busy} onClick={()=>{
   if(!openSaleDocument(data))state.setError("Permite las ventanas emergentes para abrir la vista de impresión.");
  }}>Imprimir</AppButton>}
@@ -40,14 +33,14 @@ export default function OrderPreparationDialog({company,orderId,onClose,onSaved,
  {data&&<>{!finishOnly&&<><p><strong>{data.order.customer_snapshot.name}</strong> · {data.order.customer_snapshot.phone}</p><p>{fulfillmentLabels[stage]}</p><OrderDeliverySummary order={data.order} delivery={data.delivery}/><CustomerCommercialInfo info={data.commercial_info}/>
  <div className="table-wrap"><ResponsiveTable><thead><tr><th>Producto</th><th>Tamaño</th><th>Cantidad</th><th>Regalo</th><th>Precio unitario</th><th>Descuento</th><th>Subtotal</th></tr></thead><tbody>{data.lines.map((l:Row)=><tr key={l.id}><td>{saleDocumentLine(l).product}</td><td>{saleDocumentLine(l).size}</td><td data-sort-value={l.quantity}>{l.quantity}</td><td>{l.is_gift?"Sí":"—"}</td><td data-sort-value={l.unit_price}>{money(l.unit_price,data.order.currency)}</td><td data-sort-value={l.line_discount??0}>{money(l.line_discount??0,data.order.currency)}</td><td data-sort-value={saleLineTotals(l).net}>{money(saleLineTotals(l).net,data.order.currency)}</td></tr>)}</tbody></ResponsiveTable></div>
  <div className="order-preparation-total"><strong>Total de factura: {money(data.order.total,data.order.currency)}</strong><strong className={Number(data.order.total)>Number(data.summary.paid)?"balance-debt":"balance-zero"}>{stage==="draft"?"Pendiente de confirmación del cliente":<>Total pendiente: {money(data.summary.balance??Math.max(0,Number(data.order.total)-Number(data.summary.paid)),data.order.currency)}</>}</strong></div>
- <div className="form-actions">{state.canWrite&&!data.settled&&["pending","dispatched"].includes(data.order.status)&&action&&<AppButton iconKey={action==="handoff"?"action.confirm":"action.edit"} disabled={state.busy||reverting||finishing} onClick={advance}>{actionLabel}</AppButton>}{state.canWrite&&!data.settled&&["pending","dispatched"].includes(data.order.status)&&(!["draft","invoiced"].includes(stage)||data.order.status==="dispatched")&&<AppButton className="danger" iconKey="action.back" disabled={state.busy||finishing} onClick={()=>setReverting(true)}>Revertir</AppButton>}<AppButton className="secondary" disabled={state.busy} onClick={close}>Volver</AppButton></div>
+ <div className="form-actions">{state.canWrite&&!data.settled&&["pending","dispatched"].includes(data.order.status)&&canPrepare&&<AppButton iconKey="action.confirm" disabled={state.busy||reverting||finishing} onClick={()=>setFinishing(true)}>Confirmar preparación</AppButton>}{state.canWrite&&!data.settled&&["pending","dispatched"].includes(data.order.status)&&(!["draft","invoiced"].includes(stage)||data.order.status==="dispatched")&&<AppButton className="danger" iconKey="action.back" disabled={state.busy||finishing} onClick={()=>setReverting(true)}>Revertir</AppButton>}<AppButton className="secondary" disabled={state.busy} onClick={close}>Volver</AppButton></div>
  </>}
- {finishOnly&&stage!=="preparing"&&<p role="status">El pedido ya no está en preparación. Cierra y actualiza el listado.</p>}
- {finishing&&stage==="preparing"&&state.canWrite&&!data.settled&&<form data-dirty-managed onSubmit={e=>{e.preventDefault();void state.run(async()=>{
+ {finishOnly&&!canPrepare&&<p role="status">La factura ya no está pendiente de preparar.</p>}
+ {finishing&&canPrepare&&state.canWrite&&!data.settled&&<form data-dirty-managed onSubmit={e=>{e.preventDefault();void state.run(async()=>{
   const supplies=Object.entries(packaging).filter(([,quantity])=>quantity!==""&&Number(quantity)>0)
     .map(([material,quantity])=>({material,quantity}));
-  await keyedRequest(company,"sales_fulfillment",{order:orderId,expected_stage:"preparing",packaging:supplies,gifts:Object.entries(gifts).map(([variant,quantity])=>({variant,quantity}))},"finish");
-  setFinishing(false);setPackaging({});setGifts({});await load();await onSaved();
+  await keyedRequest(company,"sales_fulfillment",{order:orderId,expected_stage:stage,packaging:supplies,gifts:Object.entries(gifts).map(([variant,quantity])=>({variant,quantity}))},"finish");
+  setFinishing(false);setPackaging({});setGifts({});await load();await onSaved();if(finishOnly)onClose();
  });}}>
   <h3>Empaque y productos de regalo</h3>
   <p className="muted">Al confirmar se descuentan del inventario los insumos y regalos registrados. Los regalos se registran al costo, sin cargo para el cliente.</p>
@@ -79,7 +72,7 @@ export default function OrderPreparationDialog({company,orderId,onClose,onSaved,
       <AppButton type="button" className="secondary" disabled={state.busy} onClick={()=>setGifts(previous=>Object.fromEntries(Object.entries(previous).filter(([id])=>id!==item.id)))}>Quitar regalo</AppButton>
     </div>)}</div>
   </>}
-  <div className="form-actions"><AppButton type="submit" iconKey="action.confirm" disabled={state.busy}>Confirmar pedido terminado</AppButton>
+  <div className="form-actions"><AppButton type="submit" iconKey="action.confirm" disabled={state.busy}>Confirmar preparación</AppButton>
     <AppButton type="button" className="secondary" disabled={state.busy} onClick={()=>{if(finishOnly){void close();return;}setFinishing(false);setPackaging({});setGifts({});}}>Cancelar</AppButton></div>
  </form>}
  {data.settled&&<p>Ruta liquidada. Revierte primero la liquidación para reabrir esta factura.</p>}

@@ -1,3 +1,4 @@
+import ProductionMenu from "./ProductionMenu";
 import SearchSelect from "./SearchSelect";
 import ResponsiveTable from "./ResponsiveTable";
 import { confirmAction } from "./ConfirmDialog";
@@ -315,7 +316,7 @@ export default function BusinessPartners({
             Buscar {typeName(partnerType).toLowerCase()}
             <SearchField
               type="search"
-              placeholder="Código, nombre, redes sociales o teléfonos…"
+              placeholder={partnerType==="courier"?"Código, nombre, redes sociales o teléfonos…":"Nombre, teléfono, dirección o código…"}
               value={query}
               maxLength={120}
               onChange={(e) => {
@@ -340,7 +341,7 @@ export default function BusinessPartners({
           </label>
         </div>
         <div className="partner-table-scroll" aria-busy={loading}>
-          <ResponsiveTable>
+          <ResponsiveTable className={partnerType==="courier"?undefined:"admin-partner-list"} compactRowActions={partnerType!=="courier"} showAllMobileFields={partnerType!=="courier"}>
             <thead>
               <tr>
                 {[
@@ -407,7 +408,7 @@ export default function BusinessPartners({
                     >
                       Ver
                     </AppButton>
-                    {data.canManage && (
+                    {data.canManage && (partnerType==="courier"?<>
                       <>
                         <AppButton
                           disabled={busy || loading}
@@ -424,7 +425,10 @@ export default function BusinessPartners({
                           {row.active ? "Desactivar" : "Activar"}
                         </AppButton>
                       </>
-                    )}
+                    </>:<ProductionMenu document={row.name}>
+                      <AppButton className="secondary" disabled={busy||loading} onClick={()=>open(row,true)}>Editar</AppButton>
+                      <AppButton className="secondary" disabled={busy||loading} onClick={()=>toggle(row)}>{row.active?"Desactivar":"Activar"}</AppButton>
+                    </ProductionMenu>)}
                   </td>
                 </tr>
               ))}
@@ -489,6 +493,11 @@ export default function BusinessPartners({
                 {error}
               </p>
             )}
+            {partnerType!=="courier"&&<nav className="partner-section-nav" aria-label="Secciones de la ficha">
+              {[["general","Información general"],["contacts","Contactos"],["addresses","Direcciones"],
+                ["commercial","Información comercial"],...(draft.id?[["history","Historial"]]:[])].map(([id,label])=>
+                  <button type="button" className="secondary" key={id} onClick={()=>document.getElementById("partner-"+id)?.scrollIntoView({block:"nearest"})}>{label}</button>)}
+            </nav>}
             <form onSubmit={save}>
               {mode === "edit" && matches.length > 0 && <aside className="sheet-warning partner-matches" role="status">
                 <strong>Posibles coincidencias · puedes continuar guardando</strong>
@@ -502,7 +511,7 @@ export default function BusinessPartners({
                 </div>)}
               </aside>}
               <fieldset disabled={readOnly || busy}>
-                <legend>Datos generales</legend>
+                <legend id="partner-general">Datos generales</legend>
                 {field("code", `Código de ${typeName(partnerType).toLowerCase()} · automático`, { max: 40 })}
                 {field("alternate_code", "Código alterno · opcional", { max: 40 })}
                 <p className="form-wide muted">El código definitivo se asigna al guardar.</p>
@@ -518,6 +527,7 @@ export default function BusinessPartners({
                   {field("instagram", "Instagram · usuario", { max: 200 })}
                   {field("facebook", "Facebook · usuario o perfil", { max: 200 })}
                 </>}
+                {partnerType!=="courier"&&<h3 id="partner-contacts" className="form-wide partner-contact-heading">Contactos</h3>}
                 {field("phone", "Teléfono principal", { max: 40, inputType: "tel" })}
                 {partnerType === "courier" && field("phone_secondary", "Teléfono secundario · opcional", {max:40,inputType:"tel"})}
                 {partnerType === "customer" && <>
@@ -557,7 +567,7 @@ export default function BusinessPartners({
                 })}
               </fieldset>
               {partnerType !== "courier" && <fieldset disabled={readOnly || busy}>
-                <legend>Direcciones</legend>
+                <legend id="partner-addresses">Direcciones</legend>
                 <p className="form-wide muted">
                   Hasta 20 direcciones por socio. Marca una como principal.
                 </p>
@@ -696,7 +706,7 @@ export default function BusinessPartners({
                 )}
               </fieldset>}
               {partnerType !== "courier" && <fieldset disabled={readOnly || busy}>
-                <legend>Información comercial · {typeName(partnerType)}</legend>
+                <legend id="partner-commercial">Información comercial · {typeName(partnerType)}</legend>
                 {partnerType === "customer" && <label>Lista de precios
                   <SearchSelect value={draft.price_list_id || data.default_price_list || ""} onChange={e => change("price_list_id", e.target.value)}>
                     <option value="">Sin lista disponible</option>
@@ -740,7 +750,7 @@ export default function BusinessPartners({
               </div>
             </form>
             {draft.id && (
-              <section className="partner-history">
+              <section className="partner-history" id="partner-history">
                 <h3>Relaciones e historial</h3>
                 <p className="muted">
                   Hasta 100 registros recientes por sección, según tus permisos.

@@ -118,7 +118,7 @@ function App() {
     [importNotice, setImportNotice] = useState("");
   const [materialCosts, setMaterialCosts] = useState<Record<string, Row>>({});
   const [dashboardLot, setDashboardLot] = useState<{ company: string; id: string } | null>(null);
-  const [dashboardDraftsCompany, setDashboardDraftsCompany] = useState("");
+  const [dashboardSales, setDashboardSales] = useState<{ company: string; filter: string } | null>(null);
   const [dashboardSettlement, setDashboardSettlement] = useState<{ company: string; id: string } | null>(null);
   const [section, setSection] = useState<Section>("dashboard"),
     [configView, setConfigView] = useState("profile"),
@@ -130,7 +130,7 @@ function App() {
     [settingsDirty, setSettingsDirty] = useState(false);
   useEffect(() => {
     if (section !== "production") setDashboardLot(null);
-    if (section !== "sales") setDashboardDraftsCompany("");
+    if (section !== "sales") setDashboardSales(null);
   }, [section, company]);
 
   useEffect(() => {
@@ -919,7 +919,12 @@ function App() {
                     catalogRead={activeCompany?.catalog_read}
                     onDrafts={activeCompany?.sales_read ? async () => {
                       if (!(await leaveSheet())) return;
-                      setDashboardDraftsCompany(company);
+                      setDashboardSales({company,filter:"draft"});
+                      setSection("sales");
+                    } : undefined}
+                    onSalesPending={activeCompany?.sales_read ? async (filter) => {
+                      if (!(await leaveSheet())) return;
+                      setDashboardSales({company,filter});
                       setSection("sales");
                     } : undefined}
                     onProduction={activeCompany?.production_read ? async (id) => {
@@ -1032,7 +1037,7 @@ function App() {
                 <Sales
                   key={company + section}
                   company={company}
-                  initialDrafts={dashboardDraftsCompany === company}
+                  initialFilter={dashboardSales?.company === company ? dashboardSales.filter : ""}
                   currency={activeCompany?.currency}
                 />
               )}

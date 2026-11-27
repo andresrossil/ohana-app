@@ -21,10 +21,11 @@ type DashboardData = Record<string, unknown> & {
   suggested_production?: { id: string; name: string; minimum: Quantity; available: Quantity; suggested: Quantity }[];
   reorder_materials?: Material[];
   price_list?: string | null;
-  suppliers?: number; customers?: number; drafts?: number; invoices?: number; active_customers?: number; reorder?: number;
+  preparation_pending?: number; payments_pending?: number; settlement_drafts?: number; settlement_open?: number; suppliers?: number; customers?: number; drafts?: number; invoices?: number; active_customers?: number; reorder?: number;
 };
 type Panel = "stock" | "settlements" | "reorder" | "curing";
 type Props = {
+  onSalesPending?: (filter: string) => void;
   company: string; currency: string; companyName?: string; corporationName?: string;
   materials?: number; products?: number; catalogRead?: boolean;
   onOpenSettlement?: (id: string) => void;
@@ -77,7 +78,7 @@ function BusinessCard({ icon, label, count, children }: { icon: string; label: s
 }
 
 export default function Dashboard({ company, currency, companyName, corporationName, materials, products,
-  catalogRead, onOpenSettlement, onProduction, onDrafts }: Props) {
+  catalogRead, onOpenSettlement, onProduction, onDrafts, onSalesPending }: Props) {
   const [data, setData] = useState<DashboardData>();
   const [failed, setFailed] = useState(false);
   const [skus, setSkus] = useState<Record<string, string>>({});
@@ -156,8 +157,11 @@ export default function Dashboard({ company, currency, companyName, corporationN
         <div className="dashboard-pending-list">
           {onProduction && <Pending label="Lotes listos" icon="status.pending" count={ready} onClick={() => reveal("curing")} />}
           {low != null && <Pending label="Materiales bajo mínimo" icon="module.materials" count={low} onClick={() => reveal("reorder")} />}
-          {data?.drafts != null && <Pending label="Pedidos en borrador" icon="module.sales" count={data.drafts} onClick={onDrafts} />}
-          {settlements && <Pending label="Liquidaciones pendientes" icon="module.settlements" count={settlements.length} onClick={() => reveal("settlements")} />}
+          {data?.drafts != null && <Pending label="Pedidos por confirmar" icon="module.sales" count={data.drafts} onClick={onDrafts} />}
+          {data?.preparation_pending != null && <Pending label="Facturas por preparar" icon="module.sales" count={data.preparation_pending} onClick={onSalesPending&&(()=>onSalesPending("to_prepare"))} />}
+          {data?.payments_pending != null && <Pending label="Facturas por cobrar" icon="module.sales" count={data.payments_pending} onClick={onSalesPending&&(()=>onSalesPending("to_pay"))} />}
+          {data?.settlement_drafts != null && <Pending label="Liquidaciones en borrador" icon="module.settlements" count={data.settlement_drafts} onClick={() => reveal("settlements")} />}
+          {data?.settlement_open != null && <Pending label="Liquidaciones por finalizar" icon="module.settlements" count={data.settlement_open} onClick={() => reveal("settlements")} />}
           {!onProduction && low == null && data?.drafts == null && !settlements && data && <p>Sin indicadores disponibles.</p>}
         </div>
       </section>

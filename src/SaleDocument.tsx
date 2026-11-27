@@ -248,7 +248,7 @@ function SaleDocument({ data, format, onPrint, schedule, current, customerWarnin
       const url = URL.createObjectURL(blob);
       const link = documentNode.ownerDocument.createElement("a");
       link.href = url;
-      link.download = `${isLabel ? "Etiqueta" : isDraft ? "Borrador" : "Confirmado"}-${(order.invoice_number || String(order.number).padStart(6, "0"))}.png`;
+      link.download = `${isLabel ? "Etiqueta" : isDraft ? "Pedido" : "Factura"}-${(order.invoice_number || String(order.number).padStart(6, "0"))}.png`;
       documentNode.ownerDocument.body.append(link);
       link.click();
       link.remove();
@@ -276,7 +276,7 @@ function SaleDocument({ data, format, onPrint, schedule, current, customerWarnin
         </> : <>
         <header className="document-heading">
           <div className="document-brand">{documentLogo}</div>
-          <div className="document-title"><h1>Pedido</h1><span className="document-state">{isDraft ? "Borrador" : "Confirmado"}</span></div>
+          <div className="document-title"><h1>{isDraft ? "Pedido" : "Factura"}</h1>{isDraft&&<span className="document-state">Por confirmar</span>}</div>
           <div className="document-number"><strong>No. {(order.invoice_number || String(order.number).padStart(6, "0"))}</strong><br />Fecha: {documentDate.format(new Date(order.created_at))}</div>
         </header>
 

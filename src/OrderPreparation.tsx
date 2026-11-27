@@ -3,8 +3,7 @@ import { useEffect, useState } from "react";
 import { AppButton } from "./AppIcon";
 import { sales, salesTodayRange, salesWorklist } from "./commerce";
 import { supabase } from "./client";
-import { keyedRequest, money, useOperation, type Row } from "./operations";
-import { confirmAction } from "./ConfirmDialog";
+import { money, useOperation, type Row } from "./operations";
 import { deliveryZoneLabel } from "./delivery-address";
 import OrderPreparationDialog, { fulfillmentLabels } from "./OrderPreparationDialog";
 import ResponsiveTable from "./ResponsiveTable";
@@ -89,20 +88,7 @@ export default function OrderPreparation({ company, userId }: { company: string;
 
   useEffect(() => { void state.run(() => load(filters)); }, [company]);
 
-  function advance(order: Row) {
-    if (order.stage === "preparing") {
-      setFinishing(order.id);
-      return;
-    }
-    const action = order.stage === "invoiced" ? "prepare" : "handoff";
-    void state.run(async () => {
-      if (!await confirmAction(action === "prepare"
-        ? "¿Confirmas iniciar la preparación? No se descontará inventario todavía."
-        : "¿Confirmas la entrega del pedido? El inventario ya se descontó al terminarlo.")) return;
-      await keyedRequest(company, "sales_fulfillment", { order: order.id, expected_stage: order.stage }, action);
-      await load();
-    });
-  }
+
 
   const products = new Map<string, { product: string; size: string; quantity: number; lines: string[] }>();
   const customers = new Map<string, { name: string; orders: Row[] }>();
@@ -205,10 +191,9 @@ export default function OrderPreparation({ company, userId }: { company: string;
                 </div>
                 <div className="preparation-contact">
                   <AppButton className="secondary" iconKey="action.expand" onClick={() => setSelected(order.id)}>Ver pedido</AppButton>
-                  {state.canWrite && ["invoiced", "preparing", "finished"].includes(order.stage) &&
-                    <AppButton iconKey="action.confirm" disabled={state.busy} onClick={() => advance(order)}>
-                      {order.stage === "invoiced" ? "Iniciar preparación" : order.stage === "preparing" ? "Pedido terminado"
-                        : order.delivery_kind === "courier" ? "Entregado a mensajería" : "Entregar al cliente"}
+                  {state.canWrite && ["invoiced", "preparing"].includes(order.stage) &&
+                    <AppButton iconKey="action.confirm" disabled={state.busy} onClick={() => setFinishing(order.id)}>
+                      Confirmar preparación
                     </AppButton>}
                 </div>
               </header>

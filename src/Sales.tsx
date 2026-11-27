@@ -5,6 +5,7 @@ import { AppButton } from "./AppIcon";
 import { confirmAction } from "./ConfirmDialog";
 import { salesTodayRange, salesWorklist } from "./commerce";
 import { keyedRequest, money, useOperation, type Row } from "./operations";
+import AdminBatchPayments from "./AdminBatchPayments";
 import OrderDeliveryDialog from "./OrderDeliveryDialog";
 import OrderPreparationDialog, { fulfillmentLabels } from "./OrderPreparationDialog";
 import ResponsiveTable from "./ResponsiveTable";
@@ -25,9 +26,9 @@ const orderDate = new Intl.DateTimeFormat("es-GT", {
   timeZone: "America/Guatemala", dateStyle: "short", timeStyle: "short",
 });
 
-export default function Sales({ company, currency = "GTQ", initialDrafts = false }: { company: string; currency?: string; initialDrafts?: boolean }) {
+export default function Sales({ company, currency = "GTQ", initialFilter = "" }: { company: string; currency?: string; initialFilter?: string }) {
   const state = useOperation(company, "sales");
-  const [filters, setFilters] = useState(() => ({ ...(initialDrafts ? { ...salesTodayRange(), from: "0001-01-01" } : salesTodayRange()), customer: "", status: initialDrafts ? "draft" : "" }));
+  const [filters, setFilters] = useState(() => ({ ...(initialFilter ? { ...salesTodayRange(), from: "0001-01-01" } : salesTodayRange()), customer: "", status: initialFilter }));
   const [applied, setApplied] = useState(filters);
   const [customers, setCustomers] = useState<Row[]>([]);
   const [orders, setOrders] = useState<Row[]>([]);
@@ -37,6 +38,8 @@ export default function Sales({ company, currency = "GTQ", initialDrafts = false
   const [editor, setEditor] = useState<Row | null | undefined>();
   const [viewOrder, setViewOrder] = useState<{ id: string; finishOnly?: boolean } | null>(null);
   const [labelDate, setLabelDate] = useState("");
+  const [selectedPayments,setSelectedPayments]=useState<Record<string,Row>>({});
+  const [batchPayments,setBatchPayments]=useState(false);
   const [managedOrder, setManagedOrder] = useState<string | null>(null);
 
   async function load(next = applied, nextPage = page) {
@@ -105,7 +108,7 @@ export default function Sales({ company, currency = "GTQ", initialDrafts = false
           disabled={state.busy} onClick={() => state.run(reload)} />
       </div>
       <div className="actions">
-        {state.canWrite && <AppButton onClick={() => setEditor(null)}>Nueva factura</AppButton>}
+        {state.canWrite && <AppButton onClick={() => setEditor(null)}>Nuevo pedido</AppButton>}
         <AppButton className="secondary" iconKey="action.print" onClick={() => setLabelDate(salesTodayRange().from)}>Imprimir etiquetas del día</AppButton>
       </div>
     </section>
@@ -123,6 +126,12 @@ export default function Sales({ company, currency = "GTQ", initialDrafts = false
     </section></div>}
     {state.error && !cancelOrder && <p className="error" role="alert" style={{ whiteSpace: "pre-line", overflowWrap: "anywhere" }}>{state.error}</p>}
     <section className="catalog sales-worklist-list">
+      <div className="actions" aria-label="Tipo de documento">
+        {[["","Todos"],["draft","Pedidos"],["invoices","Facturas"],["closed","Cancelados"]].map(([status,label])=>
+          <AppButton key={label} className="secondary" aria-pressed={applied.status===status} disabled={state.busy} onClick={()=>{
+            const next={...filters,status};setFilters(next);void state.run(()=>load(next,0));
+          }}>{label}</AppButton>)}
+      </div>
       <details className="sales-worklist-filters">
         <summary><strong>Filtros</strong><small>{filterSummary}</small></summary>
       <form className="settings-grid worklist-filters" onSubmit={(event) => {
@@ -140,7 +149,7 @@ export default function Sales({ company, currency = "GTQ", initialDrafts = false
         </SearchSelect></label>
         <label>Estado<SearchSelect value={filters.status} onChange={(e) => setFilters({ ...filters, status: e.target.value })}>
           <option value="">Todos los estados</option>
-          {Object.entries(statusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+          {[["invoices","Facturas"],["closed","Cancelados"],["to_prepare","Por preparar"],["to_pay","Por cobrar"],...Object.entries(statusLabels)].map(([value, label]) => <option key={value} value={value}>{label}</option>)}
         </SearchSelect></label>
         <div className="form-actions">
           <AppButton iconKey="action.search" disabled={state.busy}>Filtrar</AppButton>
@@ -152,9 +161,13 @@ export default function Sales({ company, currency = "GTQ", initialDrafts = false
         </div>
       </form>
       </details>
+      {!!Object.keys(selectedPayments).length&&<div className="actions">
+        <AppButton disabled={!state.canWrite||state.busy} onClick={()=>setBatchPayments(true)}>Registrar pagos ({Object.keys(selectedPayments).length})</AppButton>
+        <AppButton className="secondary" onClick={()=>setSelectedPayments({})}>Limpiar selección</AppButton>
+      </div>}
       <div className="table-wrap" aria-busy={state.busy}>
         <ResponsiveTable className="sales-worklist-table" showAllMobileFields compactRowActions>
-          <thead><tr><th>Cliente</th><th>Pedido</th><th>Fecha</th><th>Total</th><th>Pagado</th><th>Pendiente</th><th>Entrega</th><th>Forma de pago</th><th>Estado</th><th>Acciones</th></tr></thead>
+          <thead><tr><th>Seleccionar</th><th>Cliente</th><th>Pedido</th><th>Fecha</th><th>Total</th><th>Pagado</th><th>Pendiente</th><th>Entrega</th><th>Forma de pago</th><th>Estado</th><th>Acciones</th></tr></thead>
           <tbody>{orders.map((order) => {
             const draft = order.fulfillment_stage === "draft";
             const closed = ["cancelled", "expired"].includes(order.status);
@@ -169,27 +182,33 @@ export default function Sales({ company, currency = "GTQ", initialDrafts = false
             const view = (finishOnly = false) => setViewOrder({ id: order.id, finishOnly });
             const confirmDraft = () => state.run(async () => {
                 if (!await confirmAction("¿El cliente confirmó el pedido? Se comprobarán las existencias y, si alcanzan, se reservarán las unidades del pedido.",
-                  { title: "Confirmación del cliente", confirmText: "Confirmar pedido" })) return;
+                  { title: "Convertir en factura", confirmText: "Convertir en factura" })) return;
                 try {
                   await keyedRequest(company, "sales_fulfillment", { order: order.id, expected_stage: "draft", expected_revision: order.revision }, "confirm_customer");
                 } catch (error) {
                   const message = (error as { message?: string }).message;
                   const stockWarning = "El pedido sigue en borrador. Revisa estas existencias:";
                   if (!message?.startsWith(stockWarning)) throw error;
-                  await confirmAction("El pedido sigue en borrador.\n\n" + message.slice(stockWarning.length).trim(),
+                  await confirmAction("El pedido sigue pendiente de confirmación.\n\n" + message.slice(stockWarning.length).trim(),
                     { title: "Inventario insuficiente", confirmText: "Cerrar", cancelText: null });
                   return;
                 }
                 await reload();
               });
             let primary: { label: string; run: () => void } | undefined;
-            if (active && order.status === "pending" && draft) primary = { label: "Confirmar", run: confirmDraft };
-            else if (active && order.display_status === "invoiced") primary = { label: "Preparar", run: () => view() };
-            else if (active && order.display_status === "preparing") primary = { label: "Terminar preparación", run: () => view(true) };
-            else if (active && order.display_status === "finished") primary = { label: order.courier_name ? "Enviar" : "Confirmar entrega", run: () => view() };
+            if (active && order.status === "pending" && draft) primary = { label: "Convertir en factura", run: confirmDraft };
+            else if (active && order.status === "pending" && ["invoiced", "preparing"].includes(order.fulfillment_stage)) {
+              primary = { label: "Confirmar preparación", run: () => view(true) };
+            }
             else if (pay) primary = { label: "Registrar pago", run: manage };
             const document = "#" + (order.invoice_number || order.number);
             return <tr key={order.id}>
+              <td data-sort-value={selectedPayments[order.id]?1:0}>{pay&&<input type="checkbox"
+                aria-label={`Seleccionar factura ${document} para cobro`} checked={!!selectedPayments[order.id]}
+                disabled={!selectedPayments[order.id]&&Object.keys(selectedPayments).length>=50}
+                onChange={event=>{const checked=event.target.checked;setSelectedPayments(previous=>{
+                  const next={...previous};if(checked)next[order.id]=order;else delete next[order.id];return next;
+                });}}/>}</td>
               <td className="sales-row-client"><strong>{order.customer_snapshot.name}</strong></td>
               <td className="sales-row-number" data-sort-value={order.invoice_number || order.number}>{document}</td>
               <td className="sales-row-date" data-sort-value={order.created_at}>{orderDate.format(new Date(order.created_at))}</td>
@@ -198,13 +217,15 @@ export default function Sales({ company, currency = "GTQ", initialDrafts = false
               <td className="sales-row-balance" data-sort-value={balance ?? ""}><strong className={balance == null ? "sales-amount-na" : balance > 0 ? "sales-amount-due" : "sales-amount-ok"}>{balance == null ? "—" : money(balance, order.currency)}</strong></td>
               <td className="sales-row-delivery">{order.courier_name || (order.delivery === "delivery" ? "Domicilio" : "Retiro")}</td>
               <td className="sales-row-method">{paymentMethods.find(method => method.value === order.payment)?.label || "—"}</td>
-              <td className="sales-row-status"><span className="sales-status" data-status={order.display_status}>{statusLabels[order.display_status] ?? order.display_status}</span></td>
+              <td className="sales-row-status"><strong>{draft?"Pedido":"Factura"}</strong><span className="sales-status" data-status={order.display_status}>{closed?(statusLabels[order.display_status] ?? order.display_status):draft?"Por confirmar":order.status==="dispatched"?"Preparada":"Por preparar"}</span>
+                {balance!=null&&<small>{balance===0?"Pagada":paid&&paid>0?"Pago parcial":"Pago pendiente"}</small>}
+                {order.settlement_state&&<small>{order.settlement_state==="settled"?"Ruta liquidada":order.settlement_state==="draft"?"Ruta en borrador":"Ruta por liquidar"}</small>}</td>
               <td className="sales-row-action"><div className="sales-row-buttons">
-                <AppButton className="secondary" onClick={() => view()}>Ver factura</AppButton>
+                <AppButton className="secondary" onClick={() => view()}>{draft?"Ver pedido":"Ver factura"}</AppButton>
                 {primary && <AppButton disabled={state.busy} onClick={primary.run}>{primary.label}</AppButton>}
                 <ProductionMenu document={document}>
-                  {editable && <AppButton className="secondary" onClick={() => setEditor(order)}>Editar factura</AppButton>}
-                  <AppButton className="secondary" iconKey="action.print" onClick={() => printOrder(order.id, "invoice")}>Imprimir factura</AppButton>
+                  {editable && <AppButton className="secondary" onClick={() => setEditor(order)}>{draft?"Editar pedido":"Editar factura"}</AppButton>}
+                  <AppButton className="secondary" iconKey="action.print" onClick={() => printOrder(order.id, "invoice")}>{draft?"Compartir pedido":"Imprimir factura"}</AppButton>
                   <AppButton className="secondary" iconKey="action.print" onClick={() => printOrder(order.id, "label")}>Imprimir etiqueta</AppButton>
                   {pay && primary?.label !== "Registrar pago" && <AppButton className="secondary" onClick={manage}>Registrar pago</AppButton>}
                   {!draft && <AppButton className="secondary" onClick={manage}>Consultar pagos</AppButton>}
@@ -224,6 +245,8 @@ export default function Sales({ company, currency = "GTQ", initialDrafts = false
     </section>
     {editor !== undefined && <SaleEditor company={company} orderId={editor?.id} currency={editor?.currency || currency} onClose={() => setEditor(undefined)} onSaved={reload} />}
     {viewOrder && <OrderPreparationDialog company={company} orderId={viewOrder.id} finishOnly={viewOrder.finishOnly} onClose={() => setViewOrder(null)} onSaved={reload} />}
+    {batchPayments&&<AdminBatchPayments company={company} orders={Object.values(selectedPayments)}
+      onClose={()=>setBatchPayments(false)} onSaved={async()=>{await reload();setSelectedPayments({});}}/>}
     {managedOrder && <OrderDeliveryDialog company={company} orderId={managedOrder} onClose={() => setManagedOrder(null)} onSaved={reload} />}
     {cancelOrder && <div className="overlay">
       <section className="modal operations-dialog" role="dialog" aria-modal="true" aria-label="Cancelar pedido">
