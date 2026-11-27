@@ -1,3 +1,4 @@
+import { ChevronRight } from "lucide-react";
 import { flushSync } from "react-dom";
 import ProductionMenu from "./ProductionMenu";
 import SearchSelect from "./SearchSelect";
@@ -324,18 +325,21 @@ export default function BusinessPartners({
                 })}
   </>;
   const readOnly = mode === "view";
+  const partnerActions = (row: Row) => data.canManage && <ProductionMenu document={row.name}>
+    <AppButton className="secondary" disabled={busy||loading} onClick={()=>open(row,true)}>Editar</AppButton>
+    <AppButton className="secondary" disabled={busy||loading} onClick={()=>toggle(row)}>{row.active?"Desactivar":"Activar"}</AppButton>
+  </ProductionMenu>;
+
   return (
     <>
-      <section className="intro">
+      <section className={tabbed ? "intro partner-list-heading" : "intro"}>
         <div>
-          <p className="eyebrow">RELACIONES DE TU EMPRESA</p>
+          {!tabbed&&<p className="eyebrow">RELACIONES DE TU EMPRESA</p>}
           <h1 className="module-title">
-            <AppIcon name={partnerType === "courier" ? "module.couriers" : partnerType === "customer" ? "module.customers" : "module.suppliers"} />
+            {!tabbed&&<AppIcon name="module.couriers" />}
             {partnerType === "courier" ? "Mensajerías" : partnerType === "customer" ? "Clientes" : "Proveedores"}
           </h1>
-          <p>
-            {partnerType === "courier" ? "Contactos de transporte y sus tarifas por entrega." : partnerType === "customer" ? "Tus clientes, contactos y pedidos." : "Tus proveedores, materiales y compras."}
-          </p>
+          {!tabbed&&<p>Contactos de transporte y sus tarifas por entrega.</p>}
         </div>
         {data.canManage && (
           <AppButton
@@ -343,7 +347,7 @@ export default function BusinessPartners({
             iconKey="action.add"
             onClick={() => open()}
           >
-            {partnerType === "courier" ? "Nueva mensajería" : partnerType === "customer" ? "Nuevo cliente" : "Nuevo proveedor"}
+            {tabbed ? "Nuevo" : "Nueva mensajería"}
           </AppButton>
         )}
       </section>
@@ -354,12 +358,13 @@ export default function BusinessPartners({
           {error}
         </p>
       )}
-      <section className="catalog partner-catalog">
+      <section className={tabbed?"catalog partner-catalog compact-partner-catalog":"catalog partner-catalog"}>
         <div className="partner-filters">
           <label>
-            Buscar {typeName(partnerType).toLowerCase()}
+            {!tabbed&&<>Buscar {typeName(partnerType).toLowerCase()}</>}
             <SearchField
               type="search"
+              aria-label={`Buscar ${typeName(partnerType).toLowerCase()}`}
               placeholder={partnerType==="courier"?"Código, nombre, redes sociales o teléfonos…":"Nombre, teléfono, dirección o código…"}
               value={query}
               maxLength={120}
@@ -369,7 +374,11 @@ export default function BusinessPartners({
               }}
             />
           </label>
-          <label>
+          {tabbed?<div className="partner-status-filters" role="group" aria-label="Filtrar por estado">
+            {[["","Todos"],["active","Activos"],["inactive","Inactivos"]].map(([value,label])=>
+              <button type="button" className="secondary" key={label} aria-pressed={status===value}
+                onClick={()=>{setStatus(value);setPage(1);}}>{label}</button>)}
+          </div>:<label>
             Estado
             <SearchSelect
               value={status}
@@ -382,9 +391,22 @@ export default function BusinessPartners({
               <option value="active">Activos</option>
               <option value="inactive">Inactivos</option>
             </SearchSelect>
-          </label>
+          </label>}
         </div>
-        <div className="partner-table-scroll" aria-busy={loading}>
+        {tabbed&&<ul className="partner-mobile-list" aria-busy={loading}>
+          {data.rows.map((row: Row)=><li key={row.id} className="partner-mobile-record">
+            <button type="button" className="partner-card-detail" onClick={()=>open(row)} disabled={busy||loading}>
+              <span className="partner-card-text">
+                <strong>{row.name}</strong>
+                {(row.code||row.phone)&&<small>{[row.code,row.phone].filter(Boolean).join(" · ")}</small>}
+                <span className="partner-card-state" data-active={row.active}>{row.active?"Activo":"Inactivo"}</span>
+              </span>
+              <ChevronRight size={18} aria-hidden="true" />
+            </button>
+            {partnerActions(row)}
+          </li>)}
+        </ul>}
+        <div className={tabbed?"partner-table-scroll partner-desktop-list":"partner-table-scroll"} aria-busy={loading}>
           <ResponsiveTable className={partnerType==="courier"?undefined:"admin-partner-list"} compactRowActions={partnerType!=="courier"} showAllMobileFields={partnerType!=="courier"}>
             <thead>
               <tr>
@@ -425,7 +447,9 @@ export default function BusinessPartners({
             </thead>
             <tbody>
               {data.rows.map((row: Row) => (
-                <tr key={row.id}>
+                <tr key={row.id} onClick={tabbed?event=>{
+                  if (!busy&&!loading&&event.target instanceof Element&&!event.target.closest("button,[popover]")) void open(row);
+                }:undefined}>
                   <td>{row.code}</td>
                   <td>{row.alternate_code || "—"}</td>
                   <td
@@ -433,7 +457,7 @@ export default function BusinessPartners({
                       row.partner_type === "supplier" ? "admin-name" : ""
                     }
                   >
-                    {row.name}
+                    {tabbed?<button type="button" className="partner-row-name" disabled={busy||loading} onClick={()=>open(row)}>{row.name}</button>:row.name}
                   </td>
                   <td>{partnerType === "courier" ? ({general:"General",zone:"Por zona",department:"Por departamento"} as Row)[row.courier_tariff_mode] : row.is_customer && row.is_supplier ? "Cliente y proveedor" : typeName(row.partner_type)}</td>
                   <td>{row.phone || "—"}</td>
@@ -445,34 +469,11 @@ export default function BusinessPartners({
                   </td>
                   <td className="actions">
                     {onTariffs && <AppButton disabled={busy || loading} className="secondary" iconKey="action.calculate" onClick={() => onTariffs(row)}>Tarifas</AppButton>}
-                    <AppButton
-                      disabled={busy || loading}
-                      className="secondary"
-                      onClick={() => open(row)}
-                    >
-                      Ver
-                    </AppButton>
-                    {data.canManage && (partnerType==="courier"?<>
-                      <>
-                        <AppButton
-                          disabled={busy || loading}
-                          className="secondary"
-                          onClick={() => open(row, true)}
-                        >
-                          Editar
-                        </AppButton>
-                        <AppButton
-                          disabled={busy || loading}
-                          className="secondary"
-                          onClick={() => toggle(row)}
-                        >
-                          {row.active ? "Desactivar" : "Activar"}
-                        </AppButton>
-                      </>
-                    </>:<ProductionMenu document={row.name}>
+                    {!tabbed&&<AppButton className="secondary" disabled={busy||loading} onClick={()=>open(row)}>Ver</AppButton>}
+                    {tabbed?partnerActions(row):data.canManage&&<>
                       <AppButton className="secondary" disabled={busy||loading} onClick={()=>open(row,true)}>Editar</AppButton>
                       <AppButton className="secondary" disabled={busy||loading} onClick={()=>toggle(row)}>{row.active?"Desactivar":"Activar"}</AppButton>
-                    </ProductionMenu>)}
+                    </>}
                   </td>
                 </tr>
               ))}

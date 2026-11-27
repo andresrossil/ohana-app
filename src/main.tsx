@@ -741,12 +741,12 @@ function App() {
           }}
         />
         <main className={["dashboard", "materials", "products"].includes(section) ? "dashboard-main" : undefined}>
-          <header>
+          {section!=="customers"&&section!=="suppliers"&&<header>
             <span>OHANA / {sectionTitle.toUpperCase()}</span>
             <span className="badge">
               {accessLabel}
             </span>
-          </header>
+          </header>}
           {importNotice && (
             <p className="sheet-notice" role="status">
               <AppIcon name="status.info" />
