@@ -1,3 +1,4 @@
+import { preparationComplete } from "./commercial-compact";
 import { usePreparationChecklist } from "./preparation-checklist";
 import { useEffect, useState } from "react";
 import { AppButton } from "./AppIcon";
@@ -204,7 +205,8 @@ export default function OrderPreparation({ company, userId }: { company: string;
                     const item = preparationLine(line);
                     const key = lineKey(order, line);
                     const price = listPrices.get(key);
-                    const checked = marks.has(key);
+                    const complete = preparationComplete(order.stage);
+                    const checked = complete || marks.has(key);
                     const description = [item.product, item.size].filter(Boolean).join(" · ");
                     return <tr key={line.id}>
                       <td>{description}{line.is_gift ? " · Regalo" : ""}</td>
@@ -213,7 +215,7 @@ export default function OrderPreparation({ company, userId }: { company: string;
                       <td data-sort-value={checked ? 1 : 0}>
                         <label className="preparation-check">
                           <input type="checkbox" aria-label={"Reunido: " + description}
-                            checked={checked} onChange={(event) => mark([key], event.target.checked)} />
+                            checked={checked} disabled={complete} onChange={(event) => mark([key], event.target.checked)} />
                           {checked ? "Reunido" : "Marcar reunido"}
                         </label>
                       </td>

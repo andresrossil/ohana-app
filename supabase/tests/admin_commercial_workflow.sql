@@ -54,8 +54,15 @@ begin
       jsonb_build_object('order',order_id,'expected_stage','draft','expected_revision',revision));
   end loop;
   if (select reserved from public.inventory_balances where company_id=c and item_id=v)<>4 then raise exception 'Reserva incorrecta';end if;
-  perform public.sales_fulfillment(c,'finish',gen_random_uuid(),
-    jsonb_build_object('order',o,'expected_stage','invoiced','gifts',jsonb_build_array(jsonb_build_object('variant',v,'quantity',1))));
+  payload:=jsonb_build_object('order',o,'expected_stage','invoiced','gifts',
+    jsonb_build_array(jsonb_build_object('variant',v,'quantity',1)));
+  order_id:=gen_random_uuid();
+  perform public.sales_fulfillment(c,'finish',order_id,payload);
+  perform public.sales_fulfillment(c,'finish',order_id,payload);
+  if not exists(select 1 from public.sales_orders where id=o and fulfillment_stage='finished')
+    or (select count(*) from public.order_lines l where l.company_id=c and l.order_id=o and l.is_gift)<>1 then
+    raise exception 'El estado preparado o el regalo no se conservó, o se duplicó';
+  end if;
   select on_hand into before_qty from public.inventory_balances where company_id=c and item_id=v;
   if before_qty<>7 or (select reserved from public.inventory_balances where company_id=c and item_id=v)<>2 then raise exception 'Salida incorrecta';end if;
   payment:=jsonb_build_object('method','transfer','date',current_date,'payments',jsonb_build_array(

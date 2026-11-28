@@ -5,17 +5,40 @@ import ResponsiveTable from "./ResponsiveTable";
 import MoneyInput from "./MoneyInput";
 import { confirmAction } from "./ConfirmDialog";
 import { courierRead } from "./delivery-model";
-import { keyedRequest, money, today, useOperation, type Row } from "./operations";
+import { keyedRequest, today, useOperation, type Row } from "./operations";
 import { courierBalanceClass, courierBalanceText, settlementNumber } from "./courier-account";
 import OrderPreparationDialog from "./OrderPreparationDialog";
 import CourierAccountDialog from "./CourierAccountDialog";
 import "./couriers.css";
+import "./commercial-compact.css";
+import { compactMoney as money, settlementResult } from "./commercial-compact";
+import { deliveryZoneLabel } from "./delivery-address";
+
+const dateLabel=(date:string)=>date?.split("-").reverse().join("/")||"—";
+const searchText=(text:string)=>text.normalize("NFD").replace(/\p{M}/gu,"").toLowerCase();
+function InvoiceDelivery({company,invoice}:{company:string;invoice:Row}){
+ const [detail,setDetail]=useState<Row|null>(null),[error,setError]=useState("");
+ return <details className="commercial-details" onToggle={event=>{
+  if(event.currentTarget.open&&!detail){
+   setError("");
+   void courierRead(company,"order",{order:invoice.order_id}).then(setDetail).catch(()=>setError("No se pudo consultar la entrega."));
+  }
+ }}><summary>Información de entrega</summary>
+  <p>{detail?.delivery?.address||invoice.address||"Sin dirección"}</p>
+  {detail?.summary?.balance!=null&&<small>Saldo de la factura {money(detail.summary.balance,detail.order?.currency)}</small>}
+  {detail?.delivery?.guide&&<small>Guía {detail.delivery.guide}</small>}
+  {detail?.order?.customer_snapshot?.phone&&<small>{detail.order.customer_snapshot.phone}</small>}
+  {detail?.delivery?.notes&&<small>{detail.delivery.notes}</small>}
+  {error&&<p role="alert">{error}</p>}
+ </details>;
+}
 
 const states:Row={draft:"Borrador",pending:"Pendiente",partial:"Parcial",settled:"Liquidada",cancelled:"Cancelada"};
 type Choice={selected:boolean;mark_collected:boolean;extra_cash:string};
 const emptyChoice=():Choice=>({selected:false,mark_collected:false,extra_cash:""});
 const blankExchange=()=>({actual_amount:"0",direction:"received",method:"cash",exchange_date:today(),exchange_notes:""});
 export default function CourierSettlements({company,onDirty,initialId,onInitialOpen}:{company:string;onDirty:(dirty:boolean)=>void;initialId?:string;onInitialOpen?:()=>void}){
+ const [query,setQuery]=useState("");
  const [preparing,setPreparing]=useState<string|null>(null);
  const state=useOperation(company,"sales");
  const [history,setHistory]=useState<Row[]>([]),[couriers,setCouriers]=useState<Row[]>([]),[filters,setFilters]=useState({courier:"",state:"",from:"",to:""});
@@ -34,16 +57,14 @@ export default function CourierSettlements({company,onDirty,initialId,onInitialO
  const open=(id?:string)=>state.run(()=>openDocument(id));
  useEffect(()=>{
   let live=true;
-  void state.run(async()=>{
-   if(initialId){
-    onInitialOpen?.();
-    await openDocument(initialId);
-   }
-   const [h,o]=await Promise.all([courierRead(company,"settlements",filters),courierRead(company,"options")]);
-   if(live){setHistory(h);setCouriers(o.couriers);}
-  });
+  void Promise.all([courierRead(company,"settlements",filters),courierRead(company,"options")])
+   .then(([h,o])=>{if(live){setHistory(h);setCouriers(o.couriers);}})
+   .catch(error=>{if(live)state.setError(error.message);});
   return()=>{live=false;};
  },[company,filters]);
+ useEffect(()=>{
+  if(initialId){onInitialOpen?.();void open(initialId);}
+ },[company,initialId]);
  const close=async()=>{if(state.busy)return;if((dirty||exchangeDirty||cancelling)&&!(await confirmAction("Hay cambios sin guardar. ¿Salir sin guardar?")))return;setDocument(null);setPaying(false);setDirty(false);setExchangeDirty(false);setCancelling(false);};
  useEffect(()=>{if(document?.state!=="draft")return;const transfers=new Set(pending.filter(p=>p.payment_method==="transfer").map(p=>p.order_id));if(items.some(i=>transfers.has(i.order_id)&&(i.payment_id||i.collection_pending)))setDirty(true);},[pending,items,document?.state]);
  const eligible=pending.filter(p=>!p.reserved_id||p.reserved_id===document?.id);
@@ -70,56 +91,102 @@ export default function CourierSettlements({company,onDirty,initialId,onInitialO
   await keyedRequest(company,"courier_operations",draft?{id:document.id,admin_complete:true,...exchange,expected_revision:document.revision}:{id:document.id,amount:exchange.actual_amount,method:exchange.method,date:exchange.exchange_date,notes:exchange.exchange_notes,expected_revision:document.revision,expected_remaining:remaining},draft?"settlement_confirm":"settlement_payment");
   setDetail(await courierRead(company,"settlement",{id:document.id}));setPaying(false);setExchangeDirty(false);setExchange(blankExchange());await load();
  });
+ const displayed=history.filter(row=>searchText(settlementNumber(row.number)+" "+row.courier_name).includes(searchText(query.trim())));
+ const openAccount=()=>setAccount(couriers.find(c=>c.id===filters.courier)||null);
+ const canSettle=state.canWrite&&document?.id&&!paying&&document.state!=="cancelled"&&(draft||Math.abs(remaining)>0);
+ const canSave=state.canWrite&&draft&&!paying;
+ const disabledSettle=state.busy||dirty||awaitingPreparation||unresolvedCash;
  return <>
-  <section className="intro"><div><h1><AppIcon name="module.settlements"/> Liquidaciones de mensajería</h1><p>Cobros, envíos e intercambios de dinero con cada mensajero.</p></div><div className="actions">{state.canWrite&&<AppButton disabled={state.busy} onClick={()=>open()}>Nueva liquidación</AppButton>}<AppButton className="secondary" disabled={state.busy} onClick={()=>state.run(load)}>Actualizar</AppButton></div></section>
+  <header className="commercial-list-header"><h1><AppIcon name="module.settlements"/> Liquidaciones</h1>
+   {state.canWrite&&<AppButton iconKey="action.add" disabled={state.busy} onClick={()=>open()}>+ Nueva</AppButton>}
+   <AppButton className="secondary" iconKey="action.refresh" aria-label="Actualizar" title="Actualizar" disabled={state.busy} onClick={()=>state.run(load)}>×</AppButton>
+  </header>
   {!document&&state.error&&<p className="error"><AppIcon name="status.error"/>{state.error}</p>}
-  <section className="catalog"><div className="settlement-filters settings-grid">
-   <label>Mensajero<SearchSelect value={filters.courier} onChange={e=>setFilters({...filters,courier:e.target.value})}><option value="">Todos los mensajeros</option>{couriers.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</SearchSelect></label>
-   <label>Estado<SearchSelect value={filters.state} onChange={e=>setFilters({...filters,state:e.target.value})}><option value="">Todos los estados</option>{Object.entries(states).map(([k,v])=><option key={k} value={k}>{v}</option>)}</SearchSelect></label>
-   <label>Desde<input type="date" value={filters.from} onChange={e=>setFilters({...filters,from:e.target.value})}/></label><label>Hasta<input type="date" min={filters.from||undefined} value={filters.to} onChange={e=>setFilters({...filters,to:e.target.value})}/></label>
-   <div className="form-actions form-wide"><AppButton className="secondary" disabled={!filters.courier} onClick={()=>setAccount(couriers.find(c=>c.id===filters.courier)||null)}>Ver cuenta del mensajero</AppButton><AppButton className="secondary" onClick={()=>setFilters({courier:"",state:"",from:"",to:""})}>Limpiar filtros</AppButton></div>
-  </div><div className="table-wrap"><ResponsiveTable><thead><tr><th>Número</th><th>Fecha</th><th>Mensajero</th><th>Pedidos</th><th>Efectivo cobrado</th><th>Costo de envíos</th><th>Resultado</th><th>Pagado</th><th>Saldo pendiente</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>{history.map(s=><tr key={s.id}><td data-sort-value={s.number}>{settlementNumber(s.number)}</td><td>{s.settled_on}</td><td>{s.courier_name}</td><td data-sort-value={s.order_count}>{s.order_count}</td><td data-sort-value={s.collected}>{money(s.collected)}</td><td data-sort-value={s.shipping_cost}>{money(s.shipping_cost)}</td><td data-sort-value={s.net}>{courierBalanceText(Number(s.net),s.courier_name)}</td><td data-sort-value={s.paid_total}>{money(s.paid_total)}</td><td data-sort-value={s.remaining}>{courierBalanceText(Number(s.remaining),s.courier_name)}</td><td>{states[s.state]}</td><td><AppButton className="secondary" onClick={()=>open(s.id)}>Ver</AppButton></td></tr>)}</tbody></ResponsiveTable></div>{!history.length&&<p className="empty">No hay liquidaciones para estos filtros.</p>}</section>
-  {document&&<div className="overlay"><section className="modal courier-dialog settlement-dialog" role="dialog" aria-modal="true" aria-label="Liquidación de mensajería" data-navigation-dirty={dirty||exchangeDirty||cancelling}>
-   <header className="hierarchy-toolbar"><h2>{document.number?settlementNumber(document.number):"Nueva liquidación"} · {states[document.state]}</h2><AppButton className="secondary" disabled={state.busy} onClick={close}>Cerrar</AppButton></header>
+  <section className="settlement-list">
+   <input type="search" aria-label="Buscar liquidaciones" placeholder="Número de liquidación o mensajero" value={query} onChange={e=>setQuery(e.target.value)}/>
+   <div className="commercial-toggle" role="group" aria-label="Estado de liquidación">
+    {[["","Todas"],["draft","Borradores"],["settled","Liquidadas"],["cancelled","Canceladas"],["pending","Pendientes"],["partial","Parciales"]].map(([key,label])=><button key={key} type="button" className="secondary" aria-pressed={filters.state===key} onClick={()=>setFilters({...filters,state:key})}>{label}</button>)}
+   </div>
+   <div className="commercial-filter-actions">
+    <details className="commercial-details"><summary>Más filtros</summary><div className="commercial-fields">
+      <label>Mensajero<SearchSelect value={filters.courier} onChange={e=>setFilters({...filters,courier:e.target.value})}><option value="">Todos los mensajeros</option>{couriers.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</SearchSelect></label>
+      <label>Fecha desde<input type="date" value={filters.from} onChange={e=>setFilters({...filters,from:e.target.value})}/></label>
+      <label>Fecha hasta<input type="date" min={filters.from||undefined} value={filters.to} onChange={e=>setFilters({...filters,to:e.target.value})}/></label>
+    </div></details>
+    <button className="secondary" type="button" onClick={()=>{setQuery("");setFilters({courier:"",state:"",from:"",to:""});}}>Limpiar filtros</button>
+    {filters.courier&&<button className="secondary" type="button" onClick={openAccount}>Ver cuenta del mensajero</button>}
+   </div>
+   <div className="commercial-desktop table-wrap"><ResponsiveTable><thead><tr><th>Número</th><th>Fecha</th><th>Mensajero</th><th>Pedidos</th><th>Efectivo</th><th>Envíos</th><th>Resultado</th><th>Liquidado</th><th>Saldo</th><th>Estado</th></tr></thead><tbody>{displayed.map(s=><tr key={s.id}><td data-sort-value={s.number}><button className="commercial-link" type="button" onClick={()=>open(s.id)}>{settlementNumber(s.number)}</button></td><td data-sort-value={s.settled_on}>{dateLabel(s.settled_on)}</td><td>{s.courier_name}</td><td data-sort-value={s.order_count}>{s.order_count}</td><td data-sort-value={s.collected}>{money(s.collected)}</td><td data-sort-value={s.shipping_cost}>{money(s.shipping_cost)}</td><td data-sort-value={s.net} className={courierBalanceClass(Number(s.net))}>{settlementResult(Number(s.net),s.state)}</td><td data-sort-value={s.paid_total}>{money(s.paid_total)}</td><td data-sort-value={s.remaining}>{money(s.remaining)}</td><td>{states[s.state]||s.state}</td></tr>)}</tbody></ResponsiveTable></div>
+   <div className="commercial-mobile">{displayed.map(s=><article className="commercial-card" key={s.id}>
+    <button type="button" className="commercial-card-open" onClick={()=>open(s.id)}>
+     <span className="commercial-card-heading"><strong>{settlementNumber(s.number)}</strong><span className="commercial-chip">{states[s.state]||s.state}</span></span>
+     <span>{s.courier_name} · {dateLabel(s.settled_on)} · {s.order_count} {Number(s.order_count)===1?"pedido":"pedidos"}</span>
+     <span className="commercial-card-heading"><small>Efectivo {money(s.collected)}</small><small>Envíos {money(s.shipping_cost)}</small></span>
+     <strong className={courierBalanceClass(Number(s.net))}>{settlementResult(Number(s.net),s.state)}</strong>
+    </button>
+    <details className="commercial-details"><summary aria-label="Importe liquidado y saldo pendiente">Detalles</summary><p>Liquidado {money(s.paid_total)} · Saldo pendiente {money(s.remaining)}</p></details>
+   </article>)}</div>
+   {!displayed.length&&<p className="empty">No hay liquidaciones para estos filtros.</p>}
+  </section>
+  {document&&<div className="overlay commercial-overlay"><section className="modal courier-dialog settlement-dialog commercial-dialog" role="dialog" aria-modal="true" aria-label="Liquidación de mensajería" data-navigation-dirty={dirty||exchangeDirty||cancelling}>
+   <header className="commercial-header"><div><h2>{document.number?settlementNumber(document.number):"Nueva liquidación"}</h2><small>{states[document.state]} · {dateLabel(document.settled_on)}</small></div><AppButton className="secondary" iconKey="action.cancel" aria-label="Cerrar" disabled={state.busy} onClick={close}>×</AppButton></header>
+   <div className="commercial-body">
    {state.error&&<p className="error"><AppIcon name="status.error"/>{state.error}</p>}
-   <form data-dirty-managed onSubmit={e=>{e.preventDefault();void save();}}><fieldset className="settings-grid" disabled={!state.canWrite||state.busy||!draft}>
+   <form id="settlement-draft" data-dirty-managed onSubmit={e=>{e.preventDefault();void save();}}><fieldset className="commercial-fields" disabled={!state.canWrite||state.busy||!draft}>
     <label>Mensajero<SearchSelect required value={document.courier_id} onChange={e=>{setDocument({...document,courier_id:e.target.value});setChoices({});setDirty(true);}}><option value="">Seleccionar mensajero</option>{couriers.filter(c=>c.active||c.id===document.courier_id).map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</SearchSelect></label>
     <label>Fecha de liquidación<input type="date" required value={document.settled_on} onChange={e=>{setDocument({...document,settled_on:e.target.value});setDirty(true);}}/></label>
     <label className="form-wide">Observaciones · opcional<input maxLength={2000} value={document.notes} onChange={e=>{setDocument({...document,notes:e.target.value});setDirty(true);}}/></label>
    </fieldset>
    {draft?<>
     <div className="hierarchy-toolbar"><h3>Pedidos disponibles para liquidación</h3><label className="settlement-check"><input type="checkbox" disabled={!state.canWrite||state.busy||!eligible.length} checked={eligible.length>0&&chosen.length===eligible.length} onChange={e=>{const checked=e.target.checked;setChoices(old=>Object.fromEntries(eligible.map(p=>[p.order_id,{...(old[p.order_id]||emptyChoice()),selected:checked}])));setDirty(true);}}/> Seleccionar todos</label></div>
-    <p>Marca el efectivo que realmente cobró el mensajero. El saldo pendiente de una factura no se considera cobrado automáticamente.</p>
-    <div className="table-wrap"><ResponsiveTable><thead><tr><th>Seleccionar</th><th>Pedido</th><th>Preparación</th><th>Cliente y dirección</th><th>Total / Pagado a OHANA</th><th>Efectivo cobrado</th><th>Costo real del envío</th></tr></thead><tbody>{pending.map(p=>{const choice=choices[p.order_id]||emptyChoice(),reserved=!!p.reserved_id&&p.reserved_id!==document.id;return <tr key={p.order_id}>
-     <td data-sort-value={choice.selected?1:0}><input aria-label={`Incluir pedido ${p.number}`} type="checkbox" disabled={reserved||!state.canWrite||state.busy} checked={choice.selected} onChange={e=>choose(p.order_id,{selected:e.target.checked})}/></td><td data-sort-value={p.number}>#{p.invoice_number||p.number}{reserved&&<small>Reservada en {settlementNumber(p.reserved_number)}</small>}</td><td data-sort-value={p.needs_preparation?0:1}>{p.needs_preparation?<AppButton type="button" className="secondary" disabled={!state.canWrite||state.busy||reserved} onClick={()=>setPreparing(p.order_id)}>Confirmar preparación</AppButton>:"Preparada"}</td><td>{p.customer}<small>{p.address}</small></td><td data-sort-value={p.invoice_total}>{money(p.invoice_total)}<small>Pagado a OHANA {money(p.direct_paid??0)}</small></td>
-     <td data-sort-value={p.payment_method==="transfer"?0:Number(p.collected)+(choice.mark_collected?Number(choice.extra_cash||0):0)}>{p.payment_method==="transfer"?<small>Transferencia · solo envío</small>:<><strong>{money(Number(p.collected)+(choice.mark_collected?Number(choice.extra_cash||0):0))}</strong>{Number(p.collected)>0&&<small>Ya registrado en Ventas: {money(p.collected)}</small>}
-      {p.needs_preparation&&Number(p.expected_cash)>0&&<p className="settlement-invoice-balance">Efectivo por cobrar: {money(p.expected_cash)}</p>}
-      {!p.needs_preparation&&Number(p.expected_cash)>0&&<><label className="settlement-check"><input type="checkbox" checked={choice.mark_collected} disabled={!choice.selected||!state.canWrite||state.busy} onChange={e=>choose(p.order_id,{mark_collected:e.target.checked,extra_cash:e.target.checked?String(p.expected_cash):""})}/> Confirmar efectivo recibido</label><MoneyInput aria-label={`Efectivo adicional cobrado del pedido ${p.number}`} required={choice.mark_collected&&choice.selected} min="0.01" disabled={!choice.mark_collected||!choice.selected||!state.canWrite||state.busy} value={choice.extra_cash} onChange={e=>choose(p.order_id,{extra_cash:e.target.value})}/><p className="settlement-invoice-balance">Pendiente de la factura: {money(p.expected_cash)}</p></>}
-     </>}</td><td data-sort-value={p.shipping_cost}>{money(p.shipping_cost)}</td>
-    </tr>;})}</tbody></ResponsiveTable></div>
+    <div className="commercial-invoices">{pending.map(p=>{
+     const choice=choices[p.order_id]||emptyChoice(),reserved=!!p.reserved_id&&p.reserved_id!==document.id;
+     const disabled=reserved||!state.canWrite||state.busy;
+     const invoiceBalance=p.balance??(p.payment_method==="transfer"?null:p.expected_cash);
+     return <article className="commercial-card" key={p.order_id}>
+      <label className="settlement-check"><input aria-label={`Incluir pedido ${p.number}`} type="checkbox" disabled={disabled} checked={choice.selected} onChange={e=>choose(p.order_id,{selected:e.target.checked})}/> <strong>{p.customer}</strong></label>
+      <div className="commercial-card-heading"><small>#{p.invoice_number||p.number}{p.zone?" · "+deliveryZoneLabel(p.zone):p.department?" · "+p.department:p.address?" · "+p.address.split(/[·,]/)[0].slice(0,44):""}</small><span className="commercial-chip">{p.needs_preparation?"Pendiente de preparar":"Preparada"}</span></div>
+      {reserved&&<small>Reservada en {settlementNumber(p.reserved_number)}</small>}
+      <dl className="commercial-metrics"><div><dt>Total</dt><dd>{money(p.invoice_total)}</dd></div><div><dt>Pagado a OHANA</dt><dd>{money(p.direct_paid??0)}</dd></div><div><dt>Pendiente</dt><dd><strong>{invoiceBalance==null?"Ver entrega":money(invoiceBalance)}</strong></dd></div></dl>
+      <div className="commercial-card-heading"><small>Costo real del envío</small><strong>{money(p.shipping_cost)}</strong></div>
+      {p.needs_preparation&&<button type="button" className="secondary" disabled={disabled} onClick={()=>setPreparing(p.order_id)}>Confirmar preparación</button>}
+      {p.payment_method==="transfer"?<small>Transferencia · solo envío</small>:<>
+       {Number(p.collected)>0&&<small>Efectivo ya registrado {money(p.collected)}</small>}
+       {!p.needs_preparation&&Number(p.expected_cash)>0&&<>
+        <label className="settlement-check"><input type="checkbox" checked={choice.mark_collected} disabled={disabled||!choice.selected} onChange={e=>choose(p.order_id,{mark_collected:e.target.checked,extra_cash:e.target.checked?String(p.expected_cash):""})}/> Confirmar efectivo cobrado</label>
+        {choice.mark_collected&&choice.selected&&<label>Importe cobrado<MoneyInput compact required min="0.01" disabled={disabled} value={choice.extra_cash} onChange={e=>choose(p.order_id,{extra_cash:e.target.value})}/></label>}
+       </>}
+      </>}
+      <InvoiceDelivery company={company} invoice={p}/>
+     </article>;
+    })}</div>
     {!pending.length&&<p>No hay pedidos disponibles para este mensajero.</p>}
-    {state.canWrite&&<div className="form-actions"><AppButton disabled={state.busy||!chosen.length}>Guardar borrador</AppButton></div>}
    </>:<div className="table-wrap"><ResponsiveTable><thead><tr><th>Pedido</th><th>Fecha de entrega</th><th>Cliente</th><th>Concepto</th><th>Importe histórico</th></tr></thead><tbody>{items.map(i=><tr key={i.id}><td>#{i.snapshot.number}</td><td>{i.snapshot.delivered_at?new Date(i.snapshot.delivered_at).toLocaleDateString("es-GT"):"—"}</td><td>{i.snapshot.customer}</td><td>{i.delivery_id?"Costo de envío":"Efectivo cobrado"}</td><td data-sort-value={i.amount}>{money(i.amount)}</td></tr>)}</tbody></ResponsiveTable></div>}
    </form>
-   <section className="settlement-summary"><h3>Resumen</h3><dl>
+   <section className="settlement-summary"><h3>Resumen · {draft?chosen.length:new Set(items.map(i=>i.order_id)).size} facturas</h3><dl>
     <div><dt>Efectivo cobrado por el mensajero</dt><dd>{money(collected)}</dd></div><div><dt>Costo de envíos</dt><dd>{money(cost)}</dd></div>
-    <div className="settlement-final"><dt>{draft?"Resultado del borrador":"Importe original"}</dt><dd>{courierBalanceText(net,courierName)}</dd></div>
+    <div className="settlement-final"><dt>{draft?"Resultado del borrador":"Importe original"}</dt><dd className={courierBalanceClass(net)}>{settlementResult(net,document.state)}</dd></div>
     {!draft&&document.state!=="cancelled"&&<><div><dt>Importe pagado</dt><dd>{money(paidTotal)}</dd></div><div className="settlement-final"><dt>Saldo pendiente</dt><dd className={courierBalanceClass(remaining)}>{courierBalanceText(remaining,courierName)}</dd></div></>}
    </dl></section>
    <p className="muted">Saldo acumulado de {courierName}: {courierBalanceText(balance,courierName)}</p>
-   {state.canWrite&&document.id&&!paying&&document.state!=="cancelled"&&(draft||Math.abs(remaining)>0)&&<div className="form-actions"><AppButton disabled={state.busy||dirty||awaitingPreparation||unresolvedCash} onClick={beginPayment}>{draft?"Liquidar":"Registrar pago"}</AppButton>{dirty&&<span>Guarda primero el borrador.</span>}{awaitingPreparation&&<span>Confirma la preparación de las facturas seleccionadas.</span>}{!awaitingPreparation&&unresolvedCash&&<span>Confirma el efectivo pendiente y resuelve cualquier diferencia antes de liquidar.</span>}</div>}
-   {paying&&state.canWrite&&<form onSubmit={e=>{e.preventDefault();void confirm();}}><fieldset className="settings-grid" disabled={state.busy}>
+   {canSettle&&disabledSettle&&<p>{dirty?"Guarda primero el borrador.":awaitingPreparation?"Confirma la preparación de las facturas seleccionadas.":unresolvedCash?"Confirma el efectivo pendiente y resuelve las diferencias antes de liquidar.":""}</p>}
+   {paying&&state.canWrite&&<form id="settlement-final-payment" onSubmit={e=>{e.preventDefault();void confirm();}}><fieldset className="commercial-fields" disabled={state.busy}>
     <legend>{draft?"Liquidar":"Registrar pago"}</legend><p className="form-wide settlement-balance">{courierBalanceText(remaining,courierName)}</p>
-    <label>Importe realmente pagado<MoneyInput required min={draft?"0":"0.01"} max={Math.abs(remaining)} value={exchange.actual_amount} onChange={e=>editExchange("actual_amount",e.target.value)}/></label>
+    <label>Importe realmente pagado<MoneyInput compact required min={draft?"0":"0.01"} max={Math.abs(remaining)} value={exchange.actual_amount} onChange={e=>editExchange("actual_amount",e.target.value)}/></label>
     <label>Método<SearchSelect value={exchange.method} onChange={e=>editExchange("method",e.target.value)}><option value="cash">Efectivo</option><option value="transfer">Transferencia bancaria</option></SearchSelect></label>
     <label>Fecha<input required type="date" max={today()} value={exchange.exchange_date} onChange={e=>editExchange("exchange_date",e.target.value)}/></label>
     <label>Observaciones · opcional<input maxLength={2000} value={exchange.exchange_notes} onChange={e=>editExchange("exchange_notes",e.target.value)}/></label>
-    <div className="form-actions form-wide"><AppButton disabled={dirty}>{draft?"Confirmar liquidación":"Guardar pago"}</AppButton><AppButton type="button" className="secondary" onClick={()=>{setPaying(false);setExchangeDirty(false);}}>Cancelar</AppButton></div>
    </fieldset></form>}
    {!draft&&<><h3>Historial de pagos</h3><div className="table-wrap"><ResponsiveTable><thead><tr><th>Fecha</th><th>Importe</th><th>Método</th><th>Observaciones</th><th>Estado</th></tr></thead><tbody>{payments.map(p=><tr key={p.id}><td>{p.occurred_on}</td><td data-sort-value={Math.abs(Number(p.signed_amount))}>{money(Math.abs(Number(p.signed_amount)))}</td><td>{p.method==="cash"?"Efectivo":p.method==="transfer"?"Transferencia":"No registrado"}</td><td>{p.notes||"—"}</td><td>{p.reversed?"Revertido":"Registrado"}</td></tr>)}</tbody></ResponsiveTable></div>{!payments.length&&<p>Sin pagos registrados.</p>}{document.state==="cancelled"&&<p>Liquidación anulada; se conserva su historial.</p>}</>}
    {document.id&&document.state!=="cancelled"&&state.canWrite&&<div className="form-actions"><AppButton className="danger" disabled={state.busy} onClick={()=>{setCancelling(true);setReason("");}}>Anular liquidación</AppButton></div>}
    {cancelling&&<form onSubmit={e=>{e.preventDefault();void state.run(async()=>{if(!(await confirmAction("¿Anular esta liquidación? Se revertirán sus movimientos y cobros generados; se conservará el historial. Si existen compensaciones posteriores, primero deberás revertirlas. No se realizan devoluciones bancarias automáticamente.")))return;await keyedRequest(company,"courier_operations",{id:document.id,reason},"settlement_cancel");setDetail(await courierRead(company,"settlement",{id:document.id}));setCancelling(false);setExchangeDirty(false);await load();});}}><label>Motivo<input required minLength={5} maxLength={500} value={reason} onChange={e=>setReason(e.target.value)}/></label><div className="form-actions"><AppButton disabled={state.busy}>Confirmar anulación</AppButton><AppButton type="button" className="secondary" onClick={()=>setCancelling(false)}>Cancelar</AppButton></div></form>}
    {document.cancel_reason&&<p>Motivo: {document.cancel_reason}</p>}
+   </div>
+   {(canSave||canSettle||(paying&&state.canWrite))&&<footer className="commercial-footer">
+    {paying&&state.canWrite&&<><AppButton type="button" className="secondary" disabled={state.busy} onClick={()=>{setPaying(false);setExchangeDirty(false);}}>Cancelar</AppButton><AppButton type="submit" form="settlement-final-payment" disabled={dirty||state.busy}>{draft?"Confirmar liquidación":"Guardar pago"}</AppButton></>}
+    {canSave&&<AppButton type="submit" form="settlement-draft" disabled={state.busy||!chosen.length}>Guardar borrador</AppButton>}
+    {canSettle&&<AppButton disabled={disabledSettle} onClick={beginPayment}>{draft?"Liquidar":"Registrar pago"}</AppButton>}
+   </footer>}
   </section></div>}
   {account&&<CourierAccountDialog company={company} courier={account} onClose={()=>setAccount(null)} onSaved={load}/>}
  {preparing&&<OrderPreparationDialog finishOnly company={company} orderId={preparing} onClose={()=>setPreparing(null)} onSaved={async()=>{

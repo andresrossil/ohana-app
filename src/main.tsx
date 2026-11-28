@@ -741,7 +741,7 @@ function App() {
           }}
         />
         <main className={["dashboard", "materials", "products"].includes(section) ? "dashboard-main" : undefined}>
-          {section!=="customers"&&section!=="suppliers"&&<header>
+          {section!=="customers"&&section!=="suppliers"&&<header className={["sales","order-preparation","settlements"].includes(section)?"commercial-route":undefined}>
             <span>OHANA / {sectionTitle.toUpperCase()}</span>
             <span className="badge">
               {accessLabel}

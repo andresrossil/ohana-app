@@ -6,11 +6,12 @@ export default function MoneyInput({
   defaultValue,
   name,
   currency = "GTQ",
+  compact = false,
   onChange,
   onFocus,
   onBlur,
   ...props
-}: InputHTMLAttributes<HTMLInputElement> & { currency?: string }) {
+}: InputHTMLAttributes<HTMLInputElement> & { currency?: string; compact?: boolean }) {
   const [local, setLocal] = useState(String(defaultValue ?? "")),
     [focused, setFocused] = useState(false);
   const ref = useRef<HTMLInputElement>(null),
@@ -25,7 +26,7 @@ export default function MoneyInput({
   const code = /^[A-Z]{3}$/.test(currency) ? currency : "GTQ";
   const shown =
     !focused && valid
-      ? new Intl.NumberFormat("es-GT", {
+      ? compact && code === "GTQ" ? "Q" + new Intl.NumberFormat("en-GT", {minimumFractionDigits:2,maximumFractionDigits:2}).format(n) : new Intl.NumberFormat("es-GT", {
           style: "currency",
           currency: code,
           minimumFractionDigits: 2,
