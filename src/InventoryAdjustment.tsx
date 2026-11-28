@@ -482,6 +482,19 @@ export default function InventoryAdjustment({
       </label>
     </div>
   );
+  function addLine() {
+    const line = empty();
+    changed();
+    setRows(previous => [...previous, line]);
+    requestAnimationFrame(() => {
+      const article = document.getElementById(`inventory-line-${line.line_key}`)?.querySelector<HTMLInputElement>("input[data-search-select]");
+      article?.focus({ preventScroll: true });
+      article?.scrollIntoView({ block: "nearest", inline: "nearest" });
+    });
+  }
+  const addLineButton = <AppButton type="button" className="secondary" iconKey="action.add"
+    disabled={state.busy} onClick={addLine}>Agregar línea</AppButton>;
+
   const pasteFields = (
     <>
       <div className={countMode ? "inventory-count-import" : "inventory-paste"}>
@@ -510,16 +523,6 @@ export default function InventoryAdjustment({
         </small>}
       </div>
       <div className={countMode ? "inventory-count-tools" : "actions"}>
-        <AppButton
-          className="secondary"
-          disabled={state.busy}
-          onClick={() => {
-            changed();
-            setRows([...rows, empty()]);
-          }}
-        >
-          Agregar fila
-        </AppButton>
         <AppButton
           className="secondary"
           onClick={() =>
@@ -589,7 +592,7 @@ export default function InventoryAdjustment({
               : values.difference > 0 ? "Entrada" : values.difference < 0 ? "Salida" : "Sin diferencia";
             const action = countActions[r.count_action || "count"];
             return (
-              <tr key={r.line_key} data-count-collapsed={countMode && !rowOpen ? "true" : undefined}>
+              <tr key={r.line_key} id={`inventory-line-${r.line_key}`} data-count-collapsed={countMode && !rowOpen ? "true" : undefined}>
                 <td className={countMode ? "count-index" : undefined}>{i + 1}</td>
                 <td className={countMode ? "count-type" : undefined}>
                   {r.item_kind === "material"
@@ -840,14 +843,15 @@ export default function InventoryAdjustment({
           <fieldset className="compact-form" disabled={state.busy}>
             <div ref={body} className="compact-form-body">
               {alerts}
-              <FormSection title="Datos del documento" icon="status.info">{documentFields}</FormSection>
-              <FormSection title="Pegar filas desde Excel" icon="action.upload">{pasteFields}</FormSection>
+              <FormSection initiallyOpen={false} title="Datos del documento" icon="status.info">{documentFields}</FormSection>
+              <FormSection initiallyOpen={false} title="Pegar filas desde Excel" icon="action.upload">{pasteFields}</FormSection>
               <FormSection title="Detalle de artículos" icon="module.inventory">
-                {rows.length ? itemTable : <p className="muted">Agrega una fila o pega artículos desde Excel.</p>}
+                {rows.length ? itemTable : <p className="muted">Agrega una línea o pega artículos desde Excel.</p>}
+                <div className="inventory-add-line">{addLineButton}</div>
               </FormSection>
               {reviewContent}
             </div>
-            <div className="compact-form-actions inventory-count-footer">{cancel}{reviewButton}</div>
+            <div className="compact-form-actions inventory-count-footer">{addLineButton}{cancel}{reviewButton}</div>
           </fieldset>
         </> : <>
           <header className="catalog-head">
@@ -857,9 +861,9 @@ export default function InventoryAdjustment({
           <fieldset disabled={state.busy}>
             {documentFields}
             {alerts}
-            {!reversal && <>{pasteFields}{itemTable}</>}
+            {!reversal && <>{pasteFields}{itemTable}<div className="inventory-add-line">{addLineButton}</div></>}
             {reviewContent}
-            <div className="actions">{reviewButton}{confirmButton}{cancel}</div>
+            <div className="actions inventory-adjustment-footer">{!reversal&&addLineButton}{reviewButton}{confirmButton}{cancel}</div>
           </fieldset>
         </>}
       </section>

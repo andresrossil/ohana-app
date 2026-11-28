@@ -1,3 +1,4 @@
+import InventoryWallToWall from "./InventoryWallToWall";
 import PurchaseReceiptEditor from "./PurchaseReceiptEditor";
 import PurchasePlanning from "./PurchasePlanning";
 import InventoryAdjustment from "./InventoryAdjustment";
@@ -42,7 +43,7 @@ export default function Inventory({
       movements: [],
     }),
     [receipts, setReceipts] = useState<Row[]>([]),
-    [form, setForm] = useState<"receive" | "adjust" | "count" | null>(null),
+    [form, setForm] = useState<"receive" | "adjust" | "count" | "wall-to-wall" | null>(null),
     [query, setQuery] = useState("");
   async function load() {
     const [d, r] = await Promise.all([
@@ -114,6 +115,7 @@ export default function Inventory({
               <AppButton className="secondary" onClick={()=>setForm("count")}>Conteo de inventario</AppButton>
             </>
           )}
+          {!purchases&&<AppButton className="secondary" onClick={()=>setForm("wall-to-wall")}>Levantamientos de inventario</AppButton>}
           <AppButton
             className="secondary"
             disabled={state.busy}
@@ -163,6 +165,8 @@ export default function Inventory({
           </section>
         </div>
       )}
+      {form==="wall-to-wall"&&<InventoryWallToWall key={company} company={company}
+        onClose={()=>setForm(null)} onPosted={load}/>}
       {(form === "adjust" || form === "count") && (
         <InventoryAdjustment
           key={company+form}

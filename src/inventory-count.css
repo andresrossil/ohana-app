@@ -112,3 +112,25 @@
   }
   .shell .inventory-count-footer > button:last-child { flex: 1.4; }
 }
+
+.shell .inventory-add-line { padding-block: 6px; }
+.shell .inventory-adjustment-footer {
+  position: sticky;
+  bottom: 0;
+  z-index: 3;
+  padding: 6px;
+  background: var(--admin-surface);
+}
+.shell .inventory-adjustment tbody :is(input,select) { min-height: 40px; }
+@media (min-width: 761px) {
+  .shell .inventory-adjustment .table-wrap {
+    max-height: 52dvh;
+    overflow: auto;
+  }
+  .shell .inventory-adjustment thead {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: var(--admin-surface);
+  }
+}
