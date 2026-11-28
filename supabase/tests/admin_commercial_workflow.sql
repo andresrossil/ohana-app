@@ -132,9 +132,27 @@ begin
   end;
   if not caught then raise exception 'Liquidación aceptó una factura sin preparar';end if;
   perform public.sales_fulfillment(c,'finish',gen_random_uuid(),jsonb_build_object('order',o,'expected_stage','invoiced'));
-  perform public.courier_operations(c,'settlement_save',gen_random_uuid(),jsonb_build_object('id',sid,'admin_draft',true,
-    'courier',courier,'date',current_date,'orders',jsonb_build_array(jsonb_build_object('order',o,'mark_collected',true,'extra_cash',20))));
-  perform public.courier_operations(c,'settlement_confirm',gen_random_uuid(),jsonb_set(payload,'{actual_amount}','15'));
+  payload:=jsonb_build_object('draft',jsonb_build_object('id',sid,
+    'expected_revision',(select st.revision from public.courier_settlements st where st.id=sid),
+    'courier',courier,'date',current_date,'orders',jsonb_build_array(jsonb_build_object('order',o,'mark_collected',true,'extra_cash',20))),
+    'expected_collected',20,'expected_shipping',5,'method','transfer','exchange_date',current_date);
+  begin
+    perform public.finalize_courier_settlement(c,gen_random_uuid(),jsonb_set(payload,'{expected_shipping}','6'));
+    raise exception 'Se aceptó un importe desactualizado';
+  exception when others then
+    if sqlerrm not like 'Cambió el efectivo%' then raise;end if;
+  end;
+  if (select st.revision from public.courier_settlements st where st.id=sid)<>(payload#>>'{draft,expected_revision}')::int then
+    raise exception 'El intento fallido modificó el borrador';
+  end if;
+  declare retry_key uuid:=gen_random_uuid(); first_result jsonb;
+  begin
+    first_result:=public.finalize_courier_settlement(c,retry_key,payload);
+    if first_result<>public.finalize_courier_settlement(c,retry_key,payload) then raise exception 'Reintento inconsistente';end if;
+  end;
+  if (select count(*) from public.courier_account_movements where settlement_id=sid)<>2 then
+    raise exception 'Se duplicaron movimientos del mensajero';
+  end if;
   if (select state from public.courier_settlements where id=sid)<>'settled' then raise exception 'No liquidada';end if;
   if (select count(*) from public.order_payments where company_id=c and order_id=o and receiver='courier' and confirmed)<>1 then raise exception 'Cobro de ruta incorrecto';end if;
   if (select on_hand from public.inventory_balances where company_id=c and item_id=v)<>initial_qty-1 then raise exception 'Liquidación descargó inventario';end if;
@@ -197,10 +215,10 @@ begin
   if (select net from public.courier_settlements where id=sid)<>0 then raise exception 'Neto mixto de cero incorrecto';end if;
   -- Remove the transferred invoice from the draft and add it to a different draft.
   perform public.courier_operations(c,'settlement_save',gen_random_uuid(),payload||jsonb_build_object('id',sid,'orders',jsonb_build_array(list->0)));
-  second_sid:=(public.courier_operations(c,'settlement_save',gen_random_uuid(),payload||jsonb_build_object('orders',jsonb_build_array(list->1)))->>'id')::uuid;
+  second_sid:=(public.finalize_courier_settlement(c,gen_random_uuid(),
+    jsonb_build_object('draft',payload||jsonb_build_object('orders',jsonb_build_array(list->1)),
+      'expected_collected',0,'expected_shipping',5,'method','cash','exchange_date',current_date))->>'id')::uuid;
   if (select net from public.courier_settlements where id=second_sid)<>-5 then raise exception 'La transferencia entró como efectivo';end if;
-  perform public.courier_operations(c,'settlement_confirm',gen_random_uuid(),
-    jsonb_build_object('id',second_sid,'admin_complete',true,'actual_amount',5,'method','cash','exchange_date',current_date));
   if (select state from public.courier_settlements where id=second_sid)<>'settled' then raise exception 'No liquidó saldo a favor del mensajero';end if;
   begin
     perform public.courier_operations(c,'settlement_save',gen_random_uuid(),payload||jsonb_build_object('orders',jsonb_build_array(list->1)));
@@ -208,6 +226,16 @@ begin
   exception when others then
     if sqlerrm='Liquidación duplicada aceptada' then raise;end if;
   end;
+  perform public.courier_operations(c,'settlement_cancel',gen_random_uuid(),
+    jsonb_build_object('id',second_sid,'reason','Anulación de liquidación sintética'));
+  perform public.finalize_courier_settlement(c,gen_random_uuid(),
+    jsonb_build_object('draft',payload||jsonb_build_object('id',sid,
+      'expected_revision',(select st.revision from public.courier_settlements st where st.id=sid),'orders',list),
+      'expected_collected',20,'expected_shipping',20,'method','cash','exchange_date',current_date));
+  if (select state from public.courier_settlements where id=sid)<>'settled'
+    or exists(select 1 from public.courier_account_movements where settlement_id=sid and kind='exchange') then
+    raise exception 'La liquidación en cero generó un intercambio';
+  end if;
 end $$;
 select public.store_settings('35000000-0000-0000-0000-000000000001','{"published":true,"pickup":true,"delivery":true}');
 set local role anon;

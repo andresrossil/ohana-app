@@ -9,3 +9,9 @@ export function settlementResult(amount: number, state: string) {
     : amount > 0 ? "Por recibir" : "Por pagar";
   return label + " " + compactMoney(Math.abs(amount));
 }
+
+export function settlementTone(amount: number, state: string) {
+  if (!amount || state === "cancelled") return "neutral";
+  if (state === "settled") return "settled";
+  return amount > 0 ? "due" : "payable";
+}

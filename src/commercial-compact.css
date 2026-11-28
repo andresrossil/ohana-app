@@ -73,3 +73,36 @@
 .commercial-fields label > input,.commercial-fields label > .money-input {width:100%;box-sizing:border-box;}
 .commercial-dialog input[readonly] {background:var(--admin-secondary);}
 .commercial-desktop th,.commercial-desktop td {padding:6px 8px;}
+
+:is(.settlement-list,.settlement-dialog) [data-tone="due"],
+:is(.settlement-list,.settlement-dialog) [data-state="draft"],
+:is(.settlement-list,.settlement-dialog) [data-state="pending"],
+:is(.settlement-list,.settlement-dialog) [data-state="partial"] {color:#8a5000;}
+:is(.settlement-list,.settlement-dialog) [data-tone="payable"],
+:is(.settlement-list,.settlement-dialog) [data-state="cancelled"],
+.shell .settlement-dialog .settlement-annul {color:#a61e32;}
+:is(.settlement-list,.settlement-dialog) [data-tone="settled"],
+:is(.settlement-list,.settlement-dialog) [data-state="settled"] {color:#176237;}
+:is(.settlement-list,.settlement-dialog) [data-tone="neutral"] {color:var(--admin-muted);}
+.settlement-list .commercial-card {padding:4px 8px;}
+.shell .settlement-list .commercial-card-open {gap:3px;padding:3px 0;}
+.settlement-list .commercial-card-heading {column-gap:12px;}
+.settlement-list .commercial-card small {font-size:.76rem;}
+.settlement-card-amounts {display:flex;flex-wrap:wrap;gap:4px 8px;}
+.settlement-card-amounts small + small {padding-inline-start:8px;border-inline-start:1px solid var(--admin-border);}
+.settlement-list .commercial-card .commercial-details {margin:2px 0 0;}
+.settlement-list .commercial-card .commercial-details summary {padding:4px 0;font-size:.78rem;}
+.shell main > header.settlement-list-header {position:static;}
+.settlement-status-filters {flex-wrap:nowrap;overflow-x:auto;max-width:100%;padding:2px;scrollbar-width:thin;}
+.settlement-status-filters button {flex:none;}
+.settlement-invoice-heading,.settlement-cash {display:flex;align-items:center;flex-wrap:wrap;justify-content:space-between;gap:4px 8px;}
+.settlement-invoice-heading h3 small {display:block;font-weight:normal;}
+.shell .settlement-invoice-heading .settlement-check {margin:0;}
+.settlement-cash > label:not(.settlement-check) {flex:1 1 7rem;}
+.settlement-dialog .commercial-details > input {width:100%;}
+.shell .settlement-dialog .settlement-summary {padding:8px 10px;margin:8px 0;}
+.shell .settlement-dialog .settlement-summary dl > div {display:flex;justify-content:space-between;gap:8px;padding-bottom:0;}
+.shell .settlement-dialog .settlement-summary .settlement-final {padding-top:5px;}
+.settlement-summary dd {text-align:end;}
+.settlement-exchange {margin-bottom:6px;}
+.shell .settlement-dialog .settlement-annul {border:0;background:transparent;font-size:.85rem;}
