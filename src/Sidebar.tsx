@@ -1,4 +1,3 @@
-import { DISCLOSURE_INITIALLY_OPEN } from "./disclosure-default";
 import { onIdleRefresh } from "./idle-refresh";
 import SearchSelect from "./SearchSelect";
 import { AppIcon, AppButton } from "./AppIcon";
@@ -306,7 +305,7 @@ export default function Sidebar({
             {categories.map(({ id, label, icon, items }) => {
               const visible = items.filter(canShow);
               if (!visible.length) return null;
-              const isExpanded = expanded[id] ?? DISCLOSURE_INITIALLY_OPEN;
+              const isExpanded = expanded[id] ?? false;
               const contentId = `ohana-nav-${id}`;
               return <div className="sidebar-category" key={id}>
                 <button
@@ -314,7 +313,7 @@ export default function Sidebar({
                   className={activeCategory === id && !isExpanded ? "sidebar-category-toggle selected" : "sidebar-category-toggle"}
                   aria-expanded={isExpanded}
                   aria-controls={contentId}
-                  onClick={() => setExpanded(previous => ({ ...previous, [id]: !(previous[id] ?? DISCLOSURE_INITIALLY_OPEN) }))}
+                  onClick={() => setExpanded(previous => ({ ...previous, [id]: !previous[id] }))}
                 >
                   <span aria-hidden="true"><NavIcon name={icon} /></span>
                   {label}

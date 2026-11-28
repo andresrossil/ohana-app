@@ -21,7 +21,7 @@ export default function Notes({ company, user, canManage, onDirty }: {
   const [labels, setLabels] = useState<NoteLabel[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [collapsed, setCollapsed] = useState<string[]>([]);
+  const [groupExpansion, setGroupExpansion] = useState<Record<string, boolean>>({});
   const [view, setView] = useState<"groups" | "editor">("groups");
   const [query, setQuery] = useState("");
   const [groupFilter, setGroupFilter] = useState("");
@@ -212,8 +212,13 @@ export default function Notes({ company, user, canManage, onDirty }: {
     else groupedNotes.set(id, [note]);
   }
 
+  function groupIsExpanded(id: string) {
+    return groupExpansion[id] ?? (Boolean(query.trim()) && Boolean(groupedNotes.get(id)?.length));
+  }
+
   function toggleGroup(id: string) {
-    setCollapsed(items => items.includes(id) ? items.filter(item => item !== id) : [...items, id]);
+    const expanded = groupIsExpanded(id);
+    setGroupExpansion(items => ({ ...items, [id]: !expanded }));
     setMenu("");
   }
 
@@ -333,7 +338,7 @@ export default function Notes({ company, user, canManage, onDirty }: {
   </form>;
 
   function folderButton(id: string, title: string) {
-    const expanded = !collapsed.includes(id);
+    const expanded = groupIsExpanded(id);
     return <button type="button" className="note-group-choice" aria-expanded={expanded} onClick={() => toggleGroup(id)}>
       <AppIcon name={expanded ? "action.collapse" : "action.expand"} />
       {expanded ? <FolderOpen size={16} aria-hidden="true" /> : <Folder size={16} aria-hidden="true" />}
@@ -382,7 +387,6 @@ export default function Notes({ company, user, canManage, onDirty }: {
           position={(groups.at(-1)?.position ?? 0) + 1} onClose={() => setGroupForm(undefined)}
           onSaved={item => {
             setLabels(items => [...items.filter(label => label.id !== item.id), item]);
-            setCollapsed(items => items.filter(id => id !== item.id));
             setGroupForm(undefined);
           }} />}
         {deletion && <form className="note-label-form" onSubmit={async event => {
@@ -412,7 +416,7 @@ export default function Notes({ company, user, canManage, onDirty }: {
           <div className="note-inline"><AppButton className="secondary" onClick={() => setDeletion(undefined)}>Cancelar</AppButton>
             <AppButton className="danger" type="submit" disabled={pending}>Eliminar grupo</AppButton></div>
         </form>}
-        <input type="search" placeholder="Buscar notas…" aria-label="Buscar notas" value={query} onChange={event => { setQuery(event.target.value); if (event.target.value.trim()) setCollapsed([]); }} />
+        <input type="search" placeholder="Buscar notas…" aria-label="Buscar notas" value={query} onChange={event => setQuery(event.target.value)} />
         <details className="note-filters">
           <summary>Filtros y orden</summary>
           <div className="note-inline">
@@ -437,13 +441,14 @@ export default function Notes({ company, user, canManage, onDirty }: {
           <AppButton className="secondary" onClick={() => { setGroupFilter(""); setStatusFilter(""); setTagFilters([]); setPinnedOnly(false); setQuery(""); }}>Limpiar filtros</AppButton>
         </details>
 
+        <div className="note-folder-scroll" role="region" aria-label="Lista de grupos y notas" tabIndex={0}>
         {loading ? <p role="status">Cargando notas…</p> : !filtered.length && <p role="status">No hay notas para esta selección.</p>}
         <div className="note-group">
           {folderButton(UNASSIGNED, "Sin clasificar")}
-          {(!collapsed.includes(UNASSIGNED)) && renderFolderNotes(UNASSIGNED)}
+          {groupIsExpanded(UNASSIGNED) && renderFolderNotes(UNASSIGNED)}
         </div>
         {groups.map(item => {
-          const expanded = !collapsed.includes(item.id);
+          const expanded = groupIsExpanded(item.id);
           const editable = canManage || item.created_by === user;
           return <div className="note-group" key={item.id} draggable={canManage && !pending}
             onDragStart={event => { event.stopPropagation(); groupDrag.current = item.id; }}
@@ -479,6 +484,7 @@ export default function Notes({ company, user, canManage, onDirty }: {
             {expanded && renderFolderNotes(item.id)}
           </div>;
         })}
+        </div>
       </aside>
       <article className="note-editor">
         {draft ? <>

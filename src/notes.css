@@ -137,3 +137,29 @@
   font-size: 1.4rem;
 }
 .note-rich:focus-visible, .shell .production-notes .note-title:focus-visible { outline-offset: 2px; }
+
+.note-groups {
+  position: sticky;
+  top: calc(var(--chrome-height, 0px) + 12px);
+  max-height: calc(var(--ohana-vh, 100dvh) - var(--chrome-height, 0px) - 32px);
+  display: flex;
+  flex-direction: column;
+}
+.note-groups > :not(.note-folder-scroll) { flex: none; }
+.note-folder-scroll {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  scrollbar-gutter: stable;
+  padding-inline-end: .25rem;
+}
+.note-folder-scroll .note-actions-pop {
+  position: static;
+  min-width: 0;
+}
+.note-folder-scroll .note-group-row:has(.note-actions-pop) .note-menu { grid-column: 1 / -1; }
+.note-folder-scroll .note-card-menu:has(.note-actions-pop) { position: static; }
+@media (max-width: 800px) {
+  .note-groups { position: static; }
+  .note-folder-scroll { max-height: 60dvh; }
+}
